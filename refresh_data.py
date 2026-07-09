@@ -498,13 +498,30 @@ def _pdate(s):
 
 
 def _parse_mstr(text):
-    """Strategy 8-K 'BTC Update' -> (start, end, acquired, holdings).
+    """Strategy 8-K 'BTC Update' -> (start, end, acquired, holdings, avg_cost).
 
-    Handles three observed shapes: a purchase-week table, a no-purchase-week
-    table (acquired shown as '-'), and a prose no-purchase statement.
+    Handles four observed shapes: a purchase-week table, a no-purchase-week
+    table (acquired shown as '-'), a prose no-purchase statement, and the
+    sale-week format first seen 2026-07-06 ("BTC Sold ... As of DATE
+    Aggregate BTC Holdings N"). acquired is negative for sale weeks.
+    avg_cost is the reported aggregate average purchase price when present.
     """
     if "BTC Update" not in text:
         return None
+    # sale weeks (first seen 2026-07-06): use the LAST period block + the final
+    # "As of" holdings figure; column headers carry footnote digits like "(2)",
+    # so gaps are bounded non-greedy scans rather than [^0-9]*
+    if "BTC Sold" in text:
+        periods = list(re.finditer(r"During Period\s+(.+?)\s+to\s+([A-Z][a-z]+ \d{1,2}, \d{4})", text))
+        asofs = list(re.finditer(r"As of [A-Z][a-z]+ \d{1,2}, \d{4}\*?\s*Aggregate BTC Holdings"
+                                 r".{0,120}?([\d,]{7,})\s+\$\s*[\d,.]+\s+\$\s*([\d,]+)", text))
+        sold = [int(m.group(1).replace(",", "")) for m in
+                re.finditer(r"BTC Sold.{0,140}?([\d,]{3,})\s*(?:\(\d\))?\s*\$\s*[\d,.]+\s+\$\s*[\d,]+", text)]
+        if periods and asofs:
+            p = periods[-1]
+            h = int(asofs[-1].group(1).replace(",", ""))
+            avg = int(asofs[-1].group(2).replace(",", ""))
+            return (_pdate(p.group(1)), _pdate(p.group(2)), -sum(sold), h, avg)
     dm = re.search(r"During Period\s+(.+?)\s+to\s+([A-Z][a-z]+ \d{1,2}, \d{4})", text)
     if not dm:
         dm = re.search(r"period between\s+(.+?)\s+and\s+([A-Z][a-z]+ \d{1,2}, \d{4})", text, re.I)
@@ -514,15 +531,15 @@ def _parse_mstr(text):
 
     # table row (tolerates "$ 101.3" or "$34.9", and "-" for no-purchase weeks)
     tm = re.search(r"Aggregate BTC Holdings.*?([\d,]+|-)\s+\$\s*[\d,.\-]+\s+\$\s*[\d,.\-]+"
-                   r"\s+([\d,]{5,})\s+\$\s*[\d,.]+\s+\$\s*[\d,]+", text)
+                   r"\s+([\d,]{5,})\s+\$\s*[\d,.]+\s+\$\s*([\d,]+)", text)
     if tm:
         acquired = 0 if tm.group(1).strip() == "-" else int(tm.group(1).replace(",", ""))
-        return (start, end, acquired, int(tm.group(2).replace(",", "")))
+        return (start, end, acquired, int(tm.group(2).replace(",", "")), int(tm.group(3).replace(",", "")))
 
     # prose no-purchase week
     pm = re.search(r"holds approximately ([\d,]{5,}) bitcoin", text, re.I)
     if pm and re.search(r"did not (?:purchase|acquire)", text, re.I):
-        return (start, end, 0, int(pm.group(1).replace(",", "")))
+        return (start, end, 0, int(pm.group(1).replace(",", "")), None)
     return None
 
 
@@ -591,13 +608,19 @@ def fetch_holdings(data, max_points=60):
                 log(f"[skip] EDGAR {tk}: no parseable 8-Ks"); continue
             pts.reverse()
             pts = [p for p in pts if p[1] >= cutoff] or pts
+            # net change from successive holdings is more robust than the reported
+            # acquired column (a fiscal-boundary 8-K can report two periods; sales
+            # split across them would otherwise be understated)
+            acq = [pts[0][2]] + [pts[i][3] - pts[i-1][3] for i in range(1, len(pts))]
             weekly[tk] = {
-                "dates":    [f(e) for (_, e, _, _) in pts],
-                "ranges":   [f"{f(s)} – {f(e)}" if s else f(e) for (s, e, _, _) in pts],
-                "acquired": [a for (_, _, a, _) in pts],
-                "holdings": [h for (_, _, _, h) in pts],
+                "dates":    [f(e) for (_, e, _, _, _) in pts],
+                "ranges":   [f"{f(s)} – {f(e)}" if s else f(e) for (s, e, _, _, _) in pts],
+                "acquired": acq,
+                "holdings": [h for (_, _, _, h, _) in pts],
             }
             cur = pts[-1][3]
+            if pts[-1][4]:      # authoritative avg purchase price from the latest 8-K
+                data["companies"][tk]["avgCost"] = pts[-1][4]
         else:  # ASST — observation-based
             allobs, fetched = {}, 0
             for url in docs():
@@ -630,6 +653,9 @@ def fetch_holdings(data, max_points=60):
 
         data["companies"][tk]["holdings"] = cur
         data["companies"][tk]["pctSupply"] = round(cur / data["btcSupply"] * 100, 4)
+        ye = (data["companies"][tk].get("yearEnd") or {}).get(str(cutoff.year - 1))
+        if ye is not None:
+            data["companies"][tk]["netChangeYtd"] = cur - ye
         log(f"{tk}: {len(weekly[tk]['dates'])} points via EDGAR ({weekly[tk]['dates'][0]} -> "
             f"{weekly[tk]['dates'][-1]}), latest {cur:,} BTC")
     if "MSTR" in weekly or "ASST" in weekly:
