@@ -1,9 +1,9 @@
 {
   "asOf": "2026-07-09",
   "priceAsOf": "2026-07-09",
-  "btcPriceUsd": 62375,
+  "btcPriceUsd": 62721,
   "btcSupply": 21000000,
-  "btcCirculating": 20053912,
+  "btcCirculating": 20054046,
   "companies": {
     "MSTR": {
       "name": "Strategy",
@@ -136,7 +136,7 @@
       "capStructAsOf": "2026-03-31 (10-Q)",
       "dilutedShares": 401.29,
       "marketCapBasic": 29540,
-      "navPremiumBasic": 0.662,
+      "navPremiumBasic": 0.658,
       "treasuryDate": "2026-07-06",
       "bpsHistory": {
         "dates": [
@@ -2662,8 +2662,8 @@
           1.096,
           1.091,
           1.079,
-          1.08,
-          1.07
+          1.073,
+          1.064
         ]
       }
     },
@@ -2718,7 +2718,7 @@
       "capStructAsOf": "2026-06-18 (8-K)",
       "dilutedShares": 112.06,
       "marketCapBasic": 925,
-      "navPremiumBasic": 0.826,
+      "navPremiumBasic": 0.821,
       "treasuryDate": "2026-07-02",
       "bpsHistory": {
         "dates": [
@@ -4058,7 +4058,7 @@
           1.312,
           1.299,
           1.301,
-          1.297
+          1.29
         ]
       }
     }
