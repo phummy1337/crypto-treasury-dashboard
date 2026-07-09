@@ -1,9 +1,9 @@
 {
-  "asOf": "2026-07-08",
-  "priceAsOf": "2026-07-08",
-  "btcPriceUsd": 62162,
+  "asOf": "2026-07-09",
+  "priceAsOf": "2026-07-09",
+  "btcPriceUsd": 62375,
   "btcSupply": 21000000,
-  "btcCirculating": 20053775,
+  "btcCirculating": 20053912,
   "companies": {
     "MSTR": {
       "name": "Strategy",
@@ -12,13 +12,13 @@
       "prefTicker": "STRC",
       "asset": "BTC",
       "accent": "#ff2e97",
-      "stockPrice": 94.03,
-      "dayChangePct": -3.42,
+      "stockPrice": 93.87,
+      "dayChangePct": 0.0,
       "sharesOutstanding": 371.61,
       "betaBtc": 1.61,
       "week52Low": 82.31,
       "week52High": 455.9,
-      "prefPrice": 85.89,
+      "prefPrice": 86.17,
       "holdings": 847363,
       "pctSupply": 4.0351,
       "netChangeYtd": 174000,
@@ -41,7 +41,7 @@
       "prefNotional": 15476,
       "annualObligations": 1711,
       "staking": 0,
-      "prefChangePct": -0.77,
+      "prefChangePct": -0.45,
       "yearEnd": {
         "2020": 70470,
         "2021": 124391,
@@ -136,7 +136,7 @@
       "capStructAsOf": "2026-03-31 (10-Q)",
       "dilutedShares": 401.29,
       "marketCapBasic": 29540,
-      "navPremiumBasic": 0.666,
+      "navPremiumBasic": 0.662,
       "treasuryDate": "2026-07-06",
       "bpsHistory": {
         "dates": [
@@ -1086,7 +1086,7 @@
         ]
       },
       "daysToCover": 1.82,
-      "prefMarket": 12865,
+      "prefMarket": 12894,
       "prefHistory": {
         "dates": [
           "Jul 25",
@@ -1568,7 +1568,7 @@
           87.87,
           88.58,
           86.56,
-          85.81
+          86.17
         ],
         "notional": [
           null,
@@ -2094,7 +2094,8 @@
           "Jul 5",
           "Jul 6",
           "Jul 7",
-          "Jul 8"
+          "Jul 8",
+          "Jul 9"
         ],
         "px": [
           338.41,
@@ -2377,7 +2378,8 @@
           100.77,
           100.77,
           97.36,
-          94.03
+          93.87,
+          93.87
         ],
         "mnav": [
           1.474,
@@ -2660,7 +2662,8 @@
           1.096,
           1.091,
           1.079,
-          1.076
+          1.08,
+          1.07
         ]
       }
     },
@@ -2671,13 +2674,13 @@
       "prefTicker": "SATA",
       "asset": "BTC",
       "accent": "#22d3ee",
-      "stockPrice": 12.29,
-      "dayChangePct": -3.22,
+      "stockPrice": 12.39,
+      "dayChangePct": 0.0,
       "sharesOutstanding": 82.73,
       "betaBtc": 1.29,
       "week52Low": 7.16,
       "week52High": 178.2,
-      "prefPrice": 96.27,
+      "prefPrice": 96.3,
       "holdings": 19882,
       "pctSupply": 0.0947,
       "netChangeYtd": 11600,
@@ -2700,7 +2703,7 @@
       "prefNotional": 783,
       "annualObligations": 102,
       "staking": 0,
-      "prefChangePct": -0.96,
+      "prefChangePct": -0.93,
       "yearEnd": {
         "2025": 0
       },
@@ -2715,7 +2718,7 @@
       "capStructAsOf": "2026-06-18 (8-K)",
       "dilutedShares": 112.06,
       "marketCapBasic": 925,
-      "navPremiumBasic": 0.823,
+      "navPremiumBasic": 0.826,
       "treasuryDate": "2026-07-02",
       "bpsHistory": {
         "dates": [
@@ -3309,7 +3312,7 @@
           97.15,
           97.6,
           97.2,
-          96.19
+          96.3
         ],
         "notional": [
           null,
@@ -3670,7 +3673,8 @@
           "Jul 5",
           "Jul 6",
           "Jul 7",
-          "Jul 8"
+          "Jul 8",
+          "Jul 9"
         ],
         "px": [
           14.76,
@@ -3861,7 +3865,8 @@
           13.11,
           13.11,
           12.7,
-          12.29
+          12.39,
+          12.39
         ],
         "mnav": [
           1.172,
@@ -4052,7 +4057,8 @@
           1.321,
           1.312,
           1.299,
-          1.296
+          1.301,
+          1.297
         ]
       }
     }
@@ -4061,7 +4067,6 @@
     "illustrative": false,
     "daily": true,
     "dates": [
-      "Jul 9",
       "Jul 10",
       "Jul 11",
       "Jul 12",
@@ -4425,10 +4430,10 @@
       "Jul 5",
       "Jul 6",
       "Jul 7",
-      "Jul 8"
+      "Jul 8",
+      "Jul 9"
     ],
     "MSTR": [
-      415.41,
       421.74,
       434.58,
       434.58,
@@ -4792,10 +4797,10 @@
       100.77,
       100.77,
       97.36,
-      94.03
+      93.87,
+      93.87
     ],
     "ASST": [
-      121.0,
       137.2,
       133.2,
       133.2,
@@ -5159,7 +5164,8 @@
       13.11,
       13.11,
       12.7,
-      12.29
+      12.39,
+      12.39
     ]
   },
   "weekly": {
