@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>APYX — Bitcoin Treasury Tracker</title>
+<title>APYX — BTC Treasury &amp; Digital Credit Tracker</title>
 <link rel="icon" href="apyx-logo.svg" type="image/svg+xml">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -204,11 +204,11 @@
   <header class="top">
     <div class="masthead">
       <div class="title">
-        <h1>Bitcoin Treasury <span class="hl">Tracker</span></h1>
-        <p>How <b>MSTR</b> / <b>STRC</b> and <b>ASST</b> / <b>SATA</b> are trending relative to Bitcoin.</p>
+        <h1>BTC Treasury &amp; <span class="hl">Digital Credit</span> Tracker</h1>
+        <p>How Strategy (<b>MSTR</b>) and Strive (<b>ASST</b>) — and their preferred equities <b>STRC</b> and <b>SATA</b> — are trending relative to Bitcoin.</p>
         <div class="legend">
-          <span><span class="dot" style="background:var(--mstr)"></span>MSTR · STRC</span>
-          <span><span class="dot" style="background:var(--asst)"></span>ASST · SATA</span>
+          <span><span class="dot" style="background:var(--mstr)"></span>Strategy — <b>MSTR</b> common · <b>STRC</b> preferred</span>
+          <span><span class="dot" style="background:var(--asst)"></span>Strive — <b>ASST</b> common · <b>SATA</b> preferred</span>
         </div>
       </div>
       <a href="https://apyx.fi" target="_blank" rel="noopener"><img class="logo" src="apyx-logo.svg" alt="APYX"></a>
@@ -480,7 +480,7 @@ function row(cfg){
 }
 
 function headRow(){
-  const c = (k)=>{const o=DATA.companies[k];return `<div class="co" style="color:${o.accent}">${o.ticker} <small>· ${o.prefTicker}</small></div>`;};
+  const c = (k)=>{const o=DATA.companies[k];return `<div class="co" style="color:${o.accent}">${o.ticker} <small>· ${o.name} · ${o.prefTicker} pref</small></div>`;};
   return `<div class="grow headrow"><div class="glabel"></div>${c("MSTR")}${c("ASST")}</div>`;
 }
 
