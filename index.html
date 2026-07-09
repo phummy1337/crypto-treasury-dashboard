@@ -3,130 +3,106 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>BTC Treasury Tracker — MSTR vs ASST</title>
+<title>APYX — Bitcoin Treasury Tracker</title>
+<link rel="icon" href="apyx-logo.svg" type="image/svg+xml">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600;700;800&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,wght@6..144,300..800&display=swap" rel="stylesheet">
 <script src="data.js" onerror="window.__DATA__=undefined"></script>
 <style>
   :root {
-    --bg: #040305;
-    --panel: rgba(13, 9, 12, 0.74);
-    --panel-2: rgba(22, 13, 18, 0.72);
-    --border: rgba(255, 255, 255, 0.18);
-    --border-cyan: rgba(34, 211, 238, 0.28);
-    --text: #f4f6fb;
-    --muted: #b6bccb;
-    --faint: #7e8597;
-    --btc: #ffb13c;
-    --mstr: #ff2e97;
-    --asst: #22d3ee;
-    --red: #ffffff;
-    --purple: #b14aed;
-    --pos: #2bf5b6;
-    --neg: #ff3b5e;
-    --accent: #e8ecf5;
-    --radius: 14px;
-    --shadow: 0 0 0 1px rgba(255,255,255,0.05), 0 12px 34px rgba(0,0,0,0.72), 0 0 26px rgba(255,255,255,0.05);
-    --glow-pink: 0 0 12px rgba(255,46,151,0.55);
-    --glow-cyan: 0 0 12px rgba(34,211,238,0.50);
-    --glow-red: 0 0 12px rgba(255,255,255,0.4);
+    /* APYX brand: near-black, crimson accent, white headlines, gray body (deck + logo) */
+    --bg: #0b0b0c;
+    --panel: rgba(19, 19, 21, 0.62);
+    --panel-2: rgba(28, 28, 31, 0.62);
+    --border: rgba(255, 255, 255, 0.13);
+    --border-red: rgba(220, 20, 60, 0.35);
+    --text: #f5f6f7;
+    --muted: #bdc1c6;
+    --faint: #9aa0a6;
+    --btc: #f7931a;
+    --apyx: #dc143c;
+    --mstr: #ed1946;
+    --asst: #4c9fff;
+    --red: #ed1946;
+    --pos: #34d399;
+    --neg: #ff7a7a;
+    --accent: #e8eaed;
+    --radius: 8px;
+    --shadow: 0 10px 30px rgba(0,0,0,0.55);
     font-synthesis: none;
   }
   * { box-sizing: border-box; }
   body {
     margin: 0;
     background:
-      radial-gradient(55% 30% at 50% 1%, rgba(255,255,255,0.08), transparent 60%),
-      radial-gradient(40% 20% at 50% 0%, rgba(255,46,151,0.04), transparent 66%),
-      linear-gradient(180deg, #08080c 0%, #050507 48%, #020203 100%);
+      radial-gradient(58% 44% at 92% 4%, rgba(220,20,60,0.13), transparent 62%),
+      radial-gradient(46% 38% at 4% 100%, rgba(220,20,60,0.07), transparent 65%),
+      linear-gradient(180deg, #0d0c0c 0%, #0b0b0c 55%, #090909 100%);
     background-attachment: fixed;
     color: var(--text);
-    font-family: "Rajdhani", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-family: "Google Sans Flex", "Google Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     -webkit-font-smoothing: antialiased;
-    line-height: 1.45;
+    line-height: 1.5;
     min-height: 100vh;
   }
-  /* sun glow behind the header */
-  body::before {
-    content: ""; position: fixed; top: -120px; left: 50%; transform: translateX(-50%);
-    width: 460px; height: 460px; border-radius: 50%; z-index: -2; pointer-events: none;
-    background: radial-gradient(circle, rgba(255,255,255,0.16), rgba(255,255,255,0.05) 45%, transparent 70%);
-    filter: blur(8px);
-  }
-  /* retro neon perspective grid floor */
-  body::after {
-    content: ""; position: fixed; left: -25%; right: -25%; bottom: 0; height: 46vh; z-index: -2; pointer-events: none;
-    background-image:
-      linear-gradient(rgba(255,255,255,0.34) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(34,211,238,0.26) 1px, transparent 1px);
-    background-size: 44px 44px;
-    transform: perspective(320px) rotateX(64deg); transform-origin: bottom center;
-    -webkit-mask-image: linear-gradient(transparent 8%, #000 75%);
-    mask-image: linear-gradient(transparent 8%, #000 75%);
-    opacity: 0.45;
-  }
   a { color: var(--accent); text-decoration: none; }
-  a:hover { text-decoration: underline; text-shadow: var(--glow-cyan); }
+  a:hover { text-decoration: underline; }
 
   .wrap { max-width: 1180px; margin: 0 auto; padding: 24px 20px 80px; position: relative; z-index: 1; }
 
   /* ---------- Header ---------- */
   header.top {
     display: flex; flex-direction: column; align-items: stretch;
-    gap: 18px; padding-bottom: 20px; margin-bottom: 28px;
+    gap: 18px; padding-bottom: 22px; margin-bottom: 30px;
     border-bottom: 1px solid var(--border);
-    box-shadow: 0 1px 0 rgba(255,255,255,0.22), 0 8px 24px -16px rgba(255,255,255,0.4);
   }
+  .masthead { display:flex; align-items:flex-start; justify-content:space-between; gap:24px; }
+  .masthead img.logo { height: 30px; margin-top: 4px; }
+  .title .eyebrow { color: var(--faint); font-size: 14px; margin: 0 0 10px; letter-spacing: .2px; }
   .title h1 {
-    margin: 0; font-family: "Orbitron", sans-serif; font-weight: 800; font-size: 35px; letter-spacing: 1px;
-    text-transform: uppercase;
-    background: linear-gradient(92deg, #ff2e97 0%, #ffffff 50%, #22d3ee 100%);
-    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
-    filter: drop-shadow(0 0 16px rgba(255,255,255,0.4));
+    margin: 0; font-weight: 700; font-size: 34px; letter-spacing: .5px; line-height: 1.12;
+    text-transform: uppercase; color: #fff;
   }
-  .title h1 span { -webkit-text-fill-color: var(--faint) !important; filter: none; font-weight:600; }
-  .title p { margin: 9px 0 0; color: var(--muted); font-size: 16.5px; }
-  .title .legend { margin-top: 11px; display:flex; gap:20px; font-size:15px; color:var(--muted); }
-  .dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:6px; vertical-align: middle;
-    box-shadow: 0 0 8px currentColor; }
+  .title h1 .hl { color: var(--red); }
+  .title p { margin: 10px 0 0; color: var(--muted); font-size: 16px; }
+  .title .legend { margin-top: 11px; display:flex; gap:20px; font-size:14.5px; color:var(--muted); }
+  .dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:6px; vertical-align: middle; }
 
   /* header stat bar */
   .statbar { display:grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
   .statbox {
     background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
-    padding: 13px 15px; box-shadow: var(--shadow); position: relative; overflow: hidden;
+    padding: 13px 15px; position: relative; overflow: hidden;
     backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
   }
   .statbox::before { content:""; position:absolute; left:0; top:0; bottom:0; width:3px;
-    background: var(--bx, var(--red)); box-shadow: 0 0 14px var(--bx, var(--red)); }
+    background: var(--bx, var(--red)); }
   .statbox .lbl { font-size: 12.5px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted); white-space: nowrap; }
-  .statbox .val { font-family:"Orbitron",sans-serif; font-size: 25px; font-weight: 700; margin-top: 4px;
-    color: var(--bx, var(--text)); font-variant-numeric: tabular-nums; text-shadow: 0 0 14px color-mix(in srgb, var(--bx, #fff) 45%, transparent); }
+  .statbox .val { font-size: 25px; font-weight: 700; margin-top: 4px;
+    color: var(--bx, var(--text)); font-variant-numeric: tabular-nums; }
   .statbox .sub { font-size: 12.5px; color: var(--faint); margin-top: 3px; }
   .statbox .sub.live { color: var(--pos); }
   .statbox .refresh { margin-top: 8px; display:inline-block; }
   @media (max-width: 900px) { .statbar { grid-template-columns: repeat(2, 1fr); } }
 
   /* ---------- Sections ---------- */
-  section { margin-bottom: 34px; }
+  section { margin-bottom: 40px; }
   .sec-head { display:flex; align-items:center; gap:11px; margin: 0 0 12px; }
-  .sec-head h2 { margin:0; font-family:"Orbitron",sans-serif; font-weight:600; font-size: 20px;
-    letter-spacing: 1.5px; text-transform: uppercase; color: #fff;
-    text-shadow: 0 0 12px rgba(255,255,255,0.5), 0 0 2px rgba(255,255,255,0.6); }
-  .sec-head h2 small { text-shadow:none; }
+  .sec-head h2 { margin:0; font-weight:700; font-size: 21px; letter-spacing: .3px; color: #fff; }
+  .sec-head h2 .secno { color: var(--red); font-weight: 700; margin-right: 8px; }
   .sec-head .tag {
     font-size: 11.5px; text-transform: uppercase; letter-spacing: 1px; color: var(--faint);
     border:1px solid var(--border); border-radius: 999px; padding: 3px 10px;
   }
-  .sec-head .tag.stub { color: var(--btc); border-color: rgba(255,177,60,0.45); box-shadow: 0 0 10px rgba(255,177,60,0.18); }
+  .sec-head .tag.stub { color: var(--btc); border-color: rgba(247,147,26,0.4); }
   .sec-note { color: var(--muted); font-size: 15px; margin: -2px 0 14px; max-width: 820px; line-height: 1.5; }
 
   /* metric grid: label | MSTR | ASST */
   .grid {
     background: var(--panel); border:1px solid var(--border); border-radius: var(--radius);
-    overflow: hidden; box-shadow: var(--shadow);
+    overflow: hidden;
     backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px);
   }
   .grow {
@@ -140,24 +116,24 @@
   .grow .glabel small { color: var(--faint); font-size: 13px; font-variant-numeric: normal; }
   .grow .gval { font-size: 19px; font-weight: 600; text-align: right; color: var(--text); }
   .grow .gval .unit { color: var(--faint); font-size: 12.5px; font-weight: 400; margin-left: 3px; }
-  .grow.headrow > div { background: linear-gradient(180deg, rgba(255,46,151,0.10), rgba(34,211,238,0.06)); padding: 12px 18px; }
-  .grow.headrow .co { font-family:"Orbitron",sans-serif; font-weight: 700; font-size: 15px; letter-spacing:.5px;
-    text-align:right; display:flex; align-items:center; justify-content:flex-end; gap:7px; text-shadow: 0 0 10px currentColor; }
-  .grow.headrow .co small { color: var(--faint); font-weight: 400; text-shadow:none; }
+  .grow.headrow > div { background: rgba(255,255,255,0.04); padding: 12px 18px; }
+  .grow.headrow .co { font-weight: 700; font-size: 15px; letter-spacing:.5px;
+    text-align:right; display:flex; align-items:center; justify-content:flex-end; gap:7px; }
+  .grow.headrow .co small { color: var(--faint); font-weight: 400; }
   .grow:hover:not(.headrow) > div { background: rgba(255,255,255,0.06); }
 
   .evhint, .debthint { cursor: help; border-bottom: 1px dotted var(--faint); }
   #evtip {
     position: fixed; z-index: 1000; display: none; pointer-events: none;
-    background: rgba(12,12,16,0.97); border: 1px solid rgba(255,255,255,0.35); border-radius: 10px;
+    background: rgba(16,16,18,0.97); border: 1px solid rgba(255,255,255,0.28); border-radius: 8px;
     padding: 10px 13px; box-shadow: var(--shadow); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
   }
   #debttip {
     position: fixed; z-index: 1000; display: none; pointer-events: none; max-width: 94vw;
-    background: rgba(12,12,16,0.98); border: 1px solid rgba(255,255,255,0.35); border-radius: 11px;
+    background: rgba(16,16,18,0.98); border: 1px solid rgba(255,255,255,0.28); border-radius: 8px;
     padding: 13px 15px; box-shadow: var(--shadow); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
   }
-  #debttip .et-title { font-family:"Orbitron",sans-serif; font-size: 11.5px; letter-spacing:.5px; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; }
+  #debttip .et-title { font-size: 11.5px; letter-spacing:.8px; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; font-weight: 600; }
   #debttip .dt-sum { font-size: 13px; color: var(--muted); margin-bottom: 10px; }
   #debttip .dt-sum b { color: #fff; font-weight: 700; }
   #debttip table.dt { border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 13px; }
@@ -166,30 +142,19 @@
   #debttip table.dt td { text-align: right; padding: 4px 12px; color: var(--text); }
   #debttip table.dt td:first-child { color: #fff; font-weight: 600; }
   #debttip .dt-note { font-size: 11.5px; color: var(--faint); margin-top: 9px; max-width: 540px; line-height: 1.45; }
-  #evtip .et-title { font-family:"Orbitron",sans-serif; font-size: 11.5px; letter-spacing: .5px; color: var(--muted); margin-bottom: 7px; text-transform: uppercase; }
+  #evtip .et-title { font-size: 11.5px; letter-spacing: .8px; color: var(--muted); margin-bottom: 7px; text-transform: uppercase; font-weight: 600; }
   #evtip table { border-collapse: collapse; font-variant-numeric: tabular-nums; }
   #evtip td { padding: 3px 0; font-size: 13.5px; }
   #evtip td:first-child { color: var(--muted); padding-right: 22px; }
   #evtip td:last-child { text-align: right; color: var(--text); font-weight: 600; }
   #evtip tr:last-child td { border-top: 1px solid var(--border); padding-top: 5px; color: var(--text); }
   #evtip tr:last-child td:first-child { color: var(--text); }
-  .pos { color: var(--pos); text-shadow: 0 0 8px rgba(43,245,182,0.4); }
-  .neg { color: var(--neg); text-shadow: 0 0 8px rgba(255,79,123,0.4); }
+  .pos { color: var(--pos); }
+  .neg { color: var(--neg); }
   .better { position: relative; }
   .better::after {
     content: "▲"; font-size: 8px; color: var(--pos); margin-left: 5px; vertical-align: middle;
-    text-shadow: 0 0 8px var(--pos);
   }
-
-  /* editable inputs (capital structure) */
-  input.cell {
-    width: 100%; text-align: right; background: rgba(20,8,42,0.6); border:1px solid var(--border-cyan);
-    color: var(--text); border-radius: 8px; padding: 6px 9px; font: inherit; font-size: 14px;
-    font-variant-numeric: tabular-nums; transition: border-color .15s, box-shadow .15s;
-  }
-  input.cell { font-size: 15.5px; }
-  input.cell:focus { outline:none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(0,229,255,0.25), var(--glow-cyan); }
-  .editwrap { padding: 8px 16px !important; }
 
   /* mini bars for ratio comparison */
   .bar { height:5px; background: var(--panel-2); border-radius:99px; overflow:hidden; margin-top:6px; }
@@ -203,18 +168,18 @@
     display:inline-block; font-size:10px; color: var(--btc); background: rgba(247,147,26,0.08);
     border:1px solid rgba(247,147,26,0.3); border-radius:6px; padding:1px 6px; margin-left:8px;
   }
-  .refresh { font-size:12px; color: var(--accent); cursor:pointer; border:1px solid var(--border-cyan);
-    background: rgba(0,229,255,0.06); border-radius:8px; padding:6px 11px; transition: box-shadow .15s, background .15s; }
-  .refresh:hover { box-shadow: var(--glow-cyan); background: rgba(0,229,255,0.14); }
+  .refresh { font-size:12px; color: var(--accent); cursor:pointer; border:1px solid var(--border);
+    background: rgba(255,255,255,0.04); border-radius:6px; padding:6px 11px; transition: background .15s, border-color .15s; }
+  .refresh:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.3); }
   /* charts */
   .charts { display:grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
   .charts.full { grid-template-columns: 1fr; }
   .chartcard {
     background: var(--panel); border:1px solid var(--border); border-radius: var(--radius);
-    padding: 14px 16px 12px; box-shadow: var(--shadow);
+    padding: 14px 16px 12px;
     backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px);
   }
-  .chartcard h3 { margin:0; font-family:"Orbitron",sans-serif; font-weight:600; font-size: 14px; letter-spacing:.6px;
+  .chartcard h3 { margin:0; font-weight:700; font-size: 14.5px; letter-spacing:.3px;
     display:flex; align-items:center; gap:7px; color:#fff; }
   .chartcard h3 .dot { width:9px; height:9px; }
   .chartcard .ch-sub { color: var(--faint); font-size: 12.5px; margin: 4px 0 10px; }
@@ -233,13 +198,17 @@
 <div class="wrap">
 
   <header class="top">
-    <div class="title">
-      <h1>Bitcoin Treasury Tracker</h1>
-      <p>How <b>MSTR</b> / <b>STRC</b> and <b>ASST</b> / <b>SATA</b> are trending relative to Bitcoin.</p>
-      <div class="legend">
-        <span><span class="dot" style="background:var(--mstr)"></span>MSTR · STRC</span>
-        <span><span class="dot" style="background:var(--asst)"></span>ASST · SATA</span>
+    <div class="masthead">
+      <div class="title">
+        <p class="eyebrow">APYX Research</p>
+        <h1>Bitcoin Treasury <span class="hl">Tracker</span></h1>
+        <p>How <b>MSTR</b> / <b>STRC</b> and <b>ASST</b> / <b>SATA</b> are trending relative to Bitcoin.</p>
+        <div class="legend">
+          <span><span class="dot" style="background:var(--mstr)"></span>MSTR · STRC</span>
+          <span><span class="dot" style="background:var(--asst)"></span>ASST · SATA</span>
+        </div>
       </div>
+      <a href="https://apyx.fi" target="_blank" rel="noopener"><img class="logo" src="apyx-logo.svg" alt="APYX"></a>
     </div>
     <div class="statbar">
       <div class="statbox" style="--bx:var(--btc)">
@@ -273,7 +242,7 @@
 
   <!-- 0. Company Stats -->
   <section id="company">
-    <div class="sec-head"><h2>Company Stats</h2><span class="tag stub" id="tag-company">seed data</span></div>
+    <div class="sec-head"><h2><span class="secno">01.</span>Company Stats</h2><span class="tag stub" id="tag-company">seed data</span></div>
     <p class="sec-note">Equity snapshot for each company and its preferred. Market cap = price × shares; enterprise value adds debt + preferred and nets out cash, so it recomputes with the capital-structure inputs below.</p>
     <div class="charts">
       <div class="chartcard">
@@ -303,7 +272,7 @@
 
   <!-- 1. Accumulation & Holdings -->
   <section id="holdings">
-    <div class="sec-head"><h2>Accumulation &amp; Holdings</h2><span class="tag stub" id="tag-holdings">seed data</span></div>
+    <div class="sec-head"><h2><span class="secno">02.</span>Accumulation &amp; Holdings</h2><span class="tag stub" id="tag-holdings">seed data</span></div>
     <p class="sec-note">Raw scale and pace of accumulation. Higher relative growth shows successful capital deployment.</p>
     <div class="grid" id="grid-holdings"></div>
     <div class="charts">
@@ -323,14 +292,14 @@
 
   <!-- 2. Cost & Efficiency -->
   <section id="cost">
-    <div class="sec-head"><h2>Cost &amp; Efficiency</h2><span class="tag" style="color:var(--pos);border-color:rgba(43,245,182,0.45)">live</span></div>
+    <div class="sec-head"><h2><span class="secno">03.</span>Cost &amp; Efficiency</h2><span class="tag" style="color:var(--pos);border-color:rgba(52,211,153,0.45)">live</span></div>
     <p class="sec-note">Blended cost basis and paper P/L. Lower average cost = better long-term efficiency. Unrealized P/L recomputes live with the BTC price above.</p>
     <div class="grid" id="grid-cost"></div>
   </section>
 
   <!-- 3. Per-Share & Yield -->
   <section id="pershare">
-    <div class="sec-head"><h2>Per-Share &amp; Yield <small style="color:var(--faint);font-weight:400;font-size:12px;">(common shareholders)</small></h2><span class="tag stub" id="tag-pershare">seed data</span></div>
+    <div class="sec-head"><h2><span class="secno">04.</span>Per-Share &amp; Yield <small style="color:var(--faint);font-weight:400;font-size:12px;">(common shareholders)</small></h2><span class="tag stub" id="tag-pershare">seed data</span></div>
     <p class="sec-note">Dilution-adjusted ownership. BTC Yield = % increase in BTC-per-share over the period; positive/growing yield means accumulation is accretive after dilution.</p>
     <div class="grid" id="grid-pershare"></div>
     <div class="charts">
@@ -350,7 +319,7 @@
 
   <!-- 4. Valuation & Premium (incl. CEBE) -->
   <section id="valuation">
-    <div class="sec-head"><h2>Valuation &amp; Premium</h2><span class="tag stub" id="tag-valuation">seed data</span></div>
+    <div class="sec-head"><h2><span class="secno">05.</span>Valuation &amp; Premium</h2><span class="tag stub" id="tag-valuation">seed data</span></div>
     <p class="sec-note">mNAV = EV ÷ BTC reserve, where EV = (price × basic shares) + total debt + total preferred − USD reserve. A premium (&gt;1x) lets a company raise capital cheaply and accretively. CEBE (Common Equity Bitcoin Exposure) is the conservative "after-senior" view: BTC owned by common after subtracting net senior claims (preferred + debt − cash) — it reveals the drag from STRC / SATA and debt.</p>
     <div class="charts">
       <div class="chartcard">
@@ -370,21 +339,27 @@
 
   <!-- 6. Capital Structure (FULLY WORKING, from Excel) -->
   <section id="capital">
-    <div class="sec-head"><h2>Capital Structure</h2><span class="tag" style="color:var(--pos);border-color:rgba(43,245,182,0.45)">live</span></div>
+    <div class="sec-head"><h2><span class="secno">06.</span>Capital Structure</h2><span class="tag" style="color:var(--pos);border-color:rgba(52,211,153,0.45)">live</span></div>
     <p class="sec-note">Leverage and coverage ratios implied by the holdings, cash, debt, and preferred shown under Company Stats above. Crypto NAV uses live holdings × the live BTC price.</p>
     <div class="grid" id="grid-capital"></div>
     <p class="footnote">Leverage and coverage use face/notional values. Lower leverage and higher coverage = a safer structure for common holders; higher leverage can enable faster accumulation.</p>
   </section>
 
   <div class="sources">
-    <b>Sources &amp; assumptions</b> — Capital-structure inputs from your <i>crypto_treasury_comparison.xlsx</i> (prices as of <span id="priceAsOf">—</span>; data as of <span id="dataAsOf">—</span>). Other sections are seeded with reported figures and refresh automatically when <code>refresh_data.py</code> repopulates <code>data.json</code>.
+    <b>Sources &amp; methodology</b> — Prices as of <span id="priceAsOf">—</span>; data as of <span id="dataAsOf">—</span>. Data refreshes automatically throughout market hours.
     <ul>
-      <li>Holdings / purchases / yield: bitcointreasuries.net, treasury.strive.com, strategy.com</li>
-      <li>CEBE, claims %, sats per $100: cebetracker.io</li>
+      <li>Holdings, prices, shares, yields, preferred series: strategy.com / treasury.strive.com data feed</li>
+      <li>Weekly accumulation, debt schedule, historical preferred &amp; cash: SEC EDGAR filings (8-K, 10-Q, XBRL)</li>
+      <li>Days to cover / short interest: Nasdaq (semi-monthly settlement data)</li>
       <li>Live BTC price: CoinGecko API</li>
     </ul>
     <div style="margin-top:8px;color:var(--faint)">Not investment advice. Confirm against each issuer's latest filing before relying on the ratios.</div>
   </div>
+
+  <footer style="display:flex;justify-content:space-between;align-items:center;margin-top:26px;padding-top:16px;border-top:1px solid var(--border);color:var(--faint);font-size:13px;">
+    <a href="https://apyx.fi" target="_blank" rel="noopener" style="color:var(--faint)">APYX.fi</a>
+    <span>© 2026 APYX</span>
+  </footer>
 
 </div>
 
@@ -397,13 +372,13 @@ const SEED = {
   asOf: "2026-06-17", priceAsOf: "2026-06-16",
   btcPriceUsd: 66449, btcSupply: 21000000, btcCirculating: 19900000,
   companies: {
-    MSTR: { name:"Strategy", ticker:"MSTR", prefTicker:"STRC", asset:"BTC", accent:"#ff2e97",
+    MSTR: { name:"Strategy", ticker:"MSTR", prefTicker:"STRC", asset:"BTC", accent:"#ed1946",
       stockPrice:113.66, dayChangePct:-2.49, sharesOutstanding:351.60, betaBtc:1.61, week52Low:104.17, week52High:457.22, prefPrice:99.50,
       holdings:846842, pctSupply:4.0326, netChangeYtd:174000, btcPerDay:1042, btcPerWeek:7300,
       avgCost:75656, satsPerShareBasic:219360, satsPerShareDiluted:null, btcYieldYtd:12.5, btcYieldQtd:null,
       btcGain:null, btcDollarGain:null, cebeSatsPerShare:148000, claimsPct:38, satsPer100:119000,
       mnav:0.73, cebeMnav:1.28, cash:1100, seniorDebt:6714, prefNotional:15475, annualObligations:1712, staking:0 },
-    ASST: { name:"Strive", ticker:"ASST", prefTicker:"SATA", asset:"BTC", accent:"#22d3ee",
+    ASST: { name:"Strive", ticker:"ASST", prefTicker:"SATA", asset:"BTC", accent:"#4c9fff",
       stockPrice:14.94, dayChangePct:-3.24, sharesOutstanding:73.08, betaBtc:1.29, week52Low:7.02, week52High:157.80, prefPrice:98.00,
       holdings:19105, pctSupply:0.0910, netChangeYtd:11600, btcPerDay:70, btcPerWeek:490,
       avgCost:96079, satsPerShareBasic:23979, satsPerShareDiluted:23181, btcYieldYtd:36.0, btcYieldQtd:null,
@@ -740,12 +715,13 @@ function mkChart(id, cfg){
   if(prev) prev.destroy();
   CHARTS[id] = new Chart(el.getContext("2d"), cfg);
 }
-const GRID = "rgba(140,90,200,0.20)", AX = "#c0a6e0";
+const GRID = "rgba(255,255,255,0.07)", AX = "#9aa0a6";
+if(typeof Chart !== "undefined") Chart.defaults.font.family = "'Google Sans Flex','Google Sans',-apple-system,'Segoe UI',Roboto,sans-serif";
 const baseOpts = (extra={}) => Object.assign({
   responsive:true, maintainAspectRatio:false, interaction:{mode:"index",intersect:false},
   plugins:{ legend:{ labels:{ boxWidth:14, boxHeight:14, color:AX, font:{size:13} } },
-            tooltip:{ backgroundColor:"rgba(10,10,14,0.95)", borderColor:"rgba(255,255,255,0.65)", borderWidth:1,
-              titleColor:"#ffffff", bodyColor:"#d6dae6" } }
+            tooltip:{ backgroundColor:"rgba(14,14,16,0.96)", borderColor:"rgba(255,255,255,0.5)", borderWidth:1,
+              titleColor:"#ffffff", bodyColor:"#d5d7db" } }
 }, extra);
 const axis = (title, side="left", opts={}) => Object.assign({
   position:side, title:{display:!!title,text:title,color:AX,font:{size:12}},
@@ -763,7 +739,7 @@ function weekRange(label, year){
 
 function renderCharts(){
   if(typeof Chart === "undefined"){ document.querySelectorAll(".chartwrap").forEach(w=>w.innerHTML='<div style="color:var(--faint);font-size:12px;padding:20px">Charts need network (Chart.js CDN).</div>'); return; }
-  const acc = {MSTR:"#ff2e97", ASST:"#22d3ee"};
+  const acc = {MSTR:"#ed1946", ASST:"#4c9fff"};
 
   // per-section status: flip chip + caption (all sections are now real/derived, no modeled history)
   const setStatus = (sec, illus) => {
@@ -771,7 +747,7 @@ function renderCharts(){
     if(tag){ tag.textContent = illus ? "seed data" : "live";
       tag.classList.toggle("stub", illus);
       tag.style.color = illus ? "" : "var(--pos)";
-      tag.style.borderColor = illus ? "" : "rgba(43,245,182,0.45)"; }
+      tag.style.borderColor = illus ? "" : "rgba(52,211,153,0.45)"; }
     const cap = document.getElementById("illus-"+sec);
     if(cap) cap.textContent = "";
   };
