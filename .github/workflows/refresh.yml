@@ -1,0 +1,43 @@
+# Refreshes data.json / data.js in the cloud so the GitHub Pages site stays
+# current without the local machine being awake. Mirrors the local cron.
+name: Refresh data
+
+on:
+  schedule:
+    - cron: "30 10 * * 1-5"       # 6:30 am ET pre-market (UTC-4)
+    - cron: "*/30 13-21 * * 1-5"  # every 30 min, 9:00 am – 5:30 pm ET, weekdays
+  workflow_dispatch:               # manual "Run workflow" button
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install certifi
+
+      - name: Run refresh
+        run: python refresh_data.py
+
+      - name: Commit updated data (if changed)
+        run: |
+          git config user.name "data-refresh-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data.json data.js
+          if git diff --cached --quiet; then
+            echo "No data changes."
+          else
+            git commit -m "data refresh $(date -u +'%Y-%m-%d %H:%M UTC')"
+            git push
+          fi

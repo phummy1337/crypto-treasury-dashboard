@@ -1,0 +1,4 @@
+refresh.log
+__pycache__/
+.claude/
+.DS_Store

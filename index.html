@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>BTC Treasury Tracker — MSTR vs ASST</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600;700;800&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+<script src="data.js" onerror="window.__DATA__=undefined"></script>
+<style>
+  :root {
+    --bg: #040305;
+    --panel: rgba(13, 9, 12, 0.74);
+    --panel-2: rgba(22, 13, 18, 0.72);
+    --border: rgba(255, 255, 255, 0.18);
+    --border-cyan: rgba(34, 211, 238, 0.28);
+    --text: #f4f6fb;
+    --muted: #b6bccb;
+    --faint: #7e8597;
+    --btc: #ffb13c;
+    --mstr: #ff2e97;
+    --asst: #22d3ee;
+    --red: #ffffff;
+    --purple: #b14aed;
+    --pos: #2bf5b6;
+    --neg: #ff3b5e;
+    --accent: #e8ecf5;
+    --radius: 14px;
+    --shadow: 0 0 0 1px rgba(255,255,255,0.05), 0 12px 34px rgba(0,0,0,0.72), 0 0 26px rgba(255,255,255,0.05);
+    --glow-pink: 0 0 12px rgba(255,46,151,0.55);
+    --glow-cyan: 0 0 12px rgba(34,211,238,0.50);
+    --glow-red: 0 0 12px rgba(255,255,255,0.4);
+    font-synthesis: none;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background:
+      radial-gradient(55% 30% at 50% 1%, rgba(255,255,255,0.08), transparent 60%),
+      radial-gradient(40% 20% at 50% 0%, rgba(255,46,151,0.04), transparent 66%),
+      linear-gradient(180deg, #08080c 0%, #050507 48%, #020203 100%);
+    background-attachment: fixed;
+    color: var(--text);
+    font-family: "Rajdhani", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.45;
+    min-height: 100vh;
+  }
+  /* sun glow behind the header */
+  body::before {
+    content: ""; position: fixed; top: -120px; left: 50%; transform: translateX(-50%);
+    width: 460px; height: 460px; border-radius: 50%; z-index: -2; pointer-events: none;
+    background: radial-gradient(circle, rgba(255,255,255,0.16), rgba(255,255,255,0.05) 45%, transparent 70%);
+    filter: blur(8px);
+  }
+  /* retro neon perspective grid floor */
+  body::after {
+    content: ""; position: fixed; left: -25%; right: -25%; bottom: 0; height: 46vh; z-index: -2; pointer-events: none;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.34) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(34,211,238,0.26) 1px, transparent 1px);
+    background-size: 44px 44px;
+    transform: perspective(320px) rotateX(64deg); transform-origin: bottom center;
+    -webkit-mask-image: linear-gradient(transparent 8%, #000 75%);
+    mask-image: linear-gradient(transparent 8%, #000 75%);
+    opacity: 0.45;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; text-shadow: var(--glow-cyan); }
+
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 24px 20px 80px; position: relative; z-index: 1; }
+
+  /* ---------- Header ---------- */
+  header.top {
+    display: flex; flex-direction: column; align-items: stretch;
+    gap: 18px; padding-bottom: 20px; margin-bottom: 28px;
+    border-bottom: 1px solid var(--border);
+    box-shadow: 0 1px 0 rgba(255,255,255,0.22), 0 8px 24px -16px rgba(255,255,255,0.4);
+  }
+  .title h1 {
+    margin: 0; font-family: "Orbitron", sans-serif; font-weight: 800; font-size: 35px; letter-spacing: 1px;
+    text-transform: uppercase;
+    background: linear-gradient(92deg, #ff2e97 0%, #ffffff 50%, #22d3ee 100%);
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 0 16px rgba(255,255,255,0.4));
+  }
+  .title h1 span { -webkit-text-fill-color: var(--faint) !important; filter: none; font-weight:600; }
+  .title p { margin: 9px 0 0; color: var(--muted); font-size: 16.5px; }
+  .title .legend { margin-top: 11px; display:flex; gap:20px; font-size:15px; color:var(--muted); }
+  .dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:6px; vertical-align: middle;
+    box-shadow: 0 0 8px currentColor; }
+
+  /* header stat bar */
+  .statbar { display:grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+  .statbox {
+    background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 13px 15px; box-shadow: var(--shadow); position: relative; overflow: hidden;
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  }
+  .statbox::before { content:""; position:absolute; left:0; top:0; bottom:0; width:3px;
+    background: var(--bx, var(--red)); box-shadow: 0 0 14px var(--bx, var(--red)); }
+  .statbox .lbl { font-size: 12.5px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted); white-space: nowrap; }
+  .statbox .val { font-family:"Orbitron",sans-serif; font-size: 25px; font-weight: 700; margin-top: 4px;
+    color: var(--bx, var(--text)); font-variant-numeric: tabular-nums; text-shadow: 0 0 14px color-mix(in srgb, var(--bx, #fff) 45%, transparent); }
+  .statbox .sub { font-size: 12.5px; color: var(--faint); margin-top: 3px; }
+  .statbox .sub.live { color: var(--pos); }
+  .statbox .refresh { margin-top: 8px; display:inline-block; }
+  @media (max-width: 900px) { .statbar { grid-template-columns: repeat(2, 1fr); } }
+
+  /* ---------- Sections ---------- */
+  section { margin-bottom: 34px; }
+  .sec-head { display:flex; align-items:center; gap:11px; margin: 0 0 12px; }
+  .sec-head h2 { margin:0; font-family:"Orbitron",sans-serif; font-weight:600; font-size: 20px;
+    letter-spacing: 1.5px; text-transform: uppercase; color: #fff;
+    text-shadow: 0 0 12px rgba(255,255,255,0.5), 0 0 2px rgba(255,255,255,0.6); }
+  .sec-head h2 small { text-shadow:none; }
+  .sec-head .tag {
+    font-size: 11.5px; text-transform: uppercase; letter-spacing: 1px; color: var(--faint);
+    border:1px solid var(--border); border-radius: 999px; padding: 3px 10px;
+  }
+  .sec-head .tag.stub { color: var(--btc); border-color: rgba(255,177,60,0.45); box-shadow: 0 0 10px rgba(255,177,60,0.18); }
+  .sec-note { color: var(--muted); font-size: 15px; margin: -2px 0 14px; max-width: 820px; line-height: 1.5; }
+
+  /* metric grid: label | MSTR | ASST */
+  .grid {
+    background: var(--panel); border:1px solid var(--border); border-radius: var(--radius);
+    overflow: hidden; box-shadow: var(--shadow);
+    backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px);
+  }
+  .grow {
+    display:grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 0;
+    border-top: 1px solid var(--border);
+  }
+  .grow { border-top: 1px solid var(--border); }
+  .grow:first-child { border-top: none; }
+  .grow > div { padding: 13px 18px; font-variant-numeric: tabular-nums; }
+  .grow .glabel { color: var(--muted); font-size: 16.5px; display:flex; flex-direction:column; gap:2px;}
+  .grow .glabel small { color: var(--faint); font-size: 13px; font-variant-numeric: normal; }
+  .grow .gval { font-size: 19px; font-weight: 600; text-align: right; color: var(--text); }
+  .grow .gval .unit { color: var(--faint); font-size: 12.5px; font-weight: 400; margin-left: 3px; }
+  .grow.headrow > div { background: linear-gradient(180deg, rgba(255,46,151,0.10), rgba(34,211,238,0.06)); padding: 12px 18px; }
+  .grow.headrow .co { font-family:"Orbitron",sans-serif; font-weight: 700; font-size: 15px; letter-spacing:.5px;
+    text-align:right; display:flex; align-items:center; justify-content:flex-end; gap:7px; text-shadow: 0 0 10px currentColor; }
+  .grow.headrow .co small { color: var(--faint); font-weight: 400; text-shadow:none; }
+  .grow:hover:not(.headrow) > div { background: rgba(255,255,255,0.06); }
+
+  .evhint, .debthint { cursor: help; border-bottom: 1px dotted var(--faint); }
+  #evtip {
+    position: fixed; z-index: 1000; display: none; pointer-events: none;
+    background: rgba(12,12,16,0.97); border: 1px solid rgba(255,255,255,0.35); border-radius: 10px;
+    padding: 10px 13px; box-shadow: var(--shadow); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  }
+  #debttip {
+    position: fixed; z-index: 1000; display: none; pointer-events: none; max-width: 94vw;
+    background: rgba(12,12,16,0.98); border: 1px solid rgba(255,255,255,0.35); border-radius: 11px;
+    padding: 13px 15px; box-shadow: var(--shadow); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  }
+  #debttip .et-title { font-family:"Orbitron",sans-serif; font-size: 11.5px; letter-spacing:.5px; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; }
+  #debttip .dt-sum { font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+  #debttip .dt-sum b { color: #fff; font-weight: 700; }
+  #debttip table.dt { border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 13px; }
+  #debttip table.dt th { color: var(--muted); font-weight: 600; text-align: right; padding: 4px 12px; border-bottom: 1px solid var(--border); }
+  #debttip table.dt th:first-child, #debttip table.dt td:first-child { text-align: left; }
+  #debttip table.dt td { text-align: right; padding: 4px 12px; color: var(--text); }
+  #debttip table.dt td:first-child { color: #fff; font-weight: 600; }
+  #debttip .dt-note { font-size: 11.5px; color: var(--faint); margin-top: 9px; max-width: 540px; line-height: 1.45; }
+  #evtip .et-title { font-family:"Orbitron",sans-serif; font-size: 11.5px; letter-spacing: .5px; color: var(--muted); margin-bottom: 7px; text-transform: uppercase; }
+  #evtip table { border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  #evtip td { padding: 3px 0; font-size: 13.5px; }
+  #evtip td:first-child { color: var(--muted); padding-right: 22px; }
+  #evtip td:last-child { text-align: right; color: var(--text); font-weight: 600; }
+  #evtip tr:last-child td { border-top: 1px solid var(--border); padding-top: 5px; color: var(--text); }
+  #evtip tr:last-child td:first-child { color: var(--text); }
+  .pos { color: var(--pos); text-shadow: 0 0 8px rgba(43,245,182,0.4); }
+  .neg { color: var(--neg); text-shadow: 0 0 8px rgba(255,79,123,0.4); }
+  .better { position: relative; }
+  .better::after {
+    content: "▲"; font-size: 8px; color: var(--pos); margin-left: 5px; vertical-align: middle;
+    text-shadow: 0 0 8px var(--pos);
+  }
+
+  /* editable inputs (capital structure) */
+  input.cell {
+    width: 100%; text-align: right; background: rgba(20,8,42,0.6); border:1px solid var(--border-cyan);
+    color: var(--text); border-radius: 8px; padding: 6px 9px; font: inherit; font-size: 14px;
+    font-variant-numeric: tabular-nums; transition: border-color .15s, box-shadow .15s;
+  }
+  input.cell { font-size: 15.5px; }
+  input.cell:focus { outline:none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(0,229,255,0.25), var(--glow-cyan); }
+  .editwrap { padding: 8px 16px !important; }
+
+  /* mini bars for ratio comparison */
+  .bar { height:5px; background: var(--panel-2); border-radius:99px; overflow:hidden; margin-top:6px; }
+  .bar > span { display:block; height:100%; border-radius:99px; }
+
+  .footnote { color: var(--faint); font-size: 13px; margin-top: 8px; }
+  .sources { margin-top: 26px; padding-top: 18px; border-top:1px solid var(--border); color: var(--muted); font-size: 13.5px; }
+  .sources b { color: var(--text); }
+  .sources ul { margin:8px 0 0; padding-left:18px; } .sources li { margin:3px 0; }
+  .badge-stub {
+    display:inline-block; font-size:10px; color: var(--btc); background: rgba(247,147,26,0.08);
+    border:1px solid rgba(247,147,26,0.3); border-radius:6px; padding:1px 6px; margin-left:8px;
+  }
+  .refresh { font-size:12px; color: var(--accent); cursor:pointer; border:1px solid var(--border-cyan);
+    background: rgba(0,229,255,0.06); border-radius:8px; padding:6px 11px; transition: box-shadow .15s, background .15s; }
+  .refresh:hover { box-shadow: var(--glow-cyan); background: rgba(0,229,255,0.14); }
+  /* charts */
+  .charts { display:grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
+  .charts.full { grid-template-columns: 1fr; }
+  .chartcard {
+    background: var(--panel); border:1px solid var(--border); border-radius: var(--radius);
+    padding: 14px 16px 12px; box-shadow: var(--shadow);
+    backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px);
+  }
+  .chartcard h3 { margin:0; font-family:"Orbitron",sans-serif; font-weight:600; font-size: 14px; letter-spacing:.6px;
+    display:flex; align-items:center; gap:7px; color:#fff; }
+  .chartcard h3 .dot { width:9px; height:9px; }
+  .chartcard .ch-sub { color: var(--faint); font-size: 12.5px; margin: 4px 0 10px; }
+  .chartwrap { position: relative; height: 250px; }
+  .illus { color: var(--btc); font-size: 12.5px; margin-top: 6px; opacity:.9; }
+
+  @media (max-width: 760px) { .charts { grid-template-columns: 1fr; } }
+  @media (max-width: 640px) {
+    .grow { grid-template-columns: 1.3fr 1fr 1fr; }
+    .grow > div { padding: 9px 10px; }
+    .btcprice { min-width: 160px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="title">
+      <h1>Bitcoin Treasury Tracker</h1>
+      <p>How <b>MSTR</b> / <b>STRC</b> and <b>ASST</b> / <b>SATA</b> are trending relative to Bitcoin.</p>
+      <div class="legend">
+        <span><span class="dot" style="background:var(--mstr)"></span>MSTR · STRC</span>
+        <span><span class="dot" style="background:var(--asst)"></span>ASST · SATA</span>
+      </div>
+    </div>
+    <div class="statbar">
+      <div class="statbox" style="--bx:var(--btc)">
+        <div class="lbl">Bitcoin</div>
+        <div class="val" id="btcVal">—</div>
+        <div class="sub" id="btcSub">loading…</div>
+        <span class="refresh" id="refreshBtn">↻ Refresh</span>
+      </div>
+      <div class="statbox" style="--bx:var(--mstr)">
+        <div class="lbl">MSTR mNAV</div>
+        <div class="val" id="hdr-mnav-MSTR">—</div>
+        <div class="sub">EV ÷ BTC reserve</div>
+      </div>
+      <div class="statbox" style="--bx:var(--mstr)">
+        <div class="lbl">STRC price</div>
+        <div class="val" id="hdr-strc">—</div>
+        <div class="sub" id="hdr-strc-sub">Strategy pref</div>
+      </div>
+      <div class="statbox" style="--bx:var(--asst)">
+        <div class="lbl">ASST mNAV</div>
+        <div class="val" id="hdr-mnav-ASST">—</div>
+        <div class="sub">EV ÷ BTC reserve</div>
+      </div>
+      <div class="statbox" style="--bx:var(--asst)">
+        <div class="lbl">SATA price</div>
+        <div class="val" id="hdr-sata">—</div>
+        <div class="sub" id="hdr-sata-sub">Strive pref</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- 0. Company Stats -->
+  <section id="company">
+    <div class="sec-head"><h2>Company Stats</h2><span class="tag stub" id="tag-company">seed data</span></div>
+    <p class="sec-note">Equity snapshot for each company and its preferred. Market cap = price × shares; enterprise value adds debt + preferred and nets out cash, so it recomputes with the capital-structure inputs below.</p>
+    <div class="charts">
+      <div class="chartcard">
+        <h3><span class="dot" style="background:var(--mstr)"></span>MSTR — Daily Close</h3>
+        <div class="ch-sub">Line: daily close (left) · Bars: days to cover, shorts (right)</div>
+        <div class="chartwrap"><canvas id="ch-si-MSTR"></canvas></div>
+      </div>
+      <div class="chartcard">
+        <h3><span class="dot" style="background:var(--asst)"></span>ASST — Daily Close</h3>
+        <div class="ch-sub">Line: daily close since Jan 1, 2026 (left) · Bars: days to cover, shorts (right)</div>
+        <div class="chartwrap"><canvas id="ch-si-ASST"></canvas></div>
+      </div>
+      <div class="chartcard">
+        <h3><span class="dot" style="background:var(--mstr)"></span>STRC — Preferred Daily Close</h3>
+        <div class="ch-sub">Line: daily close (left) · Steps: notional outstanding (right)</div>
+        <div class="chartwrap"><canvas id="ch-pref-MSTR"></canvas></div>
+      </div>
+      <div class="chartcard">
+        <h3><span class="dot" style="background:var(--asst)"></span>SATA — Preferred Daily Close</h3>
+        <div class="ch-sub">Line: daily close (left) · Steps: notional outstanding (right)</div>
+        <div class="chartwrap"><canvas id="ch-pref-ASST"></canvas></div>
+      </div>
+    </div>
+    <div class="illus" id="illus-company"></div>
+    <div class="grid" id="grid-company"></div>
+  </section>
+
+  <!-- 1. Accumulation & Holdings -->
+  <section id="holdings">
+    <div class="sec-head"><h2>Accumulation &amp; Holdings</h2><span class="tag stub" id="tag-holdings">seed data</span></div>
+    <p class="sec-note">Raw scale and pace of accumulation. Higher relative growth shows successful capital deployment.</p>
+    <div class="grid" id="grid-holdings"></div>
+    <div class="charts">
+      <div class="chartcard">
+        <h3><span class="dot" style="background:var(--mstr)"></span>MSTR — Accumulation</h3>
+        <div class="ch-sub">Weekly · Bars: BTC acquired / week (left) · Line: total BTC holdings (right)</div>
+        <div class="chartwrap"><canvas id="ch-acc-MSTR"></canvas></div>
+      </div>
+      <div class="chartcard">
+        <h3><span class="dot" style="background:var(--asst)"></span>ASST — Accumulation</h3>
+        <div class="ch-sub">Weekly · Bars: BTC acquired / week (left) · Line: total BTC holdings (right)</div>
+        <div class="chartwrap"><canvas id="ch-acc-ASST"></canvas></div>
+      </div>
+    </div>
+    <div class="illus" id="illus-holdings"></div>
+  </section>
+
+  <!-- 2. Cost & Efficiency -->
+  <section id="cost">
+    <div class="sec-head"><h2>Cost &amp; Efficiency</h2><span class="tag" style="color:var(--pos);border-color:rgba(43,245,182,0.45)">live</span></div>
+    <p class="sec-note">Blended cost basis and paper P/L. Lower average cost = better long-term efficiency. Unrealized P/L recomputes live with the BTC price above.</p>
+    <div class="grid" id="grid-cost"></div>
+  </section>
+
+  <!-- 3. Per-Share & Yield -->
+  <section id="pershare">
+    <div class="sec-head"><h2>Per-Share &amp; Yield <small style="color:var(--faint);font-weight:400;font-size:12px;">(common shareholders)</small></h2><span class="tag stub" id="tag-pershare">seed data</span></div>
+    <p class="sec-note">Dilution-adjusted ownership. BTC Yield = % increase in BTC-per-share over the period; positive/growing yield means accumulation is accretive after dilution.</p>
+    <div class="grid" id="grid-pershare"></div>
+    <div class="charts">
+      <div class="chartcard">
+        <h3><span class="dot" style="background:var(--mstr)"></span>MSTR — BTC per Share</h3>
+        <div class="ch-sub">sats / share over time · strategytracker</div>
+        <div class="chartwrap"><canvas id="ch-bps-MSTR"></canvas></div>
+      </div>
+      <div class="chartcard">
+        <h3><span class="dot" style="background:var(--asst)"></span>ASST — BTC per Share</h3>
+        <div class="ch-sub">sats / share over time · strategytracker</div>
+        <div class="chartwrap"><canvas id="ch-bps-ASST"></canvas></div>
+      </div>
+    </div>
+    <div class="illus" id="illus-pershare"></div>
+  </section>
+
+  <!-- 4. Valuation & Premium (incl. CEBE) -->
+  <section id="valuation">
+    <div class="sec-head"><h2>Valuation &amp; Premium</h2><span class="tag stub" id="tag-valuation">seed data</span></div>
+    <p class="sec-note">mNAV = EV ÷ BTC reserve, where EV = (price × basic shares) + total debt + total preferred − USD reserve. A premium (&gt;1x) lets a company raise capital cheaply and accretively. CEBE (Common Equity Bitcoin Exposure) is the conservative "after-senior" view: BTC owned by common after subtracting net senior claims (preferred + debt − cash) — it reveals the drag from STRC / SATA and debt.</p>
+    <div class="charts">
+      <div class="chartcard">
+        <h3><span class="dot" style="background:var(--mstr)"></span>MSTR — Price vs. mNAV</h3>
+        <div class="ch-sub">Line: daily close (left) · Line: EV mNAV (right) · debt, preferred &amp; cash from filings</div>
+        <div class="chartwrap"><canvas id="ch-mnav-MSTR"></canvas></div>
+      </div>
+      <div class="chartcard">
+        <h3><span class="dot" style="background:var(--asst)"></span>ASST — Price vs. mNAV</h3>
+        <div class="ch-sub">Line: daily close (left) · Line: EV mNAV (right) · debt, preferred &amp; cash from filings</div>
+        <div class="chartwrap"><canvas id="ch-mnav-ASST"></canvas></div>
+      </div>
+    </div>
+    <div class="grid" id="grid-valuation"></div>
+    <div class="illus" id="illus-valuation"></div>
+  </section>
+
+  <!-- 6. Capital Structure (FULLY WORKING, from Excel) -->
+  <section id="capital">
+    <div class="sec-head"><h2>Capital Structure</h2><span class="tag" style="color:var(--pos);border-color:rgba(43,245,182,0.45)">live</span></div>
+    <p class="sec-note">Leverage and coverage ratios implied by the holdings, cash, debt, and preferred shown under Company Stats above. Crypto NAV uses live holdings × the live BTC price.</p>
+    <div class="grid" id="grid-capital"></div>
+    <p class="footnote">Leverage and coverage use face/notional values. Lower leverage and higher coverage = a safer structure for common holders; higher leverage can enable faster accumulation.</p>
+  </section>
+
+  <div class="sources">
+    <b>Sources &amp; assumptions</b> — Capital-structure inputs from your <i>crypto_treasury_comparison.xlsx</i> (prices as of <span id="priceAsOf">—</span>; data as of <span id="dataAsOf">—</span>). Other sections are seeded with reported figures and refresh automatically when <code>refresh_data.py</code> repopulates <code>data.json</code>.
+    <ul>
+      <li>Holdings / purchases / yield: bitcointreasuries.net, treasury.strive.com, strategy.com</li>
+      <li>CEBE, claims %, sats per $100: cebetracker.io</li>
+      <li>Live BTC price: CoinGecko API</li>
+    </ul>
+    <div style="margin-top:8px;color:var(--faint)">Not investment advice. Confirm against each issuer's latest filing before relying on the ratios.</div>
+  </div>
+
+</div>
+
+<script>
+// ---------------------------------------------------------------------------
+// Seed data (embedded fallback). The page tries ./data.json first so the
+// refresh_data.py scraper can update everything without touching this file.
+// ---------------------------------------------------------------------------
+const SEED = {
+  asOf: "2026-06-17", priceAsOf: "2026-06-16",
+  btcPriceUsd: 66449, btcSupply: 21000000, btcCirculating: 19900000,
+  companies: {
+    MSTR: { name:"Strategy", ticker:"MSTR", prefTicker:"STRC", asset:"BTC", accent:"#ff2e97",
+      stockPrice:113.66, dayChangePct:-2.49, sharesOutstanding:351.60, betaBtc:1.61, week52Low:104.17, week52High:457.22, prefPrice:99.50,
+      holdings:846842, pctSupply:4.0326, netChangeYtd:174000, btcPerDay:1042, btcPerWeek:7300,
+      avgCost:75656, satsPerShareBasic:219360, satsPerShareDiluted:null, btcYieldYtd:12.5, btcYieldQtd:null,
+      btcGain:null, btcDollarGain:null, cebeSatsPerShare:148000, claimsPct:38, satsPer100:119000,
+      mnav:0.73, cebeMnav:1.28, cash:1100, seniorDebt:6714, prefNotional:15475, annualObligations:1712, staking:0 },
+    ASST: { name:"Strive", ticker:"ASST", prefTicker:"SATA", asset:"BTC", accent:"#22d3ee",
+      stockPrice:14.94, dayChangePct:-3.24, sharesOutstanding:73.08, betaBtc:1.29, week52Low:7.02, week52High:157.80, prefPrice:98.00,
+      holdings:19105, pctSupply:0.0910, netChangeYtd:11600, btcPerDay:70, btcPerWeek:490,
+      avgCost:96079, satsPerShareBasic:23979, satsPerShareDiluted:23181, btcYieldYtd:36.0, btcYieldQtd:null,
+      btcGain:null, btcDollarGain:null, cebeSatsPerShare:13000, claimsPct:44.5, satsPer100:81000,
+      mnav:0.89, cebeMnav:1.88, cash:189, seniorDebt:0, prefNotional:751, annualObligations:98, staking:0 }
+  },
+  stockHistory: {
+    illustrative: false,
+    dates: ["Jul '25","Aug '25","Sep '25","Oct '25","Nov '25","Dec '25","Jan '26","Feb '26","Mar '26","Apr '26","May '26","Jun '26"],
+    MSTR: [401.86,334.41,322.21,269.51,177.18,151.95,149.71,129.50,124.80,165.45,159.09,113.66],
+    ASST: [66.60,123.00,50.00,26.60,22.40,14.76,16.42,7.94,10.02,15.36,17.67,14.94]
+  },
+  weekly: {
+    illustrative: true,
+    year: 2026,
+    dates: ["Jan 5","Jan 12","Jan 19","Jan 26","Feb 2","Feb 9","Feb 16","Feb 23","Mar 2","Mar 9","Mar 16","Mar 23","Mar 30","Apr 6","Apr 13","Apr 20","Apr 27","May 4","May 11","May 18","May 25","Jun 1","Jun 8","Jun 15"],
+    MSTR: {
+      acquired: [7530,5710,9360,5000,6980,10470,4360,9120,6340,7140,9910,3810,8330,7690,5550,11100,6190,7380,4760,9520,5870,8720,5230,7930],
+      holdings: [680372,686082,695442,700442,707422,717892,722252,731372,737712,744852,754762,758572,766902,774592,780142,791242,797432,804812,809572,819092,824962,833682,838912,846842]
+    },
+    ASST: {
+      acquired: [500,380,620,330,470,700,290,610,420,480,660,250,560,510,370,740,410,490,320,630,390,580,350,540],
+      holdings: [8005,8385,9005,9335,9805,10505,10795,11405,11825,12305,12965,13215,13775,14285,14655,15395,15805,16295,16615,17245,17635,18215,18565,19105]
+    }
+  },
+  history: {
+    illustrative: true,
+    dates: ["Dec '25","Jan","Feb","Mar","Apr","May","Jun"],
+    MSTR: {
+      holdings:[672842,700000,735000,768000,800000,828000,846842],
+      weeklyAcq:[5200,6300,8100,7600,7400,6500,7300],
+      satsPerShare:[194987,199000,204000,209000,213000,216500,219360],
+      btcYieldYtd:[0,2.6,5.1,7.6,9.5,11.2,12.5],
+      cebeSatsPerShare:[131000,134000,138000,141000,144000,146500,148000],
+      claimsPct:[34.0,35.0,35.8,36.6,37.2,37.7,38.0],
+      mnav:[1.15,1.12,1.08,1.05,1.04,1.02,1.01],
+      cebeMnav:[1.80,1.66,1.52,1.42,1.36,1.31,1.28]
+    },
+    ASST: {
+      holdings:[7505,9000,11200,13600,15900,17800,19105],
+      weeklyAcq:[320,410,560,620,540,470,490],
+      satsPerShare:[17632,18900,20300,21600,22600,23400,23979],
+      btcYieldYtd:[0,7.2,15.1,22.5,28.3,32.7,36.0],
+      cebeSatsPerShare:[9100,9900,10800,11600,12200,12700,13000],
+      claimsPct:[38.0,40.0,41.5,42.8,43.6,44.1,44.5],
+      mnav:[1.40,1.35,1.30,1.26,1.23,1.20,1.18],
+      cebeMnav:[2.40,2.22,2.08,1.98,1.93,1.90,1.88]
+    }
+  }
+};
+
+let DATA = JSON.parse(JSON.stringify(SEED));
+let btcPrice = DATA.btcPriceUsd;
+const COS = ["MSTR","ASST"]; // order of columns
+
+// ---------- formatting helpers ----------
+const fmt = (n, d=0) => n==null||isNaN(n) ? "—" : Number(n).toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d});
+// sign goes BEFORE the $:  -$13.48B  (not $-13.48B)
+const usd = (n, d=0) => n==null||isNaN(n) ? "—" : (n<0?"-":"")+"$"+fmt(Math.abs(n),d);
+const usdMM = (n) => n==null||isNaN(n) ? "—" : (n<0?"-":"")+"$"+fmt(Math.abs(n),0)+"M";
+const bil = (mm) => { if(mm==null||isNaN(mm)) return "—"; const s=mm<0?"-":"", a=Math.abs(mm);
+  return s+(a>=1000 ? "$"+fmt(a/1000,2)+"B" : "$"+fmt(a,0)+"M"); };
+// signed currency from a raw-dollar amount, sign before the $
+const sUsdB = (v) => (v<0?"-":"")+"$"+fmt(Math.abs(v)/1e9,2)+"B";
+const sUsdM = (v) => (v<0?"-":"")+"$"+fmt(Math.abs(v)/1e6,0)+"M";
+// capital-structure format: value in $millions -> "$6.71B" or "$189M"
+const capFmt = (mm) => { if(mm==null||isNaN(mm)) return "—"; const s=mm<0?"-":"", a=Math.abs(mm);
+  return a>=1000 ? s+"$"+fmt(a/1000,2)+"B" : s+"$"+fmt(a,0)+"M"; };
+const pct = (n, d=1) => n==null||isNaN(n) ? "—" : fmt(n,d)+"%";
+const sig = (n) => n>0?"+":"";
+
+// mNAV = EV / BTC reserve.  EV = (price × basic shares) + debt + preferred notional − USD reserve(cash)
+// (same formula as strategy.com / treasury.strive.com; note strategy.com's own widget runs a
+//  stale bundled debt schedule of $6.7B vs the $8.2B in the Q1-26 10-Q, so it reads ~0.03 low)
+function evMnav(o){
+  if(!(o.stockPrice && o.sharesOutstanding)) return o.mnav;
+  const mcap = o.stockPrice*o.sharesOutstanding;            // $mm
+  const ev   = mcap + o.seniorDebt + o.prefNotional - o.cash;
+  const nav  = o.holdings*btcPrice/1e6;                     // BTC reserve, $mm
+  return nav ? ev/nav : o.mnav;
+}
+
+function unit(v, u){ return `${v}<span class="unit">${u}</span>`; }
+
+// build a metric row: {label, sub, mstr, asst, betterFor, cls}
+function row(cfg){
+  const valCell = (co) => {
+    const isBetter = cfg.betterFor === co;
+    const extra = (cfg.cls && cfg.cls[co]) ? cfg.cls[co] : "";
+    return `<div class="gval ${extra} ${isBetter?'better':''}">${cfg[co] ?? "—"}</div>`;
+  };
+  return `<div class="grow">
+    <div class="glabel">${cfg.label}${cfg.sub?`<small>${cfg.sub}</small>`:""}</div>
+    ${valCell("MSTR")}${valCell("ASST")}
+  </div>`;
+}
+
+function headRow(){
+  const c = (k)=>{const o=DATA.companies[k];return `<div class="co" style="color:${o.accent}">${o.ticker} <small>· ${o.prefTicker}</small></div>`;};
+  return `<div class="grow headrow"><div class="glabel"></div>${c("MSTR")}${c("ASST")}</div>`;
+}
+
+// ---------- section renderers ----------
+function renderCompany(){
+  const M=DATA.companies.MSTR, A=DATA.companies.ASST;
+  const mcap = o => o.stockPrice*o.sharesOutstanding;             // $mm (shares in millions)
+  const ev   = o => mcap(o)+o.seniorDebt+o.prefNotional-o.cash;   // $mm
+  const chg  = v => `<span class="${v>=0?'pos':'neg'}">${sig(v)}${fmt(v,2)}%</span>`;
+
+  // stock-price performance hover (1wk / 1mo / YTD) from the daily series
+  const SH = DATA.stockHistory || (typeof SEED!=="undefined"?SEED.stockHistory:null) || {};
+  const yrSfx = "'"+((DATA.asOf||"2026").slice(2,4));
+  const perfN = (arr,n) => (arr && arr.length>n && arr[arr.length-1-n]!=null) ? (arr.at(-1)/arr[arr.length-1-n]-1)*100 : null;
+  const perfYtd = arr => { const ds=SH.dates||[]; const i=ds.findIndex(d=>d.includes(yrSfx)); const b=i>0?i-1:0;
+    return (arr && arr[b]!=null) ? (arr.at(-1)/arr[b]-1)*100 : null; };
+  const pctC = v => v==null ? "—" : `<span class='${v>=0?'pos':'neg'}'>${sig(v)}${fmt(v,1)}%</span>`;
+  const perfRows = arr => [["1 Week",pctC(perfN(arr,5))],["1 Month",pctC(perfN(arr,21))],["YTD",pctC(perfYtd(arr))]].map(r=>r.join("~")).join("|");
+  const priceCell = (o,arr) => `<span class="evhint" data-title="Performance" data-rows="${perfRows(arr)}">${usd(o.stockPrice,2)}</span>`;
+
+  // preferred-by-series breakdown hover (MSTR has STRC, STRF, STRK, STRD)
+  const prefCell = o => { const b=o.prefBreakdown;
+    if(!b||!b.length) return bil(o.prefNotional);
+    const rows = b.map(([tk,desc,n])=>[`${tk}  (${desc})`, bil(n)]).concat([["Total", bil(o.prefNotional)]]).map(r=>r.join("~")).join("|");
+    return `<span class="evhint" data-title="Preferred by Series" data-rows="${rows}">${bil(o.prefNotional)}</span>`; };
+
+  let h = headRow();
+  h += row({label:"Stock Price", sub:"common · hover for performance", MSTR:priceCell(M,SH.MSTR), ASST:priceCell(A,SH.ASST)});
+  h += row({label:"Day Change", MSTR:chg(M.dayChangePct), ASST:chg(A.dayChangePct)});
+  h += row({label:"Market Cap", sub:"price × shares", MSTR:bil(mcap(M)), ASST:bil(mcap(A)),
+    betterFor: mcap(M)>mcap(A)?"MSTR":"ASST"});
+  h += row({label:"Shares Outstanding", MSTR:fmt(M.sharesOutstanding,2)+" <span class='unit'>M</span>", ASST:fmt(A.sharesOutstanding,2)+" <span class='unit'>M</span>"});
+  const evRows = o => [
+    ["Market Cap", bil(mcap(o))],
+    ["+ Senior Debt", bil(o.seniorDebt)],
+    ["+ Preferred", bil(o.prefNotional)],
+    ["− USD Reserve", bil(o.cash)],
+    ["Enterprise Value", bil(ev(o))]
+  ].map(r=>r.join("~")).join("|");
+  const evCell = o => `<span class="evhint" data-title="Enterprise Value" data-rows="${evRows(o)}">${bil(ev(o))}</span>`;
+  h += row({label:"Enterprise Value", sub:"mcap + debt + pref − cash · hover for breakdown",
+    MSTR:evCell(M), ASST:evCell(A)});
+  h += row({label:"Beta to BTC", sub:"sensitivity to BTC moves", MSTR:fmt(M.betaBtc,2), ASST:fmt(A.betaBtc,2)});
+  h += row({label:"Preferred Price", sub:"vs $100 par", MSTR:usd(M.prefPrice,2), ASST:usd(A.prefPrice,2)});
+  // balance-sheet metrics (relocated from Capital Structure)
+  const debtCell = o => { const disp=capFmt(o.seniorDebt);
+    return (o.debtSchedule||[]).length ? `<span class="debthint" data-co="${o.ticker}">${disp}</span>` : disp; };
+  h += row({label:"Crypto Holdings", sub:"BTC", MSTR:"₿"+fmt(M.holdings), ASST:"₿"+fmt(A.holdings)});
+  h += row({label:"Cash & Cash Equivalents", sub:"USD", MSTR:capFmt(M.cash), ASST:capFmt(A.cash)});
+  h += row({label:"Senior Debt", sub:"convertible notes · hover for schedule", MSTR:debtCell(M), ASST:debtCell(A)});
+  h += row({label:"Preferred Equity Notional", sub:"by series · hover for breakdown", MSTR:prefCell(M), ASST:prefCell(A)});
+  h += row({label:"Annual Obligations", sub:"mostly pref dividends", MSTR:capFmt(M.annualObligations), ASST:capFmt(A.annualObligations)});
+  document.getElementById("grid-company").innerHTML = h;
+}
+
+function renderHoldings(){
+  const M=DATA.companies.MSTR, A=DATA.companies.ASST;
+  const curYr = (DATA.asOf||"2026").slice(0,4);
+  const holdRows = o => {
+    const ye = o.yearEnd || {};
+    const rows = [[`YTD ${curYr}`, fmt(o.holdings)+" ₿"]]
+      .concat(Object.keys(ye).sort().reverse().map(y => [y, fmt(ye[y])+" ₿"]));
+    return rows.map(r=>r.join("~")).join("|");
+  };
+  const holdCell = o => `<span class="evhint" data-title="BTC Holdings · Year-End" data-rows="${holdRows(o)}">${fmt(o.holdings)} <span class='unit'>BTC</span></span>`;
+  let h = headRow();
+  h += row({label:"Total BTC Holdings", sub:"hover for year-by-year", MSTR:holdCell(M), ASST:holdCell(A)});
+  h += row({label:"% of 21M Supply", MSTR:pct(M.pctSupply,3), ASST:pct(A.pctSupply,3)});
+  h += row({label:"Net Change YTD", sub:"BTC added this year",
+    MSTR:`<span class="pos">${sig(M.netChangeYtd)}${fmt(M.netChangeYtd)}</span>`,
+    ASST:`<span class="pos">${sig(A.netChangeYtd)}${fmt(A.netChangeYtd)}</span>`});
+  h += row({label:"YTD Growth (Relative)", sub:"net add ÷ (holdings − net add)",
+    MSTR:pct(relGrowth(M)), ASST:pct(relGrowth(A)), betterFor: relGrowth(A)>relGrowth(M)?"ASST":"MSTR"});
+  // average weekly/daily acquisition derived from the real 8-K weeks when available
+  const W = DATA.weekly || {};
+  const perWk = co => { let a = W[co] && W[co].acquired; if(a) a = a.filter(x=>x!=null);
+    return (a && a.length) ? Math.round(a.reduce((x,y)=>x+y,0)/a.length) : DATA.companies[co].btcPerWeek; };
+  const pwM=perWk("MSTR"), pwA=perWk("ASST");
+  const wkSub = (!W.illustrative && W.MSTR) ? "avg across reported 8-K weeks" : "";
+  h += row({label:"BTC Acquired / Week", sub:wkSub, MSTR:fmt(pwM), ASST:fmt(pwA),
+    betterFor: (pwA/A.holdings)>(pwM/M.holdings)?"ASST":"MSTR"});
+  h += row({label:"BTC Acquired / Day", MSTR:fmt(Math.round(pwM/7)), ASST:fmt(Math.round(pwA/7))});
+  document.getElementById("grid-holdings").innerHTML = h;
+}
+function relGrowth(o){ const start=o.holdings-o.netChangeYtd; return start>0 ? o.netChangeYtd/start*100 : null; }
+
+function renderCost(){
+  const M=DATA.companies.MSTR, A=DATA.companies.ASST;
+  const plM = M.holdings*(btcPrice-M.avgCost), plA = A.holdings*(btcPrice-A.avgCost);
+  const plPctM=(btcPrice/M.avgCost-1)*100, plPctA=(btcPrice/A.avgCost-1)*100;
+  const plCls = v => v>=0?"pos":"neg";
+  let h = headRow();
+  h += row({label:"Avg Acquisition Cost / BTC", MSTR:usd(M.avgCost), ASST:usd(A.avgCost),
+    betterFor: M.avgCost<A.avgCost?"MSTR":"ASST"});
+  h += row({label:"Current Return on BTC", MSTR:pct(plPctM), ASST:pct(plPctA),
+    cls:{MSTR:plCls(plPctM),ASST:plCls(plPctA)}});
+  h += row({label:"Unrealized P/L", sub:"at live BTC price",
+    MSTR:`<span class="${plCls(plM)}">${sUsdB(plM)}</span>`,
+    ASST:`<span class="${plCls(plA)}">${sUsdM(plA)}</span>`});
+  document.getElementById("grid-cost").innerHTML = h;
+}
+
+function renderPerShare(){
+  const M=DATA.companies.MSTR, A=DATA.companies.ASST;
+  const W = DATA.weekly || {};
+  const wkYield = co => { const a = W[co] && W[co].holdings;
+    return (a && a.length>=2) ? (a[a.length-1]/a[a.length-2]-1)*100 : null; };
+  const wyM=wkYield("MSTR"), wyA=wkYield("ASST");
+  const cls = v => v>=0?"pos":"neg";
+  let h = headRow();
+  h += row({label:"BTC per Share (Basic)", sub:"sats / share · latest", MSTR:fmt(M.satsPerShareBasic), ASST:fmt(A.satsPerShareBasic)});
+  h += row({label:"BTC Yield — 1 Week", sub:"Δ BTC/share, latest 8-K week", MSTR:pct(wyM), ASST:pct(wyA),
+    cls:{MSTR:cls(wyM),ASST:cls(wyA)}, betterFor: (wyA!=null&&wyM!=null&&wyA>wyM)?"ASST":"MSTR"});
+  h += row({label:"BTC Yield — YTD", sub:"% increase in BTC/share", MSTR:pct(M.btcYieldYtd), ASST:pct(A.btcYieldYtd),
+    cls:{MSTR:"pos",ASST:"pos"}, betterFor: A.btcYieldYtd>M.btcYieldYtd?"ASST":"MSTR"});
+  document.getElementById("grid-pershare").innerHTML = h;
+}
+
+function renderValuation(){
+  const M=DATA.companies.MSTR, A=DATA.companies.ASST;
+  const mcap = o => o.stockPrice*o.sharesOutstanding;            // $mm
+  const nav  = o => o.holdings*btcPrice/1e6;                     // BTC reserve $mm
+  const evv  = o => mcap(o)+o.seniorDebt+o.prefNotional-o.cash;  // enterprise value
+  const claims = o => o.seniorDebt+o.prefNotional-o.cash;        // net senior claims
+  const cebeNav = o => nav(o)-claims(o);                         // after-claims BTC NAV
+  const cebeMn = o => (o.stockPrice && o.sharesOutstanding && cebeNav(o)>0) ? mcap(o)/cebeNav(o) : o.cebeMnav;
+  // CEBE per-share metrics (all live from the capital structure + BTC price)
+  const claimsP = o => { const n=nav(o); return n>0 ? claims(o)/n*100 : null; };
+  const cebeBtc = o => o.holdings - claims(o)*1e6/btcPrice;      // BTC owned by common after claims
+  const cebeSats = o => Math.round(cebeBtc(o)*100/o.sharesOutstanding);      // sats / share (shares in M)
+  const satsPer100 = o => { const mc=mcap(o); return mc>0 ? Math.round(cebeBtc(o)*1e8/(mc*1e6)*100) : null; };
+  const mM=evMnav(M), mA=evMnav(A), cM=cebeMn(M), cA=cebeMn(A);
+  const cls = v => v>=1?"pos":"neg";
+
+  const mnavRows = o => [
+    ["Market Cap", bil(mcap(o))], ["+ Senior Debt", bil(o.seniorDebt)],
+    ["+ Preferred", bil(o.prefNotional)], ["− USD Reserve", bil(o.cash)],
+    ["= Enterprise Value", bil(evv(o))], ["÷ BTC Reserve", bil(nav(o))],
+    ["= mNAV", fmt(evMnav(o),2)+"x"]
+  ].map(r=>r.join("~")).join("|");
+  const cebeRows = o => [
+    ["Market Cap (Common)", bil(mcap(o))], ["BTC Reserve", bil(nav(o))],
+    ["− Senior Claims", bil(claims(o))], ["= CEBE NAV", bil(cebeNav(o))],
+    ["= CEBE mNAV  (mcap ÷ CEBE NAV)", fmt(cebeMn(o),2)+"x"]
+  ].map(r=>r.join("~")).join("|");
+  const cell = (v,rows,title) => `<span class="evhint" data-title="${title}" data-rows="${rows}"><span class="${cls(v)}">${fmt(v,2)}x</span></span>`;
+
+  let h = headRow();
+  h += row({label:"mNAV", sub:"EV ÷ BTC reserve · hover for math",
+    MSTR:cell(mM,mnavRows(M),"mNAV"), ASST:cell(mA,mnavRows(A),"mNAV")});
+  h += row({label:"CEBE mNAV", sub:"common mcap ÷ after-claims NAV · hover for math",
+    MSTR:cell(cM,cebeRows(M),"CEBE mNAV"), ASST:cell(cA,cebeRows(A),"CEBE mNAV")});
+  h += row({label:"CEBE", sub:"sats / share, after senior claims · live", MSTR:fmt(cebeSats(M)), ASST:fmt(cebeSats(A)),
+    betterFor: cebeSats(M)>cebeSats(A)?"MSTR":"ASST"});
+  h += row({label:"Claims % (Drag)", sub:"net senior claims ÷ BTC NAV · live", MSTR:pct(claimsP(M)), ASST:pct(claimsP(A)),
+    betterFor: claimsP(M)<claimsP(A)?"MSTR":"ASST"});
+  h += row({label:"Sats per $100 Invested", sub:"CEBE exposure per $100 of stock · live", MSTR:fmt(satsPer100(M)), ASST:fmt(satsPer100(A)),
+    betterFor: satsPer100(M)>satsPer100(A)?"MSTR":"ASST"});
+  document.getElementById("grid-valuation").innerHTML = h;
+}
+
+// ---------- Capital structure (read-only, reflects current data) ----------
+const CAP_INPUTS = [
+  {k:"holdings", label:"Crypto Holdings", unit:"₿", sub:"BTC", d:0},
+  {k:"cash", label:"Cash & Cash Equivalents", unit:"$", sub:"USD", d:0},
+  {k:"seniorDebt", label:"Senior Debt", unit:"$", sub:"convertible notes · hover for schedule", d:0},
+  {k:"prefNotional", label:"Preferred Equity Notional", unit:"$", sub:"USD (STRC / SATA)", d:0},
+  {k:"annualObligations", label:"Annual Obligations", unit:"$", sub:"USD (mostly pref dividends)", d:0},
+];
+
+function renderCapital(){
+  let h = headRow();
+
+  // derived
+  const navM = DATA.companies.MSTR.holdings*btcPrice/1e6;
+  const navA = DATA.companies.ASST.holdings*btcPrice/1e6;
+  const hardM = navM + DATA.companies.MSTR.cash;
+  const hardA = navA + DATA.companies.ASST.cash;
+  const M=DATA.companies.MSTR, A=DATA.companies.ASST;
+
+  const drow = (label,sub,vM,vA,better,fmtFn)=>{
+    const f = fmtFn || (x=>fmt(x,2));
+    const bM = better==="MSTR"?"better":"", bA = better==="ASST"?"better":"";
+    return `<div class="grow" style="border-top:1px solid var(--border)">
+      <div class="glabel">${label}${sub?`<small>${sub}</small>`:""}</div>
+      <div class="gval ${bM}">${f(vM)}</div><div class="gval ${bA}">${f(vA)}</div></div>`;
+  };
+
+  h += `<div class="grow headrow"><div class="glabel" style="color:var(--muted)">Crypto NAV &amp; Hard Assets</div><div></div><div></div></div>`;
+  h += drow("Crypto NAV", "holdings × BTC price", navM, navA, null, x=>capFmt(x));
+  h += drow("Total Hard Assets", "NAV + cash", hardM, hardA, null, x=>capFmt(x));
+
+  h += `<div class="grow headrow"><div class="glabel" style="color:var(--muted)">Leverage <small style='color:var(--faint)'>lower = safer</small></div><div></div><div></div></div>`;
+  const sdM=M.seniorDebt/hardM, sdA=A.seniorDebt/hardA;
+  const tlM=(M.seniorDebt+M.prefNotional)/hardM, tlA=(A.seniorDebt+A.prefNotional)/hardA;
+  h += drow("Senior Debt / Hard Assets","",sdM,sdA, sdM<sdA?"MSTR":"ASST", x=>fmt(x*100,1)+"%");
+  h += drow("(Debt + Preferred) / Hard Assets","",tlM,tlA, tlM<tlA?"MSTR":"ASST", x=>fmt(x*100,1)+"%");
+
+  h += `<div class="grow headrow"><div class="glabel" style="color:var(--muted)">Coverage <small style='color:var(--faint)'>higher = safer</small></div><div></div><div></div></div>`;
+  h += drow("Hard Assets / Annual Obligation","",hardM/M.annualObligations,hardA/A.annualObligations,
+    (hardM/M.annualObligations)>(hardA/A.annualObligations)?"MSTR":"ASST", x=>fmt(x,1)+"x");
+  h += drow("Crypto NAV / Annual Obligation","",navM/M.annualObligations,navA/A.annualObligations,
+    (navM/M.annualObligations)>(navA/A.annualObligations)?"MSTR":"ASST", x=>fmt(x,1)+"x");
+  h += drow("Cash / Annual Obligations","",M.cash/M.annualObligations,A.cash/A.annualObligations,
+    (M.cash/M.annualObligations)>(A.cash/A.annualObligations)?"MSTR":"ASST", x=>fmt(x,2)+"x");
+  h += drow("Crypto NAV / Preferred Notional","",navM/M.prefNotional,navA/A.prefNotional,
+    (navM/M.prefNotional)>(navA/A.prefNotional)?"MSTR":"ASST", x=>fmt(x,2)+"x");
+
+  document.getElementById("grid-capital").innerHTML = h;
+}
+
+// ---------- price + orchestration ----------
+function renderPriceHeader(){
+  document.getElementById("btcVal").textContent = usd(btcPrice);
+  const pa=document.getElementById("priceAsOf"); if(pa) pa.textContent = DATA.priceAsOf || "—";
+  const da=document.getElementById("dataAsOf"); if(da) da.textContent = DATA.asOf || "—";
+  const M=DATA.companies.MSTR, A=DATA.companies.ASST;
+  const set=(id,v)=>{const e=document.getElementById(id); if(e) e.innerHTML=v;};
+  set("hdr-mnav-MSTR", fmt(evMnav(M),2)+"x");
+  set("hdr-mnav-ASST", fmt(evMnav(A),2)+"x");
+  set("hdr-strc", usd(M.prefPrice,2));
+  set("hdr-sata", usd(A.prefPrice,2));
+  const chg = v => (v==null||isNaN(v)) ? "" : `<span class="${v>=0?'pos':'neg'}">${sig(v)}${fmt(v,2)}%</span> · `;
+  set("hdr-strc-sub", chg(M.prefChangePct)+"Strategy pref");
+  set("hdr-sata-sub", chg(A.prefChangePct)+"Strive pref");
+}
+function renderAll(){ renderPriceHeader(); renderCompany(); renderHoldings(); renderCost(); renderPerShare(); renderValuation(); renderCapital(); }
+
+// ---------- charts (Chart.js) ----------
+const CHARTS = {};
+function mkChart(id, cfg){
+  if(typeof Chart === "undefined") return;           // CDN offline -> skip gracefully
+  const el = document.getElementById(id); if(!el) return;
+  const prev = Chart.getChart(el);                   // destroy any chart bound to this canvas
+  if(prev) prev.destroy();
+  CHARTS[id] = new Chart(el.getContext("2d"), cfg);
+}
+const GRID = "rgba(140,90,200,0.20)", AX = "#c0a6e0";
+const baseOpts = (extra={}) => Object.assign({
+  responsive:true, maintainAspectRatio:false, interaction:{mode:"index",intersect:false},
+  plugins:{ legend:{ labels:{ boxWidth:14, boxHeight:14, color:AX, font:{size:13} } },
+            tooltip:{ backgroundColor:"rgba(10,10,14,0.95)", borderColor:"rgba(255,255,255,0.65)", borderWidth:1,
+              titleColor:"#ffffff", bodyColor:"#d6dae6" } }
+}, extra);
+const axis = (title, side="left", opts={}) => Object.assign({
+  position:side, title:{display:!!title,text:title,color:AX,font:{size:12}},
+  ticks:{color:AX,font:{size:12}}, grid:{color:side==="left"?GRID:"transparent",drawOnChartArea:side!=="right"}
+}, opts);
+
+// "Jan 5" (week-start Monday) -> "Week of Jan 5 – Jan 11"
+function weekRange(label, year){
+  const start = new Date(`${label} ${year}`);
+  if(isNaN(start)) return label;
+  const end = new Date(start); end.setDate(end.getDate()+6);
+  const f = d => d.toLocaleDateString("en-US",{month:"short",day:"numeric"});
+  return `Week of ${f(start)} – ${f(end)}`;
+}
+
+function renderCharts(){
+  if(typeof Chart === "undefined"){ document.querySelectorAll(".chartwrap").forEach(w=>w.innerHTML='<div style="color:var(--faint);font-size:12px;padding:20px">Charts need network (Chart.js CDN).</div>'); return; }
+  const acc = {MSTR:"#ff2e97", ASST:"#22d3ee"};
+
+  // per-section status: flip chip + caption (all sections are now real/derived, no modeled history)
+  const setStatus = (sec, illus) => {
+    const tag = document.getElementById("tag-"+sec);
+    if(tag){ tag.textContent = illus ? "seed data" : "live";
+      tag.classList.toggle("stub", illus);
+      tag.style.color = illus ? "" : "var(--pos)";
+      tag.style.borderColor = illus ? "" : "rgba(43,245,182,0.45)"; }
+    const cap = document.getElementById("illus-"+sec);
+    if(cap) cap.textContent = "";
+  };
+  const SHi = (DATA.stockHistory || SEED.stockHistory || {}).illustrative;
+  const Wi  = (DATA.weekly || SEED.weekly || {}).illustrative;
+  setStatus("company", SHi);
+  setStatus("holdings", Wi);
+  ["pershare","valuation"].forEach(s => setStatus(s, false));
+
+  const SH = DATA.stockHistory || SEED.stockHistory;
+  const W = DATA.weekly || SEED.weekly;   // weekly series (own date axis)
+
+  COS.forEach(co=>{
+    const c = acc[co];
+    // 1. Accumulation: true weekly resolution — bars BTC acquired/week (y1) + line holdings (y2)
+    const wc = W[co];
+    const wdates = wc.dates || W.dates;   // per-company dates (EDGAR) or shared (seed)
+    const accOpts = baseOpts({ scales:{
+      x:{ ticks:{color:AX,font:{size:11},autoSkip:true,maxTicksLimit:9,maxRotation:0}, grid:{color:GRID} },
+      y1:axis("BTC / week","left"), y2:axis("Total BTC","right",{ticks:{color:AX,font:{size:12},callback:v=>(v/1000)+"k"}}) } });
+    accOpts.plugins.tooltip.callbacks = { title: items => {
+      const i = items[0].dataIndex;
+      if(wc.ranges && wc.ranges[i]) return "Week of "+wc.ranges[i];   // real 8-K period
+      return weekRange(items[0].label, W.year || 2026);
+    }};
+    mkChart("ch-acc-"+co, { data:{ labels: wdates, datasets:[
+      {type:"bar", label:"BTC / week", data:wc.acquired, yAxisID:"y1",
+        backgroundColor:c+"55", borderColor:c, borderWidth:1, borderRadius:2, order:2,
+        hoverBackgroundColor:"rgba(255,255,255,0.9)", hoverBorderColor:"#ffffff", hoverBorderWidth:2},
+      {type:"line", label:"Total BTC", data:wc.holdings, yAxisID:"y2",
+        borderColor:"#fff3ff", backgroundColor:"transparent", borderWidth:2, tension:.25, pointRadius:0, order:1}
+    ]}, options: accOpts });
+
+    // 2. BTC per share over time — real series from strategytracker
+    const bh = DATA.companies[co].bpsHistory || {dates:[],sats:[]};
+    const bpsOpts = baseOpts({ scales:{
+      x:{ ticks:{color:AX,font:{size:11},autoSkip:true,maxTicksLimit:8,maxRotation:0}, grid:{color:GRID} },
+      y:axis("sats / share","left") } });
+    bpsOpts.plugins.legend.display = false;
+    mkChart("ch-bps-"+co, { type:"line", data:{ labels: bh.dates, datasets:[
+      {label:"sats / share", data:bh.sats, borderColor:c, backgroundColor:c+"22",
+        borderWidth:2, tension:.25, pointRadius:0, fill:true} ]},
+      options: bpsOpts });
+
+    // 3. Company Stats price chart — daily close (left) + days to cover bars (right, semi-monthly)
+    const si = DATA.companies[co].shortInterest;
+    if(si && SH){
+      // MSTR from Oct 2025; ASST from Jan 1, 2026
+      const _start = co==="ASST" ? Math.max(0, SH.dates.findIndex(d=>d.startsWith("Jan")))
+                                 : Math.max(0, SH.dates.findIndex(d=>d.startsWith("Oct")));
+      const labels = SH.dates.slice(_start), px = SH[co].slice(_start);
+      const dtcMap = {}, siMap = {};
+      si.dates.forEach((d,i)=>{ dtcMap[d]=si.dtc[i]; siMap[d]=si.si[i]; });
+      const dtcAligned = labels.map(d => d in dtcMap ? dtcMap[d] : null);
+      const siOpts = baseOpts({ scales:{
+        x:{ ticks:{color:AX,font:{size:11},autoSkip:true,maxTicksLimit:8,maxRotation:0}, grid:{color:GRID} },
+        yP:axis("","left",{ticks:{color:c,font:{size:11},callback:v=>"$"+(+v).toFixed(0)}}),
+        yD:axis("days","right",{ticks:{color:"#ffffff",font:{size:11},callback:v=>(+v).toFixed(1)}}) } });
+      siOpts.plugins.tooltip.callbacks = { label: ctx => {
+        if(ctx.parsed.y==null) return null;
+        if(ctx.dataset.yAxisID==="yD"){
+          const s = siMap[ctx.label];
+          return "Days to cover: "+(+ctx.parsed.y).toFixed(2) + (s?"  ·  "+(s/1e6).toFixed(1)+"M shares short":"");
+        }
+        return co+": $"+(+ctx.parsed.y).toFixed(2);
+      }};
+      mkChart("ch-si-"+co, { data:{ labels, datasets:[
+        {type:"line", label:"Price", data:px, yAxisID:"yP", borderColor:c, backgroundColor:c+"18",
+          borderWidth:2, tension:.2, pointRadius:0, fill:false, order:1},
+        {type:"bar", label:"Days to Cover (Shorts)", data:dtcAligned, yAxisID:"yD",
+          backgroundColor:"rgba(255,255,255,0.5)", borderWidth:0,
+          borderRadius:2, barThickness:6, order:2} ]},
+        options: siOpts });
+    }
+
+    // 4. Preferred price + notional outstanding (STRC / SATA)
+    const ph = DATA.companies[co].prefHistory;
+    if(ph){
+      const pt = DATA.companies[co].prefTicker;
+      const prefOpts = baseOpts({ scales:{
+        x:{ ticks:{color:AX,font:{size:11},autoSkip:true,maxTicksLimit:8,maxRotation:0}, grid:{color:GRID} },
+        yP:axis("","left",{ticks:{color:c,font:{size:11},callback:v=>"$"+(+v).toFixed(0)}}),
+        yN:axis("notional","right",{ticks:{color:"#ffffff",font:{size:11},callback:v=>capFmt(v)}}) } });
+      prefOpts.plugins.tooltip.callbacks = { label: ctx => {
+        if(ctx.parsed.y==null) return null;
+        return ctx.dataset.yAxisID==="yN" ? "Notional: "+capFmt(ctx.parsed.y)
+                                          : pt+": $"+(+ctx.parsed.y).toFixed(2);
+      }};
+      mkChart("ch-pref-"+co, { type:"line", data:{ labels: ph.dates, datasets:[
+        {label:pt+" Price", data:ph.px, yAxisID:"yP", borderColor:c, backgroundColor:c+"18",
+          borderWidth:2, tension:.2, pointRadius:0, fill:false, order:1},
+        {label:"Notional Outstanding", data:ph.notional, yAxisID:"yN", borderColor:"rgba(255,255,255,0.75)",
+          backgroundColor:"rgba(255,255,255,0.08)", borderWidth:2, stepped:true, pointRadius:0,
+          spanGaps:true, fill:true, order:2} ]},
+        options: prefOpts });
+    }
+
+    // 5. Valuation: price (left) vs daily EV mNAV (right)
+    const mh = DATA.companies[co].mnavHistory;
+    if(mh){
+      const mnOpts = baseOpts({ scales:{
+        x:{ ticks:{color:AX,font:{size:11},autoSkip:true,maxTicksLimit:8,maxRotation:0}, grid:{color:GRID} },
+        yP:axis("","left",{ticks:{color:c,font:{size:11},callback:v=>"$"+(+v).toFixed(0)}}),
+        yM:axis("mNAV","right",{ticks:{color:"#ffffff",font:{size:11},callback:v=>(+v).toFixed(2)+"x"}}) } });
+      mnOpts.plugins.tooltip.callbacks = { label: ctx => {
+        if(ctx.parsed.y==null) return null;
+        return ctx.dataset.yAxisID==="yM" ? "mNAV: "+(+ctx.parsed.y).toFixed(2)+"x"
+                                          : co+": $"+(+ctx.parsed.y).toFixed(2);
+      }};
+      mkChart("ch-mnav-"+co, { type:"line", data:{ labels: mh.dates, datasets:[
+        {label:"Price", data:mh.px, yAxisID:"yP", borderColor:c, backgroundColor:c+"18",
+          borderWidth:2, tension:.2, pointRadius:0, fill:false, order:1},
+        {label:"mNAV", data:mh.mnav, yAxisID:"yM", borderColor:"rgba(255,255,255,0.85)",
+          backgroundColor:"transparent", borderWidth:2, tension:.2, pointRadius:0, fill:false, order:2} ]},
+        options: mnOpts });
+    }
+  });
+}
+
+// ---------- generic hover breakdown tooltip (position:fixed, not clipped by the grid) ----------
+const evtip = document.createElement("div"); evtip.id = "evtip"; document.body.appendChild(evtip);
+document.addEventListener("mouseover", e => {
+  const el = e.target.closest && e.target.closest(".evhint"); if(!el) return;
+  const rows = (el.dataset.rows||"").split("|").map(r=>r.split("~"));
+  evtip.innerHTML = `<div class="et-title">${el.dataset.title||""}</div><table>` +
+    rows.map(([k,v])=>`<tr><td>${k}</td><td>${v}</td></tr>`).join("") + '</table>';
+  evtip.style.display = "block";
+  const r = el.getBoundingClientRect();
+  let left = r.right - evtip.offsetWidth; if(left < 8) left = 8;
+  let top = r.bottom + 8; if(top + evtip.offsetHeight > window.innerHeight - 8) top = r.top - evtip.offsetHeight - 8;
+  evtip.style.left = left + "px"; evtip.style.top = top + "px";
+});
+document.addEventListener("mouseout", e => {
+  if(e.target.closest && e.target.closest(".evhint")) evtip.style.display = "none";
+});
+
+// ---------- debt schedule tooltip (convertible notes) ----------
+function debtTipHTML(co){
+  const o=DATA.companies[co], ds=o.debtSchedule||[]; if(!ds.length) return null;
+  const tot=ds.reduce((s,x)=>s+x.principal,0);
+  const wac=ds.reduce((s,x)=>s+x.principal*x.coupon,0)/tot;
+  const now=new Date((DATA.asOf||"2026-06-26")+"T00:00:00");
+  const yrs=x=>(new Date(x.maturity+"T00:00:00")-now)/(365.25*864e5);
+  const wam=ds.reduce((s,x)=>s+x.principal*yrs(x),0)/tot;
+  const btcPar=(tot*1e6)/o.holdings;                     // BTC price at which reserve covers the debt
+  const px=o.stockPrice;
+  const mDate=s=>new Date(s+"T00:00:00").toLocaleDateString("en-US",{month:"short",year:"2-digit"});
+  const parity=x=>px*x.convRate/10;                       // conversion value as % of par
+  const SH=DATA.stockHistory||{}, arr=SH[co]||[];
+  const chg=n=>(arr.length>n&&arr[arr.length-1-n])?(arr.at(-1)/arr[arr.length-1-n]-1)*100:null;
+  const cc=v=>v==null?"—":`<span class='${v>=0?'pos':'neg'}'>${sig(v)}${fmt(v,1)}%</span>`;
+  const rows=ds.map(x=>`<tr><td>${x.note}</td><td>${fmt(x.coupon,3)}%</td><td>${mDate(x.maturity)}</td><td>${mDate(x.put)}</td><td>$${fmt(x.principal/1000,2)}B</td><td>$${fmt(x.convPrice,2)}</td><td>${fmt(parity(x),0)}%</td></tr>`).join("");
+  return `<div class="et-title">Convertible Notes · ${o.capStructAsOf||""}</div>
+    <div class="dt-sum"><b>$${fmt(tot/1000,2)}B</b> total · Wtd coupon <b>${fmt(wac,2)}%</b> · Wtd maturity <b>${fmt(wam,1)} yr</b> · BTC par <b>$${fmt(btcPar,0)}</b></div>
+    <table class="dt"><tr><th>Note</th><th>Coupon</th><th>Maturity</th><th>Put</th><th>Principal</th><th>Conv $</th><th>Parity</th></tr>${rows}</table>
+    <div class="dt-note">BTC par = BTC price at which reserves cover the bonds. Parity = conversion value ÷ par at live stock ($${fmt(px,2)}); stock 7d ${cc(chg(5))}, 1mo ${cc(chg(21))}. Actual bond prices trade above parity (bond floor) and need a TRACE/dealer feed.</div>`;
+}
+const debttip=document.createElement("div"); debttip.id="debttip"; document.body.appendChild(debttip);
+document.addEventListener("mouseover", e => {
+  const el=e.target.closest && e.target.closest(".debthint"); if(!el) return;
+  const html=debtTipHTML(el.dataset.co); if(!html) return;
+  debttip.innerHTML=html; debttip.style.display="block";
+  const r=el.getBoundingClientRect();
+  let left=r.right-debttip.offsetWidth; if(left<8) left=8;
+  let top=r.bottom+8; if(top+debttip.offsetHeight>window.innerHeight-8) top=Math.max(8, r.top-debttip.offsetHeight-8);
+  debttip.style.left=left+"px"; debttip.style.top=top+"px";
+});
+document.addEventListener("mouseout", e => {
+  if(e.target.closest && e.target.closest(".debthint")) debttip.style.display="none";
+});
+
+async function fetchBtcPrice(){
+  const sub = document.getElementById("btcSub");
+  try{
+    sub.textContent = "fetching live price…"; sub.className="sub";
+    const r = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true");
+    if(!r.ok) throw new Error(r.status);
+    const j = await r.json();
+    btcPrice = j.bitcoin.usd;
+    const ch = j.bitcoin.usd_24h_change;
+    sub.innerHTML = `live · CoinGecko · 24h <span class="${ch>=0?'pos':'neg'}">${sig(ch)}${fmt(ch,2)}%</span>`;
+    sub.classList.add("live");
+    renderAll();
+  }catch(e){
+    sub.textContent = `latest · ${usd(DATA.btcPriceUsd)} · as of ${DATA.priceAsOf}`;
+  }
+}
+
+async function loadData(){
+  // 1) data.js (window.__DATA__) — works even on file:// (script tag, no CORS)
+  if(window.__DATA__){ DATA = window.__DATA__; btcPrice = DATA.btcPriceUsd; }
+  else {
+    // 2) fetch data.json — works when served over http(s)
+    try{
+      const r = await fetch("./data.json", {cache:"no-store"});
+      if(r.ok){ DATA = await r.json(); btcPrice = DATA.btcPriceUsd; }
+    }catch(e){ /* 3) fall back to embedded SEED */ }
+  }
+  if(!DATA.history && SEED.history) DATA.history = SEED.history;  // per-block fallbacks
+  if(!DATA.weekly && SEED.weekly) DATA.weekly = SEED.weekly;
+  if(!DATA.stockHistory && SEED.stockHistory) DATA.stockHistory = SEED.stockHistory;
+  renderAll();
+  renderCharts();
+  fetchBtcPrice();
+}
+
+document.getElementById("refreshBtn").addEventListener("click", fetchBtcPrice);
+loadData();
+</script>
+</body>
+</html>
