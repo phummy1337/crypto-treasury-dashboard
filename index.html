@@ -13,13 +13,13 @@
 <style>
   :root {
     /* APYX brand: near-black, crimson accent, white headlines, gray body (deck + logo) */
-    --bg: #0b0b0c;
-    --panel: rgba(19, 19, 21, 0.62);
-    --panel-2: rgba(28, 28, 31, 0.62);
-    --border: rgba(255, 255, 255, 0.13);
+    --bg: #0a0a0b;
+    --panel: rgba(255, 255, 255, 0.025);
+    --panel-2: rgba(255, 255, 255, 0.06);
+    --border: rgba(255, 255, 255, 0.15);
     --border-red: rgba(220, 20, 60, 0.35);
     --text: #f5f6f7;
-    --muted: #bdc1c6;
+    --muted: #b9bdc2;
     --faint: #9aa0a6;
     --btc: #f7931a;
     --apyx: #dc143c;
@@ -29,17 +29,19 @@
     --pos: #34d399;
     --neg: #ff7a7a;
     --accent: #e8eaed;
-    --radius: 8px;
+    --radius: 4px;
     --shadow: 0 10px 30px rgba(0,0,0,0.55);
-    font-synthesis: none;
+    /* Google Sans Flex ships no italic faces; the brand's italics are synthesized
+       obliques (same as the deck), so font-synthesis stays enabled */
   }
   * { box-sizing: border-box; }
   body {
     margin: 0;
+    /* deck pages are essentially flat black with a faint ember arc in one corner */
     background:
-      radial-gradient(58% 44% at 92% 4%, rgba(220,20,60,0.13), transparent 62%),
-      radial-gradient(46% 38% at 4% 100%, rgba(220,20,60,0.07), transparent 65%),
-      linear-gradient(180deg, #0d0c0c 0%, #0b0b0c 55%, #090909 100%);
+      radial-gradient(52% 40% at 94% 2%, rgba(220,20,60,0.075), transparent 62%),
+      radial-gradient(40% 32% at 2% 100%, rgba(220,20,60,0.04), transparent 65%),
+      linear-gradient(180deg, #0b0a0a 0%, #0a0a0b 55%, #090909 100%);
     background-attachment: fixed;
     color: var(--text);
     font-family: "Google Sans Flex", "Google Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -80,7 +82,8 @@
   .statbox::before { content:""; position:absolute; left:0; top:0; bottom:0; width:3px;
     background: var(--bx, var(--red)); }
   .statbox .lbl { font-size: 12.5px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted); white-space: nowrap; }
-  .statbox .val { font-size: 25px; font-weight: 700; margin-top: 4px;
+  /* italic bold stat callouts, like the deck's "3.3x" / "-50%" figures */
+  .statbox .val { font-size: 25px; font-weight: 700; font-style: italic; margin-top: 4px;
     color: var(--bx, var(--text)); font-variant-numeric: tabular-nums; }
   .statbox .sub { font-size: 12.5px; color: var(--faint); margin-top: 3px; }
   .statbox .sub.live { color: var(--pos); }
@@ -90,8 +93,9 @@
   /* ---------- Sections ---------- */
   section { margin-bottom: 40px; }
   .sec-head { display:flex; align-items:center; gap:11px; margin: 0 0 12px; }
-  .sec-head h2 { margin:0; font-weight:700; font-size: 21px; letter-spacing: .3px; color: #fff; }
-  .sec-head h2 .secno { color: var(--red); font-weight: 700; margin-right: 8px; }
+  /* deck pattern: red roman chapter number + bold italic white section label */
+  .sec-head h2 { margin:0; font-weight:700; font-size: 20px; letter-spacing: .3px; color: #fff; font-style: italic; }
+  .sec-head h2 .secno { color: var(--red); font-weight: 700; margin-right: 8px; font-style: normal; }
   .sec-head .tag {
     font-size: 11.5px; text-transform: uppercase; letter-spacing: 1px; color: var(--faint);
     border:1px solid var(--border); border-radius: 999px; padding: 3px 10px;
@@ -182,7 +186,7 @@
   .chartcard h3 { margin:0; font-weight:700; font-size: 14.5px; letter-spacing:.3px;
     display:flex; align-items:center; gap:7px; color:#fff; }
   .chartcard h3 .dot { width:9px; height:9px; }
-  .chartcard .ch-sub { color: var(--faint); font-size: 12.5px; margin: 4px 0 10px; }
+  .chartcard .ch-sub { color: var(--faint); font-size: 12.5px; margin: 4px 0 10px; font-style: italic; }
   .chartwrap { position: relative; height: 250px; }
   .illus { color: var(--btc); font-size: 12.5px; margin-top: 6px; opacity:.9; }
 
