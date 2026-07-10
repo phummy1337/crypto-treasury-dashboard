@@ -598,13 +598,26 @@ def _asst_obs(text):
             dt = _pdate(pre[-1]) if pre else None
         if dt:
             obs.append((dt, n))
-    # press-release boilerplate ("holds approximately N bitcoin as of DATE") and
+    # press-release boilerplate ("holds approximately N bitcoin(s) as of DATE") and
     # earnings-release phrasing ("Accumulated a total of N bitcoin as of DATE")
-    for m in re.finditer(r"(?:holds approximately|[Aa]ccumulated a total of)\s+([\d,]+(?:\.\d+)?)\s+bitcoin"
+    for m in re.finditer(r"(?:holds approximately|[Aa]ccumulated a total of)\s+([\d,]+(?:\.\d+)?)\s+bitcoins?"
                          r"\s+as of\s+([A-Z][a-z]+ \d{1,2}, \d{4})", text):
         dt = _pdate(m.group(2))
         if dt:
             obs.append((dt, int(float(m.group(1).replace(",", "")))))
+    # founding-era (Sep 2025 – Jan 2026) one-off phrasings; dated by a preceding
+    # "as of" or, failing that, the 8-K's event-report date
+    for m in re.finditer(r"([\d,]+(?:\.\d+)?)\s+bitcoins?"
+                         r"(?:\s+acquired at an average cost|,\s+with a total acquisition cost)"
+                         r"|holdings increased to approximately\s+([\d,]+(?:\.\d+)?)\s+bitcoins?", text):
+        n = m.group(1) or m.group(2)
+        pre = re.findall(r"[Aa]s of ([A-Z][a-z]+ \d{1,2}, \d{4})", text[:m.start()])
+        dt = _pdate(pre[-1]) if pre else None
+        if not dt:
+            rm = re.search(r"Date of Report \(Date of earliest event reported\)\s*:?\s*([A-Z][a-z]+ \d{1,2}, \d{4})", text)
+            dt = _pdate(rm.group(1)) if rm else None
+        if dt and n:
+            obs.append((dt, int(float(n.replace(",", "")))))
     return obs
 
 
@@ -859,13 +872,16 @@ def fetch_holdings(data, max_points=60):
                 if strc_px:     # reserve = USD cash + STRC marked at the live price
                     co["cash"] = round(cash_usd + strc_sh * strc_px / 1e6)
                 log(f"ASST cash: ${cash_usd}M USD + {strc_sh:,} STRC @ ${strc_px} -> ${co['cash']}M")
+            # genesis anchor: Strive announced its bitcoin treasury pivot on
+            # Sep 9, 2025 with no BTC held; lets the first buys register as deltas
+            allobs.setdefault(datetime.date(2025, 9, 9), 0)
             # pre-May-2026 filings are prose snapshots, not change tables — derive
             # the weekly actions from consecutive snapshot deltas instead
             covered = {a["d"] for a in acts if a["co"] == "ASST"}
             sd = sorted(snaps)
             for i in range(1, len(sd)):
                 d0, d1 = sd[i - 1], sd[i]
-                if d1.isoformat() in covered or (d1 - d0).days > 35:
+                if d1.isoformat() in covered or (d1 - d0).days > 70:
                     continue
                 a, b = snaps[d0], snaps[d1]
                 its = []
@@ -887,7 +903,7 @@ def fetch_holdings(data, max_points=60):
             obs_sorted = sorted(allobs.items())
             for i in range(1, len(obs_sorted)):
                 (d0, h0), (d1, h1) = obs_sorted[i - 1], obs_sorted[i]
-                if d1.isoformat() in covered or (d1 - d0).days > 35 or h1 == h0:
+                if d1.isoformat() in covered or (d1 - d0).days > 70 or h1 == h0:
                     continue
                 acts.append({"d": d1.isoformat(), "co": "ASST",
                              "items": [f"{'Bought' if h1 > h0 else 'Sold'} {abs(h1-h0):,} BTC"]})

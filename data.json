@@ -1,9 +1,9 @@
 {
   "asOf": "2026-07-09",
   "priceAsOf": "2026-07-09",
-  "btcPriceUsd": 63813,
+  "btcPriceUsd": 63947,
   "btcSupply": 21000000,
-  "btcCirculating": 20054256,
+  "btcCirculating": 20054275,
   "companies": {
     "MSTR": {
       "name": "Strategy",
@@ -136,7 +136,7 @@
       "capStructAsOf": "2026-03-31 (10-Q)",
       "dilutedShares": 401.29,
       "marketCapBasic": 29540,
-      "navPremiumBasic": 0.649,
+      "navPremiumBasic": 0.647,
       "treasuryDate": "2026-07-06",
       "bpsHistory": {
         "dates": [
@@ -2670,8 +2670,8 @@
           1.091,
           1.079,
           1.073,
-          1.017,
-          1.017
+          1.015,
+          1.015
         ]
       },
       "strcNotionalSteps": [
@@ -2806,7 +2806,7 @@
       "capStructAsOf": "2026-06-18 (8-K)",
       "dilutedShares": 112.06,
       "marketCapBasic": 925,
-      "navPremiumBasic": 0.822,
+      "navPremiumBasic": 0.821,
       "treasuryDate": "2026-07-02",
       "bpsHistory": {
         "dates": [
@@ -4153,8 +4153,8 @@
           1.312,
           1.299,
           1.301,
-          1.284,
-          1.284
+          1.282,
+          1.282
         ]
       },
       "cashUsd": 153.4,
@@ -5385,6 +5385,7 @@
     "ASST": {
       "dates": [
         "Jan 1",
+        "Jan 13",
         "Jan 16",
         "Jan 28",
         "Mar 9",
@@ -5405,7 +5406,8 @@
       ],
       "ranges": [
         "Jan 1",
-        "Jan 1 \u2013 Jan 16",
+        "Jan 1 \u2013 Jan 13",
+        "Jan 13 \u2013 Jan 16",
         "Jan 16 \u2013 Jan 28",
         "Jan 28 \u2013 Mar 9",
         "Mar 9 \u2013 Mar 17",
@@ -5425,7 +5427,8 @@
       ],
       "acquired": [
         null,
-        null,
+        122,
+        5048,
         334,
         null,
         317,
@@ -5445,6 +5448,7 @@
       ],
       "holdings": [
         7627,
+        7749,
         12797,
         13131,
         13311,
@@ -5870,6 +5874,13 @@
       ]
     },
     {
+      "d": "2026-03-09",
+      "co": "ASST",
+      "items": [
+        "Bought 180 BTC"
+      ]
+    },
+    {
       "d": "2026-03-08",
       "co": "MSTR",
       "items": [
@@ -5940,6 +5951,20 @@
       "items": [
         "Bought 22,305 BTC (~$2,125M at ~$95,284/BTC)",
         "Raised ~$2,125M net via ATM (STRC $294M, STRK $3M, common stock $1,827M)"
+      ]
+    },
+    {
+      "d": "2026-01-16",
+      "co": "ASST",
+      "items": [
+        "Bought 5,048 BTC"
+      ]
+    },
+    {
+      "d": "2026-01-13",
+      "co": "ASST",
+      "items": [
+        "Bought 224 BTC"
       ]
     },
     {
@@ -6015,11 +6040,25 @@
       ]
     },
     {
+      "d": "2025-11-07",
+      "co": "ASST",
+      "items": [
+        "Bought 1,568 BTC"
+      ]
+    },
+    {
       "d": "2025-11-02",
       "co": "MSTR",
       "items": [
         "Bought 397 BTC (~$46M at ~$114,771/BTC)",
         "Raised ~$70M net via ATM (STRF $8M, STRK $4M, STRD $2M, common stock $54M)"
+      ]
+    },
+    {
+      "d": "2025-10-27",
+      "co": "ASST",
+      "items": [
+        "Bought 71 BTC"
       ]
     },
     {
@@ -6036,6 +6075,13 @@
       "items": [
         "Bought 168 BTC (~$19M at ~$112,051/BTC)",
         "Raised ~$19M net via ATM (STRF $11M, STRK $5M, STRD $3M)"
+      ]
+    },
+    {
+      "d": "2025-09-30",
+      "co": "ASST",
+      "items": [
+        "Bought 5,886 BTC"
       ]
     },
     {
