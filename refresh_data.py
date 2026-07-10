@@ -624,6 +624,62 @@ def _mstr_dividends_paid(data, start, end):
     return total
 
 
+_ATM_LABEL = {"STRC": "STRC", "STRF": "STRF", "STRK": "STRK", "STRD": "STRD", "MSTR": "common stock"}
+
+
+def _mstr_actions(text, rec, fl):
+    """Readable weekly actions from an MSTR 8-K."""
+    items = []
+    if rec[2] > 0:
+        avg = round(fl["btcSpent"] * 1e6 / rec[2]) if fl["btcSpent"] else None
+        items.append(f"Bought {rec[2]:,} BTC" + (f" (~${fl['btcSpent']:,.0f}M at ~${avg:,}/BTC)" if avg else ""))
+    elif rec[2] < 0:
+        items.append(f"Sold {-rec[2]:,} BTC for ~${fl['btcSold']:,.0f}M")
+    # per-series ATM sales: segment each row, net proceeds = second-to-last $ figure
+    raises = []
+    for s in ("STRC", "STRF", "STRK", "STRD", "MSTR"):
+        m = re.search(rf"{s} (?:ATM|Stock)\s*(.*?)(?=(?:STRC|STRF|STRK|STRD|STRE|MSTR)\s+(?:ATM|Stock)|Total)", text)
+        if not m:
+            continue
+        seg = m.group(1)
+        if "billion of" in seg:
+            seg = seg[:seg.rfind("$", 0, seg.find("billion of"))]
+        nums = [float(x.replace(",", "")) for x in re.findall(r"\$\s*([\d,.]+)", seg)]
+        if len(nums) >= 2 and nums[-2] >= 0.5:
+            raises.append(f"{_ATM_LABEL[s]} ${nums[-2]:,.0f}M")
+    if raises:
+        items.append(f"Raised ~${fl['raised']:,.0f}M net via ATM ({', '.join(raises)})")
+    rm = re.search(r"dividend rate[^.]{0,200}?from ([\d.]+)% to ([\d.]+)%", text)
+    if rm and "STRC" in text:
+        items.append(f"{'Raised' if float(rm.group(2)) > float(rm.group(1)) else 'Cut'} STRC dividend rate "
+                     f"{rm.group(1)}% → {rm.group(2)}%")
+    return items
+
+
+def _asst_actions(text):
+    """Readable weekly actions from a Strive 8-K."""
+    items = []
+    m = re.search(r"purchased ([\d,]+) bitcoin at an average price of approximately \$\s?([\d,]+)", text)
+    if m and int(m.group(1).replace(",", "")) > 0:
+        items.append(f"Bought {m.group(1)} BTC at ~${m.group(2)}/BTC avg")
+    cm = re.search(r"Cash and cash equivalents \(in thousands\)\s*\$\s*([\d,]+)\s*\$\s*([\d,]+)", text)
+    if cm:
+        a, b = (int(cm.group(i).replace(",", "")) / 1000 for i in (1, 2))
+        if abs(b - a) >= 1:
+            items.append(f"Cash {'+' if b >= a else '−'}${abs(b-a):,.1f}M (${a:,.1f}M → ${b:,.1f}M)")
+    sm = re.search(r"Class A common stock\s*([\d,]+)\s*([\d,]+)\s*([\d,]+)", text)
+    if sm and int(sm.group(3).replace(",", "")) > 1000:
+        items.append(f"Issued {sm.group(3)} Class A shares (ATM)")
+    pm = re.search(r"SATA Stock[^0-9]{0,60}([\d,]{6,})\s*([\d,]{6,})\s*([\d,]+)", text)
+    if pm and int(pm.group(3).replace(",", "")) > 1000:
+        items.append(f"Issued {pm.group(3)} SATA preferred shares")
+    rm = re.search(r"dividend rate[^.]{0,200}?from ([\d.]+)% to ([\d.]+)%", text)
+    if rm and "SATA" in text:
+        items.append(f"{'Raised' if float(rm.group(2)) > float(rm.group(1)) else 'Cut'} SATA dividend rate "
+                     f"{rm.group(1)}% → {rm.group(2)}%")
+    return items
+
+
 def fetch_holdings(data, max_points=60):
     """Rebuild data['weekly'] per company from the issuers' 8-Ks, from Jan 1 onward.
 
@@ -634,6 +690,7 @@ def fetch_holdings(data, max_points=60):
     cutoff = datetime.date(datetime.date.today().year, 1, 1)
     f = lambda d: d.strftime("%b %-d")
     weekly = {"illustrative": False}
+    acts = []
     for tk, cik in CIK.items():
         try:
             sub = get_json(f"https://data.sec.gov/submissions/CIK{cik}.json")
@@ -664,10 +721,13 @@ def fetch_holdings(data, max_points=60):
                 fetched += 1
                 if rec and rec[1] and rec[3] and rec[1] not in seen:
                     seen.add(rec[1]); pts.append(rec)
-                    if rec[1] > anchor and t8:             # roll cash forward from filed anchor
-                        fl = _parse_flows(t8)
+                    fl = _parse_flows(t8) if t8 else {"raised": 0, "btcSpent": 0, "btcSold": 0}
+                    if rec[1] > anchor:                    # roll cash forward from filed anchor
                         for k in flows: flows[k] += fl[k]
                         flow_asof = max(flow_asof, rec[1])
+                    ai = _mstr_actions(t8, rec, fl) if t8 else []
+                    if ai:
+                        acts.append({"d": rec[1].isoformat(), "co": "MSTR", "items": ai})
                     if len(pts) >= max_points: break
                 if fetched >= max_points * 3: break
                 time.sleep(0.12)
@@ -707,8 +767,13 @@ def fetch_holdings(data, max_points=60):
             for url in docs():
                 try:
                     t8 = _edgar_text(url)
+                    obs_dates = []
                     for d, h in _asst_obs(t8):
                         allobs[d] = h
+                        obs_dates.append(d)
+                    ai = _asst_actions(t8)
+                    if ai and obs_dates:
+                        acts.append({"d": max(obs_dates).isoformat(), "co": "ASST", "items": ai})
                     # Strive's weekly 8-K splits its reserve into true USD cash and a
                     # 505k-share STRC position at fair value (their site lumps both as
                     # "cash"); capture the components from the newest filing that has them
@@ -758,6 +823,11 @@ def fetch_holdings(data, max_points=60):
             f"{weekly[tk]['dates'][-1]}), latest {cur:,} BTC")
     if "MSTR" in weekly or "ASST" in weekly:
         data["weekly"] = weekly
+    if acts:    # merge with previously stored actions so old weeks never drop off
+        old = {(a["d"], a["co"]): a for a in (data.get("actions") or [])}
+        for a in acts:
+            old[(a["d"], a["co"])] = a
+        data["actions"] = sorted(old.values(), key=lambda a: a["d"], reverse=True)[:120]
 
 
 # --------------------------------------------------------------------------- #

@@ -164,6 +164,17 @@
   .bar { height:5px; background: var(--panel-2); border-radius:99px; overflow:hidden; margin-top:6px; }
   .bar > span { display:block; height:100%; border-radius:99px; }
 
+  /* company actions timeline (scrollable) */
+  .actionsbox { max-height: 480px; overflow-y: auto; }
+  .act-week { display: flex; gap: 16px; padding: 11px 18px; border-top: 1px solid var(--border); align-items: baseline; }
+  .act-week:first-child { border-top: none; }
+  .act-date { flex: 0 0 96px; color: var(--faint); font-size: 13.5px; font-variant-numeric: tabular-nums; }
+  .act-co { flex: 0 0 52px; font-weight: 700; font-size: 14px; }
+  .act-items { margin: 0; padding-left: 16px; flex: 1; }
+  .act-items li { margin: 2px 0; font-size: 15px; color: var(--text); }
+  .actionsbox::-webkit-scrollbar { width: 8px; }
+  .actionsbox::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
+
   .footnote { color: var(--faint); font-size: 13px; margin-top: 8px; }
   .sources { margin-top: 26px; padding-top: 18px; border-top:1px solid var(--border); color: var(--muted); font-size: 13.5px; }
   .sources b { color: var(--text); }
@@ -346,6 +357,13 @@
     <p class="sec-note">Leverage and coverage ratios implied by the holdings, cash, debt, and preferred shown under Company Stats above. Crypto NAV uses live holdings × the live BTC price.</p>
     <div class="grid" id="grid-capital"></div>
     <p class="footnote">Leverage and coverage use face/notional values. Lower leverage and higher coverage = a safer structure for common holders; higher leverage can enable faster accumulation.</p>
+  </section>
+
+  <!-- 7. Company Actions -->
+  <section id="actions">
+    <div class="sec-head"><h2><span class="secno">07.</span>Company Actions</h2><span class="tag" style="color:var(--pos);border-color:rgba(52,211,153,0.45)">live</span></div>
+    <p class="sec-note">Week-by-week actions from each issuer's SEC filings — bitcoin bought or sold, capital raised by program, share issuance, cash moves, and dividend-rate changes. Newest first; scroll for history.</p>
+    <div class="grid actionsbox" id="grid-actions"></div>
   </section>
 
   <div class="sources">
@@ -611,7 +629,14 @@ function renderPerShare(){
   const wyM=wkYield("MSTR"), wyA=wkYield("ASST");
   const cls = v => v>=0?"pos":"neg";
   let h = headRow();
-  h += row({label:"BTC per Share (Basic)", sub:"sats / share · latest", MSTR:fmt(M.satsPerShareBasic), ASST:fmt(A.satsPerShareBasic)});
+  // hover reconciles to strategy.com, whose headline figure is per assumed-diluted share
+  const bpsCell = o => {
+    if(!o.satsPerShareDiluted) return fmt(o.satsPerShareBasic);
+    const rows=[["Basic ("+fmt(o.sharesOutstanding,2)+"M sh)", fmt(o.satsPerShareBasic)],
+                ["Assumed Diluted ("+fmt(o.dilutedShares,2)+"M sh)", fmt(o.satsPerShareDiluted)]].map(r=>r.join("~")).join("|");
+    return `<span class="evhint" data-title="Sats per Share" data-rows="${rows}">${fmt(o.satsPerShareBasic)}</span>`;
+  };
+  h += row({label:"BTC per Share (Basic)", sub:"sats / share · hover for diluted", MSTR:bpsCell(M), ASST:bpsCell(A)});
   h += row({label:"BTC Yield — 1 Week", sub:"Δ BTC/share, latest 8-K week", MSTR:pct(wyM), ASST:pct(wyA),
     cls:{MSTR:cls(wyM),ASST:cls(wyA)}, betterFor: (wyA!=null&&wyM!=null&&wyA>wyM)?"ASST":"MSTR"});
   h += row({label:"BTC Yield — YTD", sub:"% increase in BTC/share", MSTR:pct(M.btcYieldYtd), ASST:pct(A.btcYieldYtd),
@@ -727,7 +752,20 @@ function renderPriceHeader(){
   set("hdr-strc-sub", chg(M.prefChangePct)+"Strategy pref");
   set("hdr-sata-sub", chg(A.prefChangePct)+"Strive pref");
 }
-function renderAll(){ renderPriceHeader(); renderCompany(); renderHoldings(); renderCost(); renderPerShare(); renderValuation(); renderCapital(); }
+function renderActions(){
+  const el = document.getElementById("grid-actions"); if(!el) return;
+  const acts = DATA.actions || [];
+  if(!acts.length){ el.innerHTML = '<div style="padding:14px 18px;color:var(--faint)">No actions parsed yet — populated by the data refresh.</div>'; return; }
+  const dt = iso => new Date(iso+"T00:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});
+  el.innerHTML = acts.map(a => {
+    const o = DATA.companies[a.co] || {};
+    return `<div class="act-week"><div class="act-date">${dt(a.d)}</div>
+      <div class="act-co" style="color:${o.accent||'#fff'}">${a.co}</div>
+      <ul class="act-items">${a.items.map(x=>`<li>${x}</li>`).join("")}</ul></div>`;
+  }).join("");
+}
+
+function renderAll(){ renderPriceHeader(); renderCompany(); renderHoldings(); renderCost(); renderPerShare(); renderValuation(); renderCapital(); renderActions(); }
 
 // ---------- charts (Chart.js) ----------
 const CHARTS = {};

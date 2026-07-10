@@ -1,7 +1,7 @@
 {
   "asOf": "2026-07-09",
   "priceAsOf": "2026-07-09",
-  "btcPriceUsd": 63851,
+  "btcPriceUsd": 63728,
   "btcSupply": 21000000,
   "btcCirculating": 20054256,
   "companies": {
@@ -136,7 +136,7 @@
       "capStructAsOf": "2026-03-31 (10-Q)",
       "dilutedShares": 401.29,
       "marketCapBasic": 29540,
-      "navPremiumBasic": 0.653,
+      "navPremiumBasic": 0.649,
       "treasuryDate": "2026-07-06",
       "bpsHistory": {
         "dates": [
@@ -2670,8 +2670,8 @@
           1.091,
           1.079,
           1.073,
-          1.068,
-          1.068
+          1.018,
+          1.018
         ]
       },
       "strcNotionalSteps": [
@@ -2747,6 +2747,10 @@
           [
             "2026-07-09",
             1474
+          ],
+          [
+            "2026-07-09",
+            3885
           ]
         ]
       }
@@ -2802,7 +2806,7 @@
       "capStructAsOf": "2026-06-18 (8-K)",
       "dilutedShares": 112.06,
       "marketCapBasic": 925,
-      "navPremiumBasic": 0.828,
+      "navPremiumBasic": 0.823,
       "treasuryDate": "2026-07-02",
       "bpsHistory": {
         "dates": [
@@ -4149,8 +4153,8 @@
           1.312,
           1.299,
           1.301,
-          1.292,
-          1.292
+          1.285,
+          1.285
         ]
       },
       "cashUsd": 153.4,
@@ -5594,5 +5598,451 @@
     }
   },
   "dataSource": "strategytracker.com (live) + SEC EDGAR (debt/preferred)",
-  "eurUsd": 1.1435
+  "eurUsd": 1.1435,
+  "actions": [
+    {
+      "d": "2026-07-05",
+      "co": "MSTR",
+      "items": [
+        "Sold 3,588 BTC for ~$216M"
+      ]
+    },
+    {
+      "d": "2026-07-02",
+      "co": "ASST",
+      "items": [
+        "Cash +$11.7M ($141.7M \u2192 $153.4M)",
+        "Issued 1,081,004 Class A shares (ATM)"
+      ]
+    },
+    {
+      "d": "2026-06-28",
+      "co": "MSTR",
+      "items": [
+        "Raised ~$1,152M net via ATM (common stock $1,152M)"
+      ]
+    },
+    {
+      "d": "2026-06-26",
+      "co": "ASST",
+      "items": [
+        "Cash \u2212$2.8M ($144.5M \u2192 $141.7M)",
+        "Issued 76,942 Class A shares (ATM)"
+      ]
+    },
+    {
+      "d": "2026-06-21",
+      "co": "MSTR",
+      "items": [
+        "Bought 520 BTC (~$35M at ~$67,068/BTC)",
+        "Raised ~$336M net via ATM (common stock $336M)"
+      ]
+    },
+    {
+      "d": "2026-06-18",
+      "co": "ASST",
+      "items": [
+        "Bought 759 BTC at ~$65,850/BTC avg",
+        "Cash +$3.1M ($141.4M \u2192 $144.5M)",
+        "Issued 1,893,822 Class A shares (ATM)",
+        "Issued 315,595 SATA preferred shares"
+      ]
+    },
+    {
+      "d": "2026-06-14",
+      "co": "MSTR",
+      "items": [
+        "Bought 1,587 BTC (~$100M at ~$63,024/BTC)",
+        "Raised ~$209M net via ATM (common stock $209M)"
+      ]
+    },
+    {
+      "d": "2026-06-12",
+      "co": "ASST",
+      "items": [
+        "Bought 73 BTC at ~$63,646/BTC avg",
+        "Cash +$2.2M ($139.2M \u2192 $141.4M)",
+        "Issued 483,400 Class A shares (ATM)"
+      ]
+    },
+    {
+      "d": "2026-06-07",
+      "co": "MSTR",
+      "items": [
+        "Bought 1,550 BTC (~$101M at ~$65,332/BTC)",
+        "Raised ~$181M net via ATM (common stock $181M)"
+      ]
+    },
+    {
+      "d": "2026-06-05",
+      "co": "ASST",
+      "items": [
+        "Bought 32 BTC at ~$63,911/BTC avg",
+        "Cash +$1.9M ($137.3M \u2192 $139.2M)",
+        "Issued 321,500 Class A shares (ATM)"
+      ]
+    },
+    {
+      "d": "2026-06-01",
+      "co": "ASST",
+      "items": [
+        "Bought 2,500 BTC at ~$74,092/BTC avg",
+        "Cash +$44.0M ($93.3M \u2192 $137.3M)",
+        "Issued 3,190,618 Class A shares (ATM)",
+        "Issued 1,754,188 SATA preferred shares"
+      ]
+    },
+    {
+      "d": "2026-05-31",
+      "co": "MSTR",
+      "items": [
+        "Raised ~$128M net via ATM (common stock $128M)"
+      ]
+    },
+    {
+      "d": "2026-05-22",
+      "co": "ASST",
+      "items": [
+        "Bought 1,109 BTC at ~$76,989/BTC avg",
+        "Cash +$6.0M ($87.3M \u2192 $93.3M)",
+        "Issued 2,232,000 Class A shares (ATM)",
+        "Issued 515,298 SATA preferred shares"
+      ]
+    },
+    {
+      "d": "2026-05-17",
+      "co": "MSTR",
+      "items": [
+        "Bought 24,869 BTC (~$2,014M at ~$80,985/BTC)",
+        "Raised ~$2,033M net via ATM (STRC $1,949M, common stock $84M)"
+      ]
+    },
+    {
+      "d": "2026-05-12",
+      "co": "ASST",
+      "items": [
+        "Bought 1,381 BTC at ~$76,524/BTC avg"
+      ]
+    },
+    {
+      "d": "2026-05-10",
+      "co": "MSTR",
+      "items": [
+        "Bought 535 BTC (~$43M at ~$80,340/BTC)",
+        "Raised ~$43M net via ATM (common stock $43M)"
+      ]
+    },
+    {
+      "d": "2026-05-03",
+      "co": "MSTR",
+      "items": [
+        "Raised ~$82M net via ATM (common stock $82M)"
+      ]
+    },
+    {
+      "d": "2026-04-26",
+      "co": "MSTR",
+      "items": [
+        "Bought 3,273 BTC (~$255M at ~$77,906/BTC)",
+        "Raised ~$255M net via ATM (common stock $255M)"
+      ]
+    },
+    {
+      "d": "2026-04-19",
+      "co": "MSTR",
+      "items": [
+        "Bought 34,164 BTC (~$2,542M at ~$74,395/BTC)",
+        "Raised ~$2,542M net via ATM (STRC $2,176M, common stock $366M)"
+      ]
+    },
+    {
+      "d": "2026-04-12",
+      "co": "MSTR",
+      "items": [
+        "Bought 13,927 BTC (~$1,001M at ~$71,902/BTC)",
+        "Raised ~$1,001M net via ATM (STRC $1,001M)"
+      ]
+    },
+    {
+      "d": "2026-03-31",
+      "co": "MSTR",
+      "items": [
+        "Raised ~$299M net via ATM (STRC $227M, common stock $72M)"
+      ]
+    },
+    {
+      "d": "2026-03-22",
+      "co": "MSTR",
+      "items": [
+        "Bought 1,031 BTC (~$77M at ~$74,326/BTC)",
+        "Raised ~$76M net via ATM (common stock $76M)"
+      ]
+    },
+    {
+      "d": "2026-03-15",
+      "co": "MSTR",
+      "items": [
+        "Bought 22,337 BTC (~$1,568M at ~$70,194/BTC)",
+        "Raised ~$1,576M net via ATM (STRC $1,180M, common stock $396M)"
+      ]
+    },
+    {
+      "d": "2026-03-01",
+      "co": "MSTR",
+      "items": [
+        "Bought 3,015 BTC (~$204M at ~$67,700/BTC)",
+        "Raised ~$237M net via ATM (STRC $7M, common stock $230M)",
+        "Raised STRC dividend rate 11.25% \u2192 11.50%"
+      ]
+    },
+    {
+      "d": "2026-02-22",
+      "co": "MSTR",
+      "items": [
+        "Bought 592 BTC (~$40M at ~$67,286/BTC)",
+        "Raised ~$40M net via ATM (common stock $40M)"
+      ]
+    },
+    {
+      "d": "2026-02-16",
+      "co": "MSTR",
+      "items": [
+        "Bought 2,486 BTC (~$168M at ~$67,710/BTC)",
+        "Raised ~$169M net via ATM (STRC $78M, common stock $90M)"
+      ]
+    },
+    {
+      "d": "2026-02-08",
+      "co": "MSTR",
+      "items": [
+        "Bought 1,142 BTC (~$90M at ~$78,815/BTC)",
+        "Raised ~$90M net via ATM (common stock $90M)"
+      ]
+    },
+    {
+      "d": "2026-02-01",
+      "co": "MSTR",
+      "items": [
+        "Bought 855 BTC (~$75M at ~$87,974/BTC)",
+        "Raised ~$106M net via ATM (common stock $106M)",
+        "Raised STRC dividend rate 11.00% \u2192 11.25%"
+      ]
+    },
+    {
+      "d": "2026-01-25",
+      "co": "MSTR",
+      "items": [
+        "Bought 2,932 BTC (~$264M at ~$90,061/BTC)",
+        "Raised ~$264M net via ATM (STRC $7M, common stock $257M)"
+      ]
+    },
+    {
+      "d": "2026-01-19",
+      "co": "MSTR",
+      "items": [
+        "Bought 22,305 BTC (~$2,125M at ~$95,284/BTC)",
+        "Raised ~$2,125M net via ATM (STRC $294M, STRK $3M, common stock $1,827M)"
+      ]
+    },
+    {
+      "d": "2026-01-11",
+      "co": "MSTR",
+      "items": [
+        "Bought 13,627 BTC (~$1,247M at ~$91,519/BTC)",
+        "Raised ~$1,248M net via ATM (STRC $119M, common stock $1,128M)"
+      ]
+    },
+    {
+      "d": "2025-12-31",
+      "co": "MSTR",
+      "items": [
+        "Bought 3 BTC (~$0M at ~$88,210/BTC)",
+        "Raised ~$196M net via ATM (common stock $196M)"
+      ]
+    },
+    {
+      "d": "2025-12-28",
+      "co": "MSTR",
+      "items": [
+        "Bought 1,229 BTC (~$109M at ~$88,568/BTC)",
+        "Raised ~$109M net via ATM (common stock $109M)"
+      ]
+    },
+    {
+      "d": "2025-12-21",
+      "co": "MSTR",
+      "items": [
+        "Raised ~$748M net via ATM (common stock $748M)"
+      ]
+    },
+    {
+      "d": "2025-12-14",
+      "co": "MSTR",
+      "items": [
+        "Bought 10,645 BTC (~$980M at ~$92,098/BTC)",
+        "Raised ~$989M net via ATM (STRF $18M, STRK $1M, STRD $82M, common stock $888M)"
+      ]
+    },
+    {
+      "d": "2025-12-07",
+      "co": "MSTR",
+      "items": [
+        "Bought 10,624 BTC (~$963M at ~$90,615/BTC)",
+        "Raised ~$963M net via ATM (STRD $35M, common stock $928M)"
+      ]
+    },
+    {
+      "d": "2025-11-16",
+      "co": "MSTR",
+      "items": [
+        "Bought 8,178 BTC (~$836M at ~$102,171/BTC)",
+        "Raised ~$136M net via ATM (STRC $131M, STRF $4M, STRK $0M)"
+      ]
+    },
+    {
+      "d": "2025-11-09",
+      "co": "MSTR",
+      "items": [
+        "Bought 487 BTC (~$50M at ~$102,557/BTC)",
+        "Raised ~$50M net via ATM (STRC $26M, STRF $18M, STRK $4M, STRD $1M)"
+      ]
+    },
+    {
+      "d": "2025-11-02",
+      "co": "MSTR",
+      "items": [
+        "Bought 397 BTC (~$46M at ~$114,771/BTC)",
+        "Raised ~$70M net via ATM (STRF $8M, STRK $4M, STRD $2M, common stock $54M)"
+      ]
+    },
+    {
+      "d": "2025-10-26",
+      "co": "MSTR",
+      "items": [
+        "Bought 390 BTC (~$43M at ~$111,117/BTC)",
+        "Raised ~$43M net via ATM (STRF $19M, STRK $17M, STRD $7M)"
+      ]
+    },
+    {
+      "d": "2025-10-19",
+      "co": "MSTR",
+      "items": [
+        "Bought 168 BTC (~$19M at ~$112,051/BTC)",
+        "Raised ~$19M net via ATM (STRF $11M, STRK $5M, STRD $3M)"
+      ]
+    },
+    {
+      "d": "2025-09-28",
+      "co": "MSTR",
+      "items": [
+        "Bought 196 BTC (~$22M at ~$113,048/BTC)",
+        "Raised ~$128M net via ATM (STRF $11M, common stock $116M)"
+      ]
+    },
+    {
+      "d": "2025-09-21",
+      "co": "MSTR",
+      "items": [
+        "Bought 850 BTC (~$100M at ~$117,344/BTC)",
+        "Raised ~$100M net via ATM (STRF $19M, common stock $81M)"
+      ]
+    },
+    {
+      "d": "2025-09-14",
+      "co": "MSTR",
+      "items": [
+        "Bought 525 BTC (~$60M at ~$114,562/BTC)",
+        "Raised ~$68M net via ATM (STRF $34M, STRK $17M, STRD $17M)"
+      ]
+    },
+    {
+      "d": "2025-09-07",
+      "co": "MSTR",
+      "items": [
+        "Bought 1,955 BTC (~$217M at ~$111,196/BTC)",
+        "Raised ~$217M net via ATM (STRF $12M, STRK $5M, common stock $200M)"
+      ]
+    },
+    {
+      "d": "2025-09-01",
+      "co": "MSTR",
+      "items": [
+        "Bought 4,048 BTC (~$449M at ~$110,981/BTC)",
+        "Raised ~$472M net via ATM (STRF $26M, STRK $19M, STRD $1M, common stock $425M)"
+      ]
+    },
+    {
+      "d": "2025-08-24",
+      "co": "MSTR",
+      "items": [
+        "Bought 3,081 BTC (~$357M at ~$115,829/BTC)",
+        "Raised ~$357M net via ATM (STRF $27M, STRK $20M)"
+      ]
+    },
+    {
+      "d": "2025-08-17",
+      "co": "MSTR",
+      "items": [
+        "Bought 430 BTC (~$51M at ~$119,666/BTC)",
+        "Raised ~$50M net via ATM (STRF $19M, STRK $19M, STRD $12M)"
+      ]
+    },
+    {
+      "d": "2025-08-10",
+      "co": "MSTR",
+      "items": [
+        "Bought 155 BTC (~$18M at ~$116,401/BTC)",
+        "Raised ~$14M net via ATM (STRF $14M)"
+      ]
+    },
+    {
+      "d": "2025-08-03",
+      "co": "MSTR",
+      "items": [
+        "Bought 21,021 BTC (~$2,465M at ~$117,256/BTC)"
+      ]
+    },
+    {
+      "d": "2025-07-20",
+      "co": "MSTR",
+      "items": [
+        "Bought 6,220 BTC (~$740M at ~$118,940/BTC)"
+      ]
+    },
+    {
+      "d": "2025-07-13",
+      "co": "MSTR",
+      "items": [
+        "Bought 4,225 BTC (~$472M at ~$111,827/BTC)"
+      ]
+    },
+    {
+      "d": "2025-06-29",
+      "co": "MSTR",
+      "items": [
+        "Bought 4,980 BTC (~$532M at ~$106,801/BTC)"
+      ]
+    },
+    {
+      "d": "2025-06-22",
+      "co": "MSTR",
+      "items": [
+        "Bought 245 BTC (~$26M at ~$105,856/BTC)"
+      ]
+    },
+    {
+      "d": "2025-06-15",
+      "co": "MSTR",
+      "items": [
+        "Bought 10,100 BTC (~$1,051M at ~$104,080/BTC)"
+      ]
+    },
+    {
+      "d": "2025-06-08",
+      "co": "MSTR",
+      "items": [
+        "Bought 1,045 BTC (~$110M at ~$105,426/BTC)"
+      ]
+    }
+  ]
 }
