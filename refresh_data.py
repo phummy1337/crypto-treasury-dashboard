@@ -500,6 +500,11 @@ def _edgar_text(url):
     return re.sub(r"\s+", " ", t)
 
 
+def _edgar_json(url):
+    req = urllib.request.Request(url, headers=EDGAR_UA)
+    return json.loads(urllib.request.urlopen(req, timeout=25, context=_SSL_CTX).read())
+
+
 def _pdate(s):
     for fmt in ("%B %d, %Y", "%b %d, %Y", "%b. %d, %Y"):
         try:
@@ -593,6 +598,13 @@ def _asst_obs(text):
             dt = _pdate(pre[-1]) if pre else None
         if dt:
             obs.append((dt, n))
+    # press-release boilerplate ("holds approximately N bitcoin as of DATE") and
+    # earnings-release phrasing ("Accumulated a total of N bitcoin as of DATE")
+    for m in re.finditer(r"(?:holds approximately|[Aa]ccumulated a total of)\s+([\d,]+(?:\.\d+)?)\s+bitcoin"
+                         r"\s+as of\s+([A-Z][a-z]+ \d{1,2}, \d{4})", text):
+        dt = _pdate(m.group(2))
+        if dt:
+            obs.append((dt, int(float(m.group(1).replace(",", "")))))
     return obs
 
 
@@ -680,6 +692,33 @@ def _asst_actions(text):
     return items
 
 
+def _asst_snapshot(text):
+    """Point-in-time snapshot from Strive's pre-May-2026 prose 8-Ks:
+    (date, {cash, strc, btc, classA, sata}). Two phrasings observed."""
+    TAIL = r"Strive had ([\d,]+) (?:and [\d,]+ )?shares of Class A.{0,90}?([\d,]+) shares of (?:its )?(?:Variable Rate|SATA)"
+    m = re.search(r"[Aa]s of ([A-Z][a-z]+ \d{1,2}, \d{4}), Strive held \$\s?([\d,.]+) million of cash"
+                  r".{0,120}?held \$\s?([\d,.]+) million in the Variable Rate.{0,160}?held ([\d,]+) bitcoin"
+                  r".{0,40}?" + TAIL, text)
+    if m:
+        g = lambda i: float(m.group(i).replace(",", ""))
+        return (_pdate(m.group(1)), {"cash": g(2), "strc": g(3), "btc": int(g(4)),
+                                     "classA": int(g(5)), "sata": int(g(6))})
+    m = re.search(r"[Aa]s of ([A-Z][a-z]+ \d{1,2}, \d{4}), the Company.?s bitcoin treasury totaled ([\d,]+) bitcoin"
+                  r" and the Company.?s cash and cash equivalents and holdings (?:in|of) .{0,160}?totaled"
+                  r" \$\s?([\d,.]+) million and \$\s?([\d,.]+) million.{0,60}?" + TAIL, text)
+    if m:
+        g = lambda i: float(m.group(i).replace(",", ""))
+        return (_pdate(m.group(1)), {"cash": g(3), "strc": g(4), "btc": int(g(2)),
+                                     "classA": int(g(5)), "sata": int(g(6))})
+    m = re.search(r"[Aa]s of ([A-Z][a-z]+ \d{1,2}, \d{4}), Strive held \$\s?([\d,.]+) million of cash"
+                  r".{0,220}?(?:and|,)\s*([\d,]+) bitcoin.{0,40}?" + TAIL, text)
+    if m:      # cash-only phrasing (no STRC value clause)
+        g = lambda i: float(m.group(i).replace(",", ""))
+        return (_pdate(m.group(1)), {"cash": g(2), "strc": None, "btc": int(g(3)),
+                                     "classA": int(g(4)), "sata": int(g(5))})
+    return None
+
+
 def fetch_holdings(data, max_points=60):
     """Rebuild data['weekly'] per company from the issuers' 8-Ks, from Jan 1 onward.
 
@@ -698,21 +737,21 @@ def fetch_holdings(data, max_points=60):
             log(f"[skip] EDGAR submissions {tk} failed: {e}")
             continue
         r = sub["filings"]["recent"]
-        docpat = re.compile(rf"^{tk.lower()}-\d{{8}}\.htm$")
+        docpat = re.compile(rf"^(?:{tk.lower()}-\d{{8}}\.htm|.*8k.*\.htm)$", re.I)
 
         def docs():
             for i in range(len(r["form"])):
                 if r["form"][i] == "8-K" and docpat.match(r["primaryDocument"][i] or ""):
                     acc = r["accessionNumber"][i].replace("-", "")
-                    yield (f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{acc}/"
-                           f"{r['primaryDocument'][i]}")
+                    base = f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{acc}/"
+                    yield (base + r["primaryDocument"][i], base)
 
         if tk == "MSTR":
             anchor = datetime.date.fromisoformat(MSTR_CASH_FILED[0])
             flows = {"raised": 0.0, "btcSpent": 0.0, "btcSold": 0.0}
             flow_asof = anchor
             pts, seen, fetched = [], set(), 0
-            for url in docs():
+            for url, base in docs():
                 try:
                     t8 = _edgar_text(url)
                     rec = _parse_mstr(t8)
@@ -764,7 +803,8 @@ def fetch_holdings(data, max_points=60):
         else:  # ASST — observation-based
             allobs, fetched = {}, 0
             cash_usd = strc_sh = None
-            for url in docs():
+            snaps = {}
+            for url, base in docs():
                 try:
                     t8 = _edgar_text(url)
                     obs_dates = []
@@ -772,8 +812,32 @@ def fetch_holdings(data, max_points=60):
                         allobs[d] = h
                         obs_dates.append(d)
                     ai = _asst_actions(t8)
+                    sn = _asst_snapshot(t8)
+                    if not (obs_dates or sn):
+                        # early 2026 filings put the treasury update in a press-release
+                        # exhibit (ex-99) rather than the 8-K body — check there too
+                        try:
+                            idx = _edgar_json(base + "index.json")
+                            for fobj in idx["directory"]["item"]:
+                                n = fobj["name"]
+                                if not n.endswith(".htm") or not re.search(r"ex.{0,2}99", n, re.I):
+                                    continue
+                                te = _edgar_text(base + n)
+                                time.sleep(0.1)
+                                for d, h in _asst_obs(te):
+                                    allobs[d] = h
+                                    obs_dates.append(d)
+                                sn = sn or _asst_snapshot(te)
+                                ai = ai or _asst_actions(te)
+                                if obs_dates or sn:
+                                    break
+                        except Exception:
+                            pass
                     if ai and obs_dates:
                         acts.append({"d": max(obs_dates).isoformat(), "co": "ASST", "items": ai})
+                    if sn and sn[0]:
+                        snaps[sn[0]] = sn[1]
+                        allobs.setdefault(sn[0], sn[1]["btc"])
                     # Strive's weekly 8-K splits its reserve into true USD cash and a
                     # 505k-share STRC position at fair value (their site lumps both as
                     # "cash"); capture the components from the newest filing that has them
@@ -795,10 +859,43 @@ def fetch_holdings(data, max_points=60):
                 if strc_px:     # reserve = USD cash + STRC marked at the live price
                     co["cash"] = round(cash_usd + strc_sh * strc_px / 1e6)
                 log(f"ASST cash: ${cash_usd}M USD + {strc_sh:,} STRC @ ${strc_px} -> ${co['cash']}M")
+            # pre-May-2026 filings are prose snapshots, not change tables — derive
+            # the weekly actions from consecutive snapshot deltas instead
+            covered = {a["d"] for a in acts if a["co"] == "ASST"}
+            sd = sorted(snaps)
+            for i in range(1, len(sd)):
+                d0, d1 = sd[i - 1], sd[i]
+                if d1.isoformat() in covered or (d1 - d0).days > 35:
+                    continue
+                a, b = snaps[d0], snaps[d1]
+                its = []
+                if b["btc"] > a["btc"]:
+                    its.append(f"Bought {b['btc']-a['btc']:,} BTC")
+                elif b["btc"] < a["btc"]:
+                    its.append(f"Sold {a['btc']-b['btc']:,} BTC")
+                dc = b["cash"] - a["cash"]
+                if abs(dc) >= 1:
+                    its.append(f"Cash {'+' if dc >= 0 else '−'}${abs(dc):,.1f}M (${a['cash']:,.1f}M → ${b['cash']:,.1f}M)")
+                if b["classA"] - a["classA"] > 1000:
+                    its.append(f"Issued {b['classA']-a['classA']:,} Class A shares (ATM)")
+                if b["sata"] - a["sata"] > 1000:
+                    its.append(f"Issued {b['sata']-a['sata']:,} SATA preferred shares")
+                if its:
+                    acts.append({"d": d1.isoformat(), "co": "ASST", "items": its})
+            # earliest weeks disclosed only BTC counts — fall back to holdings deltas
+            covered = {a["d"] for a in acts if a["co"] == "ASST"}
+            obs_sorted = sorted(allobs.items())
+            for i in range(1, len(obs_sorted)):
+                (d0, h0), (d1, h1) = obs_sorted[i - 1], obs_sorted[i]
+                if d1.isoformat() in covered or (d1 - d0).days > 35 or h1 == h0:
+                    continue
+                acts.append({"d": d1.isoformat(), "co": "ASST",
+                             "items": [f"{'Bought' if h1 > h0 else 'Sold'} {abs(h1-h0):,} BTC"]})
             items = sorted((d, h) for d, h in allobs.items() if d >= cutoff)
             if not items:
                 log(f"[skip] EDGAR {tk}: no parseable 8-Ks"); continue
-            items = [(cutoff, 0)] + items          # held ~0 BTC at the start of the year
+            ye0 = (data["companies"][tk].get("yearEnd") or {}).get(str(cutoff.year - 1)) or 0
+            items = [(cutoff, ye0)] + items        # anchor at last year-end holdings
             holds = [h for _, h in items]
             # bars only for weekly-cadence filings; pre-weekly jumps show on the line only
             wk = datetime.timedelta(days=14)
