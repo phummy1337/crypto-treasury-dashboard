@@ -529,7 +529,16 @@ function renderCompany(){
   const debtCell = o => { const disp=capFmt(o.seniorDebt);
     return (o.debtSchedule||[]).length ? `<span class="debthint" data-co="${o.ticker}">${disp}</span>` : disp; };
   h += row({label:"Crypto Holdings", sub:"BTC", MSTR:"₿"+fmt(M.holdings), ASST:"₿"+fmt(A.holdings)});
-  h += row({label:"Cash & Cash Equivalents", sub:"USD", MSTR:capFmt(M.cash), ASST:capFmt(A.cash)});
+  // Strive holds 505k STRC and reports it inside "cash"; show the split on hover
+  const cashCell = o => {
+    if(o.cashUsd==null || !o.strcShares) return capFmt(o.cash);
+    const px = M.prefPrice||0, pos = o.strcShares*px/1e6;
+    const rows = [["USD Cash", capFmt(o.cashUsd)],
+                  [`STRC Held (${fmt(o.strcShares)} sh × ${usd(px,2)})`, capFmt(pos)],
+                  ["Total Reserve", capFmt(o.cashUsd+pos)]].map(r=>r.join("~")).join("|");
+    return `<span class="evhint" data-title="Cash &amp; Equivalents" data-rows="${rows}">${capFmt(o.cash)}</span>`;
+  };
+  h += row({label:"Cash & Cash Equivalents", sub:"USD · ASST incl. STRC held at market · hover", MSTR:capFmt(M.cash), ASST:cashCell(A)});
   h += row({label:"Senior Debt", sub:"convertible notes · hover for schedule", MSTR:debtCell(M), ASST:debtCell(A)});
   h += row({label:"Preferred Equity Notional", sub:"by series · hover for breakdown", MSTR:prefCell(M), ASST:prefCell(A)});
   h += row({label:"Annual Obligations", sub:"mostly pref dividends", MSTR:capFmt(M.annualObligations), ASST:capFmt(A.annualObligations)});

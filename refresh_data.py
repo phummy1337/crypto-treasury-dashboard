@@ -170,6 +170,11 @@ def _step(steps, iso):
     return v
 
 
+# STRE is EUR-denominated: 7,750,000 shares × €100 stated amount (Nov 13, 2025
+# offering, per 8-K) = €775mm, converted at the live ECB EURUSD rate each refresh.
+# The tracker carries a stale fixed conversion ($899mm), so we override it.
+STRE_EUR_NOTIONAL = 775.0
+
 PREF_LABEL = {"STRC": "Stretch · {r}% var", "STRK": "Strike · {r}%", "STRF": "Strife · {r}%",
               "STRD": "Stride · {r}%", "STRE": "STRE · {r}% (EUR)", "SATA": "Strive pref · {r}%"}
 
@@ -187,6 +192,10 @@ def fetch_strategytracker(data):
         log(f"[skip] strategytracker failed: {e} — keeping existing values")
         return
     comps = full.get("companies", {})
+    try:    # live EURUSD (ECB) for the EUR-denominated STRE notional
+        data["eurUsd"] = round(get_json("https://api.frankfurter.dev/v1/latest?base=EUR&symbols=USD")["rates"]["USD"], 4)
+    except Exception:
+        log("[skip] EURUSD fetch failed — keeping previous rate")
     hist = {}
     for tk in ("MSTR", "ASST"):
         c = comps.get(tk)
@@ -221,6 +230,8 @@ def fetch_strategytracker(data):
             for p in ps:
                 t = p["ticker"]
                 notM = p.get("notionalMillions") or round((p.get("notionalUSD") or 0) / 1e6)
+                if t == "STRE" and data.get("eurUsd"):
+                    notM = round(STRE_EUR_NOTIONAL * data["eurUsd"])
                 rate = p.get("dividendRate")
                 lab = PREF_LABEL.get(t, "{r}%").format(r=("%g" % rate) if rate is not None else "?")
                 bd.append([t, lab, round(notM)])
@@ -258,8 +269,8 @@ def fetch_strategytracker(data):
             co["prefBreakdown"] = bd
             co["prefNotional"] = round(sum(x[2] for x in bd))
             co["prefMarket"] = round(mkt)
-            pref_div = sum((p.get("notionalMillions") or (p.get("notionalUSD") or 0) / 1e6)
-                           * (p.get("dividendRate") or 0) / 100 for p in ps)
+            corr = {x[0]: x[2] for x in bd}   # FX-corrected notionals
+            pref_div = sum(corr.get(p["ticker"], 0) * (p.get("dividendRate") or 0) / 100 for p in ps)
             debt_int = sum(x["principal"] * x["coupon"] / 100 for x in (co.get("debtSchedule") or []))
             co["annualObligations"] = round(pref_div + debt_int)
         sp = [x for x in hd["stock_prices"][-365:] if x is not None]
@@ -623,15 +634,33 @@ def fetch_holdings(data, max_points=60):
                 data["companies"][tk]["avgCost"] = pts[-1][4]
         else:  # ASST — observation-based
             allobs, fetched = {}, 0
+            cash_usd = strc_sh = None
             for url in docs():
                 try:
-                    for d, h in _asst_obs(_edgar_text(url)):
+                    t8 = _edgar_text(url)
+                    for d, h in _asst_obs(t8):
                         allobs[d] = h
+                    # Strive's weekly 8-K splits its reserve into true USD cash and a
+                    # 505k-share STRC position at fair value (their site lumps both as
+                    # "cash"); capture the components from the newest filing that has them
+                    if cash_usd is None:
+                        cm = re.search(r"Cash and cash equivalents \(in thousands\)\s*\$\s*[\d,]+\s*\$\s*([\d,]+)", t8)
+                        sm = re.search(r"Shares of STRC held\s*[\d,]+\s*([\d,]+)", t8)
+                        if cm and sm:
+                            cash_usd = round(int(cm.group(1).replace(",", "")) / 1000, 1)
+                            strc_sh = int(sm.group(1).replace(",", ""))
                 except Exception:
                     pass
                 fetched += 1
                 if fetched >= max_points: break
                 time.sleep(0.12)
+            if cash_usd is not None:
+                co = data["companies"][tk]
+                co["cashUsd"], co["strcShares"] = cash_usd, strc_sh
+                strc_px = data["companies"]["MSTR"].get("prefPrice") or 0
+                if strc_px:     # reserve = USD cash + STRC marked at the live price
+                    co["cash"] = round(cash_usd + strc_sh * strc_px / 1e6)
+                log(f"ASST cash: ${cash_usd}M USD + {strc_sh:,} STRC @ ${strc_px} -> ${co['cash']}M")
             items = sorted((d, h) for d, h in allobs.items() if d >= cutoff)
             if not items:
                 log(f"[skip] EDGAR {tk}: no parseable 8-Ks"); continue
