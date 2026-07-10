@@ -252,6 +252,7 @@ def fetch_strategytracker(data):
                         first = chg[0]["effective_date"] if chg else "9999-99-99"
                         chg = [{"effective_date": d, "notional_millions": n}
                                for d, n in STRC_BACKFILL if d < first] + chg
+                        co["strcNotionalSteps"] = [[e["effective_date"], e["notional_millions"]] for e in chg]
                     dts, px, no = [], [], []
                     for q in hp:
                         dts.append(_iso_lbl(q["date"], "%b %-d"))
@@ -508,6 +509,25 @@ def _pdate(s):
     return None
 
 
+def _parse_flows(text):
+    """Weekly cash flows from an MSTR 8-K: ATM net proceeds in, BTC spend out,
+    BTC sale proceeds in (all $mm). BTC dollar amounts are derived as
+    quantity × average price — the aggregate column switches between
+    (in millions) and (in billions) across filings, the avg price never does."""
+    raised = spent = sold = 0.0
+    am = re.search(r"ATM (?:Program Summary|Updates?).{0,6000}?Total\s*\$\s*([\d,.]+)", text)
+    if am:
+        raised = float(am.group(1).replace(",", ""))
+    # period purchase row: "<acquired> $<aggregate> $<avg price> <holdings> ..."
+    tm = re.search(r"Aggregate BTC Holdings.*?([\d,]+)\s+\$\s*[\d,.]+\s+\$\s*([\d,]+)"
+                   r"\s+[\d,]{5,}\s+\$\s*[\d,.]+\s+\$\s*[\d,]+", text)
+    if tm:
+        spent = int(tm.group(1).replace(",", "")) * int(tm.group(2).replace(",", "")) / 1e6
+    for m in re.finditer(r"BTC Sold.{0,140}?([\d,]{3,})\s*(?:\(\d\))?\s*\$\s*[\d,.]+\s+\$\s*([\d,]+)", text):
+        sold += int(m.group(1).replace(",", "")) * int(m.group(2).replace(",", "")) / 1e6
+    return {"raised": raised, "btcSpent": spent, "btcSold": sold}
+
+
 def _parse_mstr(text):
     """Strategy 8-K 'BTC Update' -> (start, end, acquired, holdings, avg_cost).
 
@@ -576,6 +596,34 @@ def _asst_obs(text):
     return obs
 
 
+# MSTR cash roll-forward: anchor at the last filed balance-sheet cash, then add
+# weekly 8-K flows (ATM net proceeds + BTC sale proceeds − BTC purchases) and
+# subtract scheduled preferred dividends / convert coupons.
+MSTR_CASH_FILED = ("2026-03-31", 2207.2)      # Q1-26 10-Q — bump when the next 10-Q lands
+STRC_DIV_RATE = 0.115                          # current per-annum rate (monthly payer)
+QTRLY_PREF_DIV = (1402 * .08 + 1284 * .10 + 1402 * .10) / 4   # STRK/STRF/STRD, $mm per quarter
+CONVERT_COUPONS = {"06-15": 800 * .0225 / 2, "12-15": 800 * .0225 / 2,     # 2032s
+                   "03-15": (1010 * .00625 + 800 * .00625 + 603.66 * .00875) / 2,
+                   "09-15": (1010 * .00625 + 800 * .00625 + 603.66 * .00875) / 2}
+
+
+def _mstr_dividends_paid(data, start, end):
+    """Scheduled MSTR dividend/coupon cash out between (start, end], $mm (approx)."""
+    steps = [tuple(x) for x in (data["companies"]["MSTR"].get("strcNotionalSteps") or [])]
+    stre = next((x[2] for x in data["companies"]["MSTR"].get("prefBreakdown", []) if x[0] == "STRE"), 886)
+    total = 0.0
+    d = start
+    while d < end:
+        d += datetime.timedelta(days=1)
+        nxt = d + datetime.timedelta(days=1)
+        if nxt.day == 1:                                   # d is a month end
+            total += (_step(steps, d.isoformat()) or 0) * STRC_DIV_RATE / 12   # STRC monthly
+            if d.month in (3, 6, 9, 12):                   # quarter-end payers
+                total += QTRLY_PREF_DIV + stre * .10 / 4
+        total += CONVERT_COUPONS.get(d.strftime("%m-%d"), 0)
+    return total
+
+
 def fetch_holdings(data, max_points=60):
     """Rebuild data['weekly'] per company from the issuers' 8-Ks, from Jan 1 onward.
 
@@ -603,15 +651,23 @@ def fetch_holdings(data, max_points=60):
                            f"{r['primaryDocument'][i]}")
 
         if tk == "MSTR":
+            anchor = datetime.date.fromisoformat(MSTR_CASH_FILED[0])
+            flows = {"raised": 0.0, "btcSpent": 0.0, "btcSold": 0.0}
+            flow_asof = anchor
             pts, seen, fetched = [], set(), 0
             for url in docs():
                 try:
-                    rec = _parse_mstr(_edgar_text(url))
+                    t8 = _edgar_text(url)
+                    rec = _parse_mstr(t8)
                 except Exception:
-                    rec = None
+                    rec = None; t8 = ""
                 fetched += 1
                 if rec and rec[1] and rec[3] and rec[1] not in seen:
                     seen.add(rec[1]); pts.append(rec)
+                    if rec[1] > anchor and t8:             # roll cash forward from filed anchor
+                        fl = _parse_flows(t8)
+                        for k in flows: flows[k] += fl[k]
+                        flow_asof = max(flow_asof, rec[1])
                     if len(pts) >= max_points: break
                 if fetched >= max_points * 3: break
                 time.sleep(0.12)
@@ -632,6 +688,19 @@ def fetch_holdings(data, max_points=60):
             cur = pts[-1][3]
             if pts[-1][4]:      # authoritative avg purchase price from the latest 8-K
                 data["companies"][tk]["avgCost"] = pts[-1][4]
+            # estimated current cash: filed anchor + weekly flows − scheduled dividends
+            divs = _mstr_dividends_paid(data, anchor, flow_asof)
+            est = MSTR_CASH_FILED[1] + flows["raised"] + flows["btcSold"] - flows["btcSpent"] - divs
+            co = data["companies"][tk]
+            co["cashFlows"] = {"anchor": MSTR_CASH_FILED[1], "anchorDate": MSTR_CASH_FILED[0],
+                               "raised": round(flows["raised"]), "btcSold": round(flows["btcSold"]),
+                               "btcSpent": round(flows["btcSpent"]), "divs": round(divs),
+                               "asOf": flow_asof.isoformat()}
+            co["cashFiled"] = MSTR_CASH_FILED[1]
+            co["cash"] = round(est)
+            log(f"MSTR cash est: {MSTR_CASH_FILED[1]} filed + {flows['raised']:,.0f} raised "
+                f"+ {flows['btcSold']:,.0f} BTC sold - {flows['btcSpent']:,.0f} BTC bought "
+                f"- {divs:,.0f} divs = ${est:,.0f}M (as of {flow_asof})")
         else:  # ASST — observation-based
             allobs, fetched = {}, 0
             cash_usd = strc_sh = None

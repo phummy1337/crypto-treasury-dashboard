@@ -1,9 +1,9 @@
 {
   "asOf": "2026-07-09",
   "priceAsOf": "2026-07-09",
-  "btcPriceUsd": 63322,
+  "btcPriceUsd": 63851,
   "btcSupply": 21000000,
-  "btcCirculating": 20054243,
+  "btcCirculating": 20054256,
   "companies": {
     "MSTR": {
       "name": "Strategy",
@@ -36,7 +36,7 @@
       "satsPer100": 119000,
       "mnav": 1.01,
       "cebeMnav": 1.28,
-      "cash": 2207,
+      "cash": 3885,
       "seniorDebt": 8214,
       "prefNotional": 15463,
       "annualObligations": 1710,
@@ -136,7 +136,7 @@
       "capStructAsOf": "2026-03-31 (10-Q)",
       "dilutedShares": 401.29,
       "marketCapBasic": 29540,
-      "navPremiumBasic": 0.657,
+      "navPremiumBasic": 0.653,
       "treasuryDate": "2026-07-06",
       "bpsHistory": {
         "dates": [
@@ -2670,8 +2670,84 @@
           1.091,
           1.079,
           1.073,
-          1.061,
-          1.061
+          1.068,
+          1.068
+        ]
+      },
+      "strcNotionalSteps": [
+        [
+          "2025-07-29",
+          2801.1
+        ],
+        [
+          "2025-11-09",
+          2827.3
+        ],
+        [
+          "2025-11-16",
+          2958.7
+        ],
+        [
+          "2026-01-11",
+          3078.0
+        ],
+        [
+          "2026-01-19",
+          3372.7
+        ],
+        [
+          "2026-01-25",
+          3379.7
+        ],
+        [
+          "2026-02-16",
+          3458.3
+        ],
+        [
+          "2026-03-01",
+          3465.4
+        ],
+        [
+          "2026-03-09",
+          3843.0
+        ],
+        [
+          "2026-03-16",
+          5025.0
+        ],
+        [
+          "2026-04-09",
+          5355.0
+        ],
+        [
+          "2026-04-13",
+          6357.8
+        ],
+        [
+          "2026-04-20",
+          8537.0
+        ],
+        [
+          "2026-05-25",
+          10489.0
+        ]
+      ],
+      "cashFlows": {
+        "anchor": 2207.2,
+        "anchorDate": "2026-03-31",
+        "raised": 7962,
+        "btcSold": 216,
+        "btcSpent": 6091,
+        "divs": 409,
+        "asOf": "2026-07-05"
+      },
+      "cashFiled": 2207.2,
+      "histStepsLive": {
+        "cash": [
+          [
+            "2026-07-09",
+            1474
+          ]
         ]
       }
     },
@@ -2726,7 +2802,7 @@
       "capStructAsOf": "2026-06-18 (8-K)",
       "dilutedShares": 112.06,
       "marketCapBasic": 925,
-      "navPremiumBasic": 0.829,
+      "navPremiumBasic": 0.828,
       "treasuryDate": "2026-07-02",
       "bpsHistory": {
         "dates": [
@@ -4073,8 +4149,8 @@
           1.312,
           1.299,
           1.301,
-          1.295,
-          1.295
+          1.292,
+          1.292
         ]
       },
       "cashUsd": 153.4,

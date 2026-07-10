@@ -538,7 +538,18 @@ function renderCompany(){
                   ["Total Reserve", capFmt(o.cashUsd+pos)]].map(r=>r.join("~")).join("|");
     return `<span class="evhint" data-title="Cash &amp; Equivalents" data-rows="${rows}">${capFmt(o.cash)}</span>`;
   };
-  h += row({label:"Cash & Cash Equivalents", sub:"USD · ASST incl. STRC held at market · hover", MSTR:capFmt(M.cash), ASST:cashCell(A)});
+  // MSTR cash is rolled forward weekly from the last filed balance (8-K flows)
+  const mstrCashCell = o => {
+    const f = o.cashFlows; if(!f) return capFmt(o.cash);
+    const rows = [[`Filed Cash (${f.anchorDate} 10-Q)`, capFmt(f.anchor)],
+                  ["+ ATM Net Proceeds", capFmt(f.raised)],
+                  ["+ BTC Sale Proceeds", capFmt(f.btcSold)],
+                  ["− BTC Purchases", capFmt(f.btcSpent)],
+                  ["− Pref Dividends &amp; Coupons (est)", capFmt(f.divs)],
+                  [`Estimated Cash (as of ${f.asOf})`, capFmt(o.cash)]].map(r=>r.join("~")).join("|");
+    return `<span class="evhint" data-title="Estimated USD Reserve" data-rows="${rows}">${capFmt(o.cash)}</span>`;
+  };
+  h += row({label:"Cash & Cash Equivalents", sub:"estimated from weekly filing flows · hover for build-up", MSTR:mstrCashCell(M), ASST:cashCell(A)});
   h += row({label:"Senior Debt", sub:"convertible notes · hover for schedule", MSTR:debtCell(M), ASST:debtCell(A)});
   h += row({label:"Preferred Equity Notional", sub:"by series · hover for breakdown", MSTR:prefCell(M), ASST:prefCell(A)});
   h += row({label:"Annual Obligations", sub:"mostly pref dividends", MSTR:capFmt(M.annualObligations), ASST:capFmt(A.annualObligations)});
