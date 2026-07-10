@@ -998,14 +998,15 @@ async function fetchBtcPrice(){
 }
 
 async function loadData(){
-  // 1) data.js (window.__DATA__) — works even on file:// (script tag, no CORS)
+  // 1) data.js (window.__DATA__) — instant paint, works even on file:// — but the
+  //    browser may cache it, so over http(s) always re-fetch data.json uncached
+  //    and let the fresh copy win (2); embedded SEED (3) is the last resort.
   if(window.__DATA__){ DATA = window.__DATA__; btcPrice = DATA.btcPriceUsd; }
-  else {
-    // 2) fetch data.json — works when served over http(s)
+  if(location.protocol !== "file:"){
     try{
       const r = await fetch("./data.json", {cache:"no-store"});
       if(r.ok){ DATA = await r.json(); btcPrice = DATA.btcPriceUsd; }
-    }catch(e){ /* 3) fall back to embedded SEED */ }
+    }catch(e){ /* keep data.js / SEED */ }
   }
   if(!DATA.history && SEED.history) DATA.history = SEED.history;  // per-block fallbacks
   if(!DATA.weekly && SEED.weekly) DATA.weekly = SEED.weekly;
