@@ -1116,8 +1116,30 @@ async function loadData(){
   fetchBtcPrice();
 }
 
-document.getElementById("refreshBtn").addEventListener("click", fetchBtcPrice);
-loadData();
+// real-time equity layer: the tracker's light feed (CORS-open, ~140KB) carries live
+// stock prices and holdings; refresh it on load and every 60s so mNAV tracks the tape
+async function fetchLiveEquity(){
+  try{
+    const idx = await (await fetch("https://data.strategytracker.com/latest.json", {cache:"no-store"})).json();
+    const light = await (await fetch("https://data.strategytracker.com/" + idx.files.light, {cache:"no-store"})).json();
+    let changed = false;
+    for(const tk of ["MSTR","ASST"]){
+      const src = light.companies && light.companies[tk], co = DATA.companies[tk];
+      if(!src || !co) continue;
+      if(src.stockPrice > 0 && Math.abs(src.stockPrice - co.stockPrice) > 0.005){
+        co.stockPrice = Math.round(src.stockPrice*100)/100; changed = true;
+      }
+      if(src.holdings > 0 && Math.round(src.holdings) !== co.holdings){
+        co.holdings = Math.round(src.holdings); changed = true;
+      }
+    }
+    if(changed) renderAll();
+  }catch(e){ /* keep last refresh's values */ }
+}
+
+document.getElementById("refreshBtn").addEventListener("click", () => { fetchBtcPrice(); fetchLiveEquity(); });
+loadData().then(fetchLiveEquity);
+setInterval(fetchLiveEquity, 60000);
 </script>
 </body>
 </html>
