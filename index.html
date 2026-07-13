@@ -125,7 +125,9 @@
   .grow.headrow .co small { color: var(--faint); font-weight: 400; }
   .grow:hover:not(.headrow) > div { background: rgba(255,255,255,0.06); }
 
-  .evhint, .debthint, .defhint { cursor: help; border-bottom: 1px dotted var(--faint); }
+  .evhint, .debthint { cursor: help; border-bottom: 1px dotted var(--faint); }
+  .defhint { cursor: help; color: var(--faint); font-size: 12.5px; margin-left: 7px; font-style: normal; vertical-align: 1px; }
+  .defhint:hover { color: #fff; }
   #evtip .et-sec { font-size: 10.5px; color: var(--red); text-transform: uppercase; letter-spacing: .8px; font-weight: 700; margin: 8px 0 3px; }
   #evtip .et-p { margin: 0; max-width: 340px; font-size: 13.5px; color: var(--text); line-height: 1.45; }
   #evtip {
@@ -563,7 +565,7 @@ const METRIC_DEFS = {
   "Crypto NAV / Preferred Notional": {c:"Crypto NAV ÷ preferred face value.",
     m:"Asset coverage on the preferred layer: how many times over the bitcoin covers that claim."},
 };
-const defLabel = lbl => METRIC_DEFS[lbl] ? `<span class="defhint" data-def="${lbl}">${lbl}</span>` : lbl;
+const defLabel = lbl => METRIC_DEFS[lbl] ? `${lbl}<span class="defhint" data-def="${lbl}" aria-label="About this metric">&#9432;</span>` : lbl;
 
 // build a metric row: {label, sub, mstr, asst, betterFor, cls}
 function row(cfg){
@@ -573,7 +575,7 @@ function row(cfg){
     return `<div class="gval ${extra} ${isBetter?'better':''}">${cfg[co] ?? "—"}</div>`;
   };
   return `<div class="grow">
-    <div class="glabel">${defLabel(cfg.label)}${cfg.sub?`<small>${cfg.sub}</small>`:""}</div>
+    <div class="glabel">${defLabel(cfg.label)}</div>
     ${valCell("MSTR")}${valCell("ASST")}
   </div>`;
 }
@@ -791,7 +793,7 @@ function renderCapital(){
     const f = fmtFn || (x=>fmt(x,2));
     const bM = better==="MSTR"?"better":"", bA = better==="ASST"?"better":"";
     return `<div class="grow" style="border-top:1px solid var(--border)">
-      <div class="glabel">${defLabel(label)}${sub?`<small>${sub}</small>`:""}</div>
+      <div class="glabel">${defLabel(label)}</div>
       <div class="gval ${bM}">${f(vM)}</div><div class="gval ${bA}">${f(vA)}</div></div>`;
   };
 
