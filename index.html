@@ -93,9 +93,8 @@
   /* ---------- Sections ---------- */
   section { margin-bottom: 40px; }
   .sec-head { display:flex; align-items:center; gap:11px; margin: 0 0 12px; }
-  /* deck pattern: red roman chapter number + bold italic white section label */
+  /* deck pattern: bold italic white section label */
   .sec-head h2 { margin:0; font-weight:700; font-size: 20px; letter-spacing: .3px; color: #fff; font-style: italic; }
-  .sec-head h2 .secno { color: var(--red); font-weight: 700; margin-right: 8px; font-style: normal; }
   .sec-head .tag {
     font-size: 11.5px; text-transform: uppercase; letter-spacing: 1px; color: var(--faint);
     border:1px solid var(--border); border-radius: 999px; padding: 3px 10px;
@@ -126,7 +125,9 @@
   .grow.headrow .co small { color: var(--faint); font-weight: 400; }
   .grow:hover:not(.headrow) > div { background: rgba(255,255,255,0.06); }
 
-  .evhint, .debthint { cursor: help; border-bottom: 1px dotted var(--faint); }
+  .evhint, .debthint, .defhint { cursor: help; border-bottom: 1px dotted var(--faint); }
+  #evtip .et-sec { font-size: 10.5px; color: var(--red); text-transform: uppercase; letter-spacing: .8px; font-weight: 700; margin: 8px 0 3px; }
+  #evtip .et-p { margin: 0; max-width: 340px; font-size: 13.5px; color: var(--text); line-height: 1.45; }
   #evtip {
     position: fixed; z-index: 1000; display: none; pointer-events: none;
     background: rgba(16,16,18,0.97); border: 1px solid rgba(255,255,255,0.28); border-radius: 8px;
@@ -256,8 +257,8 @@
 
   <!-- 0. Company Stats -->
   <section id="company">
-    <div class="sec-head"><h2><span class="secno">01.</span>Company Stats</h2><span class="tag stub" id="tag-company">seed data</span></div>
-    <p class="sec-note">Equity snapshot for each company and its preferred. Market cap = price × shares; enterprise value adds debt + preferred and nets out cash, so it recomputes with the capital-structure inputs below.</p>
+    <div class="sec-head"><h2>Company Stats</h2><span class="tag stub" id="tag-company">seed data</span></div>
+    <p class="sec-note">Where each company stands right now — share price, size, and the balance-sheet building blocks that every metric below is built from. Hover any line item for how it's calculated and why it matters.</p>
     <div class="charts">
       <div class="chartcard">
         <h3><span class="dot" style="background:var(--mstr)"></span>MSTR — Daily Close</h3>
@@ -286,8 +287,8 @@
 
   <!-- 1. Accumulation & Holdings -->
   <section id="holdings">
-    <div class="sec-head"><h2><span class="secno">02.</span>Accumulation &amp; Holdings</h2><span class="tag stub" id="tag-holdings">seed data</span></div>
-    <p class="sec-note">Raw scale and pace of accumulation. Higher relative growth shows successful capital deployment.</p>
+    <div class="sec-head"><h2>Accumulation &amp; Holdings</h2><span class="tag stub" id="tag-holdings">seed data</span></div>
+    <p class="sec-note">How big each bitcoin treasury is and how fast it's growing.</p>
     <div class="grid" id="grid-holdings"></div>
     <div class="charts">
       <div class="chartcard">
@@ -306,15 +307,15 @@
 
   <!-- 2. Cost & Efficiency -->
   <section id="cost">
-    <div class="sec-head"><h2><span class="secno">03.</span>Cost &amp; Efficiency</h2><span class="tag" style="color:var(--pos);border-color:rgba(52,211,153,0.45)">live</span></div>
-    <p class="sec-note">Blended cost basis and paper P/L. Lower average cost = better long-term efficiency. Unrealized P/L recomputes live with the BTC price above.</p>
+    <div class="sec-head"><h2>Cost &amp; Efficiency</h2><span class="tag" style="color:var(--pos);border-color:rgba(52,211,153,0.45)">live</span></div>
+    <p class="sec-note">How well the bitcoin was bought — each company's entry price versus today's market.</p>
     <div class="grid" id="grid-cost"></div>
   </section>
 
   <!-- 3. Per-Share & Yield -->
   <section id="pershare">
-    <div class="sec-head"><h2><span class="secno">04.</span>Per-Share &amp; Yield <small style="color:var(--faint);font-weight:400;font-size:12px;">(common shareholders)</small></h2><span class="tag stub" id="tag-pershare">seed data</span></div>
-    <p class="sec-note">Dilution-adjusted ownership. BTC Yield = % increase in BTC-per-share over the period; positive/growing yield means accumulation is accretive after dilution.</p>
+    <div class="sec-head"><h2>Per-Share &amp; Yield <small style="color:var(--faint);font-weight:400;font-size:12px;">(common shareholders)</small></h2><span class="tag stub" id="tag-pershare">seed data</span></div>
+    <p class="sec-note">What one share of common stock actually owns, and whether accumulation is outpacing dilution.</p>
     <div class="grid" id="grid-pershare"></div>
     <div class="charts">
       <div class="chartcard">
@@ -333,8 +334,8 @@
 
   <!-- 4. Valuation & Premium (incl. CEBE) -->
   <section id="valuation">
-    <div class="sec-head"><h2><span class="secno">05.</span>Valuation &amp; Premium</h2><span class="tag stub" id="tag-valuation">seed data</span></div>
-    <p class="sec-note">mNAV = EV ÷ BTC reserve, where EV = (price × basic shares) + total debt + total preferred − USD reserve. A premium (&gt;1x) lets a company raise capital cheaply and accretively. CEBE (Common Equity Bitcoin Exposure) is the conservative "after-senior" view: BTC owned by common after subtracting net senior claims (preferred + debt − cash) — it reveals the drag from STRC / SATA and debt.</p>
+    <div class="sec-head"><h2>Valuation &amp; Premium</h2><span class="tag stub" id="tag-valuation">seed data</span></div>
+    <p class="sec-note">Whether the market is pricing each company above or below the bitcoin behind it — for the structure as a whole, and for common shareholders after debt and preferred take their cut.</p>
     <div class="charts">
       <div class="chartcard">
         <h3><span class="dot" style="background:var(--mstr)"></span>MSTR — Price vs. mNAV</h3>
@@ -353,16 +354,16 @@
 
   <!-- 6. Capital Structure (FULLY WORKING, from Excel) -->
   <section id="capital">
-    <div class="sec-head"><h2><span class="secno">06.</span>Capital Structure</h2><span class="tag" style="color:var(--pos);border-color:rgba(52,211,153,0.45)">live</span></div>
-    <p class="sec-note">Leverage and coverage ratios implied by the holdings, cash, debt, and preferred shown under Company Stats above. Crypto NAV uses live holdings × the live BTC price.</p>
+    <div class="sec-head"><h2>Capital Structure</h2><span class="tag" style="color:var(--pos);border-color:rgba(52,211,153,0.45)">live</span></div>
+    <p class="sec-note">How much cushion sits between each treasury and its obligations — leverage, coverage, and staying power.</p>
     <div class="grid" id="grid-capital"></div>
     <p class="footnote">Leverage and coverage use face/notional values. Lower leverage and higher coverage = a safer structure for common holders; higher leverage can enable faster accumulation.</p>
   </section>
 
   <!-- 7. Company Actions -->
   <section id="actions">
-    <div class="sec-head"><h2><span class="secno">07.</span>Company Actions</h2><span class="tag" style="color:var(--pos);border-color:rgba(52,211,153,0.45)">live</span></div>
-    <p class="sec-note">Week-by-week actions from each issuer's SEC filings — bitcoin bought or sold, capital raised by program, share issuance, cash moves, and dividend-rate changes. Newest first; scroll for history.</p>
+    <div class="sec-head"><h2>Company Actions</h2><span class="tag" style="color:var(--pos);border-color:rgba(52,211,153,0.45)">live</span></div>
+    <p class="sec-note">A running log of what each company actually did, week by week, straight from their SEC filings — raises, buys, sales, and dividend changes. Newest first; scroll for history.</p>
     <div class="grid actionsbox" id="grid-actions"></div>
   </section>
 
@@ -484,6 +485,86 @@ function evMnav(o){
 
 function unit(v, u){ return `${v}<span class="unit">${u}</span>`; }
 
+
+// ---------- per-metric definitions (label hover: how it's calculated / what it means) ----------
+const METRIC_DEFS = {
+  "Stock Price": {c:"Latest common-share price from the strategy.com / treasury.strive.com data feed, refreshed throughout market hours.",
+    m:"What the market charges for one share of common stock — the starting point for market cap and every valuation ratio below."},
+  "Day Change": {c:"Today's price versus the prior close, in percent.",
+    m:"Direction and size of today's move — worth reading next to BTC's own 24-hour change above."},
+  "Market Cap": {c:"Stock price × basic shares outstanding.",
+    m:"The market's total value on the common equity — what all common shares are worth together."},
+  "Shares Outstanding": {c:"Basic share count across common classes, from the latest SEC filing.",
+    m:"The denominator behind every per-share figure. Growth here is dilution — unless the bitcoin grows faster."},
+  "Enterprise Value": {c:"Market cap + senior debt + preferred notional − cash reserve.",
+    m:"What it would cost to own the entire company: the equity plus every claim ahead of it, net of the cash on hand."},
+  "Beta to BTC": {c:"Slope of daily stock returns regressed against BTC returns over the past year.",
+    m:"Sensitivity to bitcoin: a beta of 1.5 means the stock has tended to move 1.5% for every 1% move in BTC."},
+  "Preferred Price": {c:"Last trade of the flagship preferred (STRC / SATA), against a $100 stated value.",
+    m:"Below $100, the market demands more yield than the coupon pays — the discount is the market's live read on issuer risk."},
+  "Crypto Holdings": {c:"Total bitcoin held, per the latest weekly 8-K filing.",
+    m:"The treasury itself — the asset backing everything else on this page."},
+  "Cash & Cash Equivalents": {c:"MSTR: last filed balance rolled forward with weekly 8-K flows (ATM proceeds, BTC buys and sales, dividends). ASST: filed USD cash plus its 505,000 STRC shares marked at the live price.",
+    m:"The liquid reserve that pays dividends and nets against debt and preferred claims in every ratio below."},
+  "Senior Debt": {c:"Sum of convertible-note principal outstanding, per the latest 10-Q.",
+    m:"The claims that rank ahead of both preferred and common if things go wrong."},
+  "Preferred Equity Notional": {c:"Face (stated) value of every preferred series — $100 per share, with the EUR-denominated STRE converted at the live rate.",
+    m:"The full preferred claim sitting senior to common — the 'digital credit' layer both companies fund themselves with."},
+  "Annual Obligations": {c:"Each preferred series' notional × its dividend rate, plus convertible-note coupons.",
+    m:"The fixed yearly cash cost of the capital structure — what must be paid out before common shareholders see anything."},
+  "Total BTC Holdings": {c:"Total bitcoin per the latest weekly 8-K; hover the value for the year-by-year path.",
+    m:"Raw treasury size — scale before adjusting for who holds claims against it."},
+  "% of 21M Supply": {c:"Holdings ÷ 21,000,000, bitcoin's hard supply cap.",
+    m:"The share of all bitcoin that will ever exist held by this one company."},
+  "Net Change YTD": {c:"Current holdings − holdings at last year-end.",
+    m:"How much bitcoin the treasury has actually added this year, net of any sales."},
+  "YTD Growth (Relative)": {c:"Net YTD change ÷ holdings at the start of the year.",
+    m:"Growth relative to size — a small treasury adding quickly can out-compound a giant one."},
+  "BTC Acquired / Week": {c:"Average bitcoin added per week across recent 8-K filings.",
+    m:"The current pace of accumulation."},
+  "BTC Acquired / Day": {c:"The weekly pace ÷ 7.",
+    m:"The same accumulation pace, expressed per day."},
+  "Avg Acquisition Cost / BTC": {c:"Aggregate purchase cost ÷ total bitcoin held, per the latest 8-K.",
+    m:"The blended entry price — the bitcoin level at which the whole stack breaks even."},
+  "Current Return on BTC": {c:"(Live BTC price − average cost) ÷ average cost.",
+    m:"The paper return on the treasury: whether the stack is in profit at today's price."},
+  "Unrealized P/L": {c:"(Live BTC price − average cost) × holdings.",
+    m:"The dollar gain or loss embedded in the treasury right now."},
+  "BTC per Share (Basic)": {c:"Holdings ÷ basic shares outstanding, in satoshis. Hover the value for the diluted view.",
+    m:"How much bitcoin one share actually represents — the core 'what do I own' number for a treasury stock."},
+  "BTC Yield — 1 Week": {c:"Percent change in BTC-per-share over the latest 8-K week.",
+    m:"Whether last week's buying grew each share's bitcoin backing after any new share issuance."},
+  "BTC Yield — YTD": {c:"Percent change in BTC-per-share since January 1.",
+    m:"The accretion scoreboard: positive means accumulation outran dilution, so each share owns more bitcoin than it did in January."},
+  "mNAV": {c:"Enterprise value ÷ bitcoin NAV (holdings × live BTC price). Hover the value for the full math.",
+    m:"The premium or discount on the whole structure versus its bitcoin: above 1x the market pays extra; below 1x the bitcoin is selling for less than spot."},
+  "CEBE mNAV": {c:"Common market cap ÷ (bitcoin NAV − net senior claims). Hover the value for the math.",
+    m:"The premium from the common shareholder's seat only, after debt and preferred have taken their cut."},
+  "CEBE": {c:"(Holdings − net senior claims ÷ BTC price) ÷ basic shares, in satoshis.",
+    m:"Common Equity Bitcoin Exposure — the bitcoin per share left over for common after every senior claim is covered."},
+  "Claims % (Drag)": {c:"(Senior debt + preferred notional − cash) ÷ bitcoin NAV.",
+    m:"How much of the treasury is already spoken for by senior claims — the drag on a common shareholder's exposure."},
+  "Sats per $100 Invested": {c:"After-claims bitcoin ÷ market cap, scaled to a $100 purchase.",
+    m:"Bang for the buck: how much net bitcoin exposure $100 of stock buys at today's price."},
+  "Crypto NAV": {c:"Holdings × the live BTC price.",
+    m:"The treasury marked to market — the asset side of the whole structure."},
+  "Total Hard Assets": {c:"Crypto NAV + cash reserve.",
+    m:"Everything liquid that's available to cover obligations."},
+  "Senior Debt / Hard Assets": {c:"Convertible-note principal ÷ total hard assets.",
+    m:"Debt leverage: the slice of the asset base lenders could claim. Lower is safer for everyone below them."},
+  "(Debt + Preferred) / Hard Assets": {c:"(Senior debt + preferred notional) ÷ total hard assets.",
+    m:"Total leverage from all senior claims — the fuller stress-test view of the structure."},
+  "Hard Assets / Annual Obligation": {c:"Total hard assets ÷ annual dividend and coupon cost.",
+    m:"Years of obligations covered by everything on hand — the big-picture safety margin."},
+  "Crypto NAV / Annual Obligation": {c:"Crypto NAV ÷ annual obligations.",
+    m:"Coverage from the bitcoin alone, ignoring cash."},
+  "Cash / Annual Obligations": {c:"Cash reserve ÷ annual obligations.",
+    m:"Years of dividends payable without selling a single bitcoin or raising a dollar."},
+  "Crypto NAV / Preferred Notional": {c:"Crypto NAV ÷ preferred face value.",
+    m:"Asset coverage on the preferred layer: how many times over the bitcoin covers that claim."},
+};
+const defLabel = lbl => METRIC_DEFS[lbl] ? `<span class="defhint" data-def="${lbl}">${lbl}</span>` : lbl;
+
 // build a metric row: {label, sub, mstr, asst, betterFor, cls}
 function row(cfg){
   const valCell = (co) => {
@@ -492,7 +573,7 @@ function row(cfg){
     return `<div class="gval ${extra} ${isBetter?'better':''}">${cfg[co] ?? "—"}</div>`;
   };
   return `<div class="grow">
-    <div class="glabel">${cfg.label}${cfg.sub?`<small>${cfg.sub}</small>`:""}</div>
+    <div class="glabel">${defLabel(cfg.label)}${cfg.sub?`<small>${cfg.sub}</small>`:""}</div>
     ${valCell("MSTR")}${valCell("ASST")}
   </div>`;
 }
@@ -528,7 +609,7 @@ function renderCompany(){
   let h = headRow();
   h += row({label:"Stock Price", sub:"common · hover for performance", MSTR:priceCell(M,SH.MSTR), ASST:priceCell(A,SH.ASST)});
   h += row({label:"Day Change", MSTR:chg(M.dayChangePct), ASST:chg(A.dayChangePct)});
-  h += row({label:"Market Cap", sub:"price × shares", MSTR:bil(mcap(M)), ASST:bil(mcap(A)),
+  h += row({label:"Market Cap", MSTR:bil(mcap(M)), ASST:bil(mcap(A)),
     betterFor: mcap(M)>mcap(A)?"MSTR":"ASST"});
   h += row({label:"Shares Outstanding", MSTR:fmt(M.sharesOutstanding,2)+" <span class='unit'>M</span>", ASST:fmt(A.sharesOutstanding,2)+" <span class='unit'>M</span>"});
   const evRows = o => [
@@ -539,9 +620,9 @@ function renderCompany(){
     ["Enterprise Value", bil(ev(o))]
   ].map(r=>r.join("~")).join("|");
   const evCell = o => `<span class="evhint" data-title="Enterprise Value" data-rows="${evRows(o)}">${bil(ev(o))}</span>`;
-  h += row({label:"Enterprise Value", sub:"mcap + debt + pref − cash · hover for breakdown",
+  h += row({label:"Enterprise Value", sub:"hover for breakdown",
     MSTR:evCell(M), ASST:evCell(A)});
-  h += row({label:"Beta to BTC", sub:"sensitivity to BTC moves", MSTR:fmt(M.betaBtc,2), ASST:fmt(A.betaBtc,2)});
+  h += row({label:"Beta to BTC", MSTR:fmt(M.betaBtc,2), ASST:fmt(A.betaBtc,2)});
   h += row({label:"Preferred Price", sub:"vs $100 par", MSTR:usd(M.prefPrice,2), ASST:usd(A.prefPrice,2)});
   // balance-sheet metrics (relocated from Capital Structure)
   const debtCell = o => { const disp=capFmt(o.seniorDebt);
@@ -570,7 +651,7 @@ function renderCompany(){
   h += row({label:"Cash & Cash Equivalents", sub:"estimated from weekly filing flows · hover for build-up", MSTR:mstrCashCell(M), ASST:cashCell(A)});
   h += row({label:"Senior Debt", sub:"convertible notes · hover for schedule", MSTR:debtCell(M), ASST:debtCell(A)});
   h += row({label:"Preferred Equity Notional", sub:"by series · hover for breakdown", MSTR:prefCell(M), ASST:prefCell(A)});
-  h += row({label:"Annual Obligations", sub:"mostly pref dividends", MSTR:capFmt(M.annualObligations), ASST:capFmt(A.annualObligations)});
+  h += row({label:"Annual Obligations", MSTR:capFmt(M.annualObligations), ASST:capFmt(A.annualObligations)});
   document.getElementById("grid-company").innerHTML = h;
 }
 
@@ -590,7 +671,7 @@ function renderHoldings(){
   h += row({label:"Net Change YTD", sub:"BTC added this year",
     MSTR:`<span class="pos">${sig(M.netChangeYtd)}${fmt(M.netChangeYtd)}</span>`,
     ASST:`<span class="pos">${sig(A.netChangeYtd)}${fmt(A.netChangeYtd)}</span>`});
-  h += row({label:"YTD Growth (Relative)", sub:"net add ÷ (holdings − net add)",
+  h += row({label:"YTD Growth (Relative)", sub:"",
     MSTR:pct(relGrowth(M)), ASST:pct(relGrowth(A)), betterFor: relGrowth(A)>relGrowth(M)?"ASST":"MSTR"});
   // average weekly/daily acquisition derived from the real 8-K weeks when available
   const W = DATA.weekly || {};
@@ -636,10 +717,10 @@ function renderPerShare(){
                 ["Assumed Diluted ("+fmt(o.dilutedShares,2)+"M sh)", fmt(o.satsPerShareDiluted)]].map(r=>r.join("~")).join("|");
     return `<span class="evhint" data-title="Sats per Share" data-rows="${rows}">${fmt(o.satsPerShareBasic)}</span>`;
   };
-  h += row({label:"BTC per Share (Basic)", sub:"sats / share · hover for diluted", MSTR:bpsCell(M), ASST:bpsCell(A)});
-  h += row({label:"BTC Yield — 1 Week", sub:"Δ BTC/share, latest 8-K week", MSTR:pct(wyM), ASST:pct(wyA),
+  h += row({label:"BTC per Share (Basic)", sub:"hover for diluted", MSTR:bpsCell(M), ASST:bpsCell(A)});
+  h += row({label:"BTC Yield — 1 Week", sub:"latest 8-K week", MSTR:pct(wyM), ASST:pct(wyA),
     cls:{MSTR:cls(wyM),ASST:cls(wyA)}, betterFor: (wyA!=null&&wyM!=null&&wyA>wyM)?"ASST":"MSTR"});
-  h += row({label:"BTC Yield — YTD", sub:"% increase in BTC/share", MSTR:pct(M.btcYieldYtd), ASST:pct(A.btcYieldYtd),
+  h += row({label:"BTC Yield — YTD", sub:"since Jan 1", MSTR:pct(M.btcYieldYtd), ASST:pct(A.btcYieldYtd),
     cls:{MSTR:"pos",ASST:"pos"}, betterFor: A.btcYieldYtd>M.btcYieldYtd?"ASST":"MSTR"});
   document.getElementById("grid-pershare").innerHTML = h;
 }
@@ -674,15 +755,15 @@ function renderValuation(){
   const cell = (v,rows,title) => `<span class="evhint" data-title="${title}" data-rows="${rows}"><span class="${cls(v)}">${fmt(v,2)}x</span></span>`;
 
   let h = headRow();
-  h += row({label:"mNAV", sub:"EV ÷ BTC reserve · hover for math",
+  h += row({label:"mNAV", sub:"hover for math",
     MSTR:cell(mM,mnavRows(M),"mNAV"), ASST:cell(mA,mnavRows(A),"mNAV")});
-  h += row({label:"CEBE mNAV", sub:"common mcap ÷ after-claims NAV · hover for math",
+  h += row({label:"CEBE mNAV", sub:"hover for math",
     MSTR:cell(cM,cebeRows(M),"CEBE mNAV"), ASST:cell(cA,cebeRows(A),"CEBE mNAV")});
-  h += row({label:"CEBE", sub:"sats / share, after senior claims · live", MSTR:fmt(cebeSats(M)), ASST:fmt(cebeSats(A)),
+  h += row({label:"CEBE", sub:"live", MSTR:fmt(cebeSats(M)), ASST:fmt(cebeSats(A)),
     betterFor: cebeSats(M)>cebeSats(A)?"MSTR":"ASST"});
-  h += row({label:"Claims % (Drag)", sub:"net senior claims ÷ BTC NAV · live", MSTR:pct(claimsP(M)), ASST:pct(claimsP(A)),
+  h += row({label:"Claims % (Drag)", sub:"live", MSTR:pct(claimsP(M)), ASST:pct(claimsP(A)),
     betterFor: claimsP(M)<claimsP(A)?"MSTR":"ASST"});
-  h += row({label:"Sats per $100 Invested", sub:"CEBE exposure per $100 of stock · live", MSTR:fmt(satsPer100(M)), ASST:fmt(satsPer100(A)),
+  h += row({label:"Sats per $100 Invested", sub:"live", MSTR:fmt(satsPer100(M)), ASST:fmt(satsPer100(A)),
     betterFor: satsPer100(M)>satsPer100(A)?"MSTR":"ASST"});
   document.getElementById("grid-valuation").innerHTML = h;
 }
@@ -710,13 +791,13 @@ function renderCapital(){
     const f = fmtFn || (x=>fmt(x,2));
     const bM = better==="MSTR"?"better":"", bA = better==="ASST"?"better":"";
     return `<div class="grow" style="border-top:1px solid var(--border)">
-      <div class="glabel">${label}${sub?`<small>${sub}</small>`:""}</div>
+      <div class="glabel">${defLabel(label)}${sub?`<small>${sub}</small>`:""}</div>
       <div class="gval ${bM}">${f(vM)}</div><div class="gval ${bA}">${f(vA)}</div></div>`;
   };
 
   h += `<div class="grow headrow"><div class="glabel" style="color:var(--muted)">Crypto NAV &amp; Hard Assets</div><div></div><div></div></div>`;
-  h += drow("Crypto NAV", "holdings × BTC price", navM, navA, null, x=>capFmt(x));
-  h += drow("Total Hard Assets", "NAV + cash", hardM, hardA, null, x=>capFmt(x));
+  h += drow("Crypto NAV", "", navM, navA, null, x=>capFmt(x));
+  h += drow("Total Hard Assets", "", hardM, hardA, null, x=>capFmt(x));
 
   h += `<div class="grow headrow"><div class="glabel" style="color:var(--muted)">Leverage <small style='color:var(--faint)'>lower = safer</small></div><div></div><div></div></div>`;
   const sdM=M.seniorDebt/hardM, sdA=A.seniorDebt/hardA;
@@ -943,6 +1024,23 @@ document.addEventListener("mouseover", e => {
 });
 document.addEventListener("mouseout", e => {
   if(e.target.closest && e.target.closest(".evhint")) evtip.style.display = "none";
+});
+
+// label-definition tooltips (how it's calculated / what it means)
+document.addEventListener("mouseover", e => {
+  const el = e.target.closest && e.target.closest(".defhint"); if(!el) return;
+  const d = METRIC_DEFS[el.dataset.def]; if(!d) return;
+  evtip.innerHTML = `<div class="et-title">${el.dataset.def}</div>
+    <div class="et-sec">How It's Calculated</div><p class="et-p">${d.c}</p>
+    <div class="et-sec">What It Means</div><p class="et-p">${d.m}</p>`;
+  evtip.style.display = "block";
+  const r = el.getBoundingClientRect();
+  let left = r.left; if(left + evtip.offsetWidth > window.innerWidth - 8) left = window.innerWidth - evtip.offsetWidth - 8;
+  let top = r.bottom + 8; if(top + evtip.offsetHeight > window.innerHeight - 8) top = r.top - evtip.offsetHeight - 8;
+  evtip.style.left = left + "px"; evtip.style.top = top + "px";
+});
+document.addEventListener("mouseout", e => {
+  if(e.target.closest && e.target.closest(".defhint")) evtip.style.display = "none";
 });
 
 // ---------- debt schedule tooltip (convertible notes) ----------
