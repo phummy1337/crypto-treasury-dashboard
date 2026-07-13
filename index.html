@@ -565,7 +565,7 @@ const METRIC_DEFS = {
   "Crypto NAV / Preferred Notional": {c:"Crypto NAV ÷ preferred face value.",
     m:"Asset coverage on the preferred layer: how many times over the bitcoin covers that claim."},
 };
-const defLabel = lbl => METRIC_DEFS[lbl] ? `${lbl}<span class="defhint" data-def="${lbl}" aria-label="About this metric">&#9432;</span>` : lbl;
+const defLabel = lbl => METRIC_DEFS[lbl] ? `<span>${lbl}<span class="defhint" data-def="${lbl}" aria-label="About this metric">&#9432;</span></span>` : lbl;
 
 // build a metric row: {label, sub, mstr, asst, betterFor, cls}
 function row(cfg){
