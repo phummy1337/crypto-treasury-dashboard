@@ -293,7 +293,7 @@
 
   <nav class="tabs">
     <button class="tabbtn active" data-tab="dash">Dashboard</button>
-    <button class="tabbtn" data-tab="calc">Implied Price Calculator</button>
+    <button class="tabbtn" data-tab="calc">MSTR/ASST Implied Price Calculator</button>
   </nav>
 
   <!-- 0. Company Stats -->
@@ -1264,11 +1264,7 @@ function initCalc(){
     document.body.classList.toggle("tab-calc", b.dataset.tab==="calc");
     window.scrollTo(0,0);
     if(b.dataset.tab==="calc") runCalc();   // re-render the chart once visible
-    history.replaceState(null, "", b.dataset.tab==="calc" ? "#calc" : "#");
   }));
-  if(location.hash === "#calc"){
-    document.querySelector('.tabbtn[data-tab="calc"]').click();
-  }
   const setDefaults = () => {
     const o = DATA.companies[calcCo];
     document.getElementById("ci-rate").value = calcCo==="MSTR" ? 12 : 13;
