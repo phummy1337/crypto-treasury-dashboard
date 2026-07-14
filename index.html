@@ -167,6 +167,31 @@
   .bar { height:5px; background: var(--panel-2); border-radius:99px; overflow:hidden; margin-top:6px; }
   .bar > span { display:block; height:100%; border-radius:99px; }
 
+  /* implied price calculator */
+  .calcbox { padding-top: 4px; }
+  .calc-co { display:flex; align-items:center; gap:10px; padding: 14px 18px 4px; flex-wrap: wrap; }
+  .cobtn { font: inherit; font-size: 13.5px; font-weight: 700; color: var(--muted); background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border); border-radius: 6px; padding: 7px 14px; cursor: pointer; }
+  .cobtn.active[data-co="MSTR"] { color:#fff; border-color: var(--mstr); background: rgba(237,25,70,0.12); }
+  .cobtn.active[data-co="ASST"] { color:#fff; border-color: var(--asst); background: rgba(76,159,255,0.12); }
+  .calc-snap { color: var(--faint); font-size: 12.5px; margin-left: auto; }
+  .calc-inputs { display:grid; grid-template-columns: repeat(4, 1fr); gap: 12px; padding: 12px 18px 4px; }
+  .calc-inputs label { display:flex; flex-direction:column; gap:5px; color: var(--muted); font-size: 12.5px;
+    text-transform: uppercase; letter-spacing: .8px; }
+  .calc-inputs .unit { color: var(--faint); text-transform: none; letter-spacing: 0; }
+  .calc-inputs input, .calc-inputs select {
+    font: inherit; font-size: 15.5px; color: var(--text); background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border); border-radius: 4px; padding: 8px 10px; font-variant-numeric: tabular-nums; }
+  .calc-inputs input:focus, .calc-inputs select:focus { outline: none; border-color: rgba(255,255,255,0.4); }
+  .calc-out { display:grid; grid-template-columns: repeat(4, 1fr); gap: 12px; padding: 14px 18px 6px; }
+  .calc-cell { border: 1px solid var(--border); border-radius: 4px; padding: 11px 13px; background: rgba(255,255,255,0.02); }
+  .calc-cell .k { font-size: 11.5px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted); }
+  .calc-cell .v { font-size: 23px; font-weight: 700; font-style: italic; margin-top: 3px; font-variant-numeric: tabular-nums; }
+  .calc-cell .s { font-size: 12px; color: var(--faint); margin-top: 2px; }
+  .calc-decomp { grid-column: 1 / -1; color: var(--muted); font-size: 14px; padding: 2px 2px 0; }
+  .calc-decomp b { color: #fff; }
+  @media (max-width: 900px) { .calc-inputs, .calc-out { grid-template-columns: repeat(2, 1fr); } }
+
   /* company actions timeline (scrollable) */
   .actionsbox { max-height: 480px; overflow-y: auto; }
   .act-week { display: flex; gap: 16px; padding: 11px 18px; border-top: 1px solid var(--border); align-items: baseline; }
@@ -360,6 +385,32 @@
     <p class="sec-note">How much cushion sits between each treasury and its obligations — leverage, coverage, and staying power.</p>
     <div class="grid" id="grid-capital"></div>
     <p class="footnote">Leverage and coverage use face/notional values. Lower leverage and higher coverage = a safer structure for common holders; higher leverage can enable faster accumulation.</p>
+  </section>
+
+  <!-- Implied Price Calculator -->
+  <section id="calc">
+    <div class="sec-head"><h2>Implied Price Calculator</h2><span class="tag" style="color:var(--btc);border-color:rgba(247,147,26,0.4)">model</span></div>
+    <p class="sec-note">Set your own assumptions — where bitcoin goes, how much capital gets raised, how dividends are funded, and what mNAV the market pays — and see the implied share price. The engine runs month by month: preferred and common issuance buys BTC, dividends are serviced, and the implied price each month is CEBE&nbsp;NAV per share × mNAV. Starting balance sheet is today's live data.</p>
+    <div class="grid calcbox">
+      <div class="calc-co">
+        <button class="cobtn active" data-co="MSTR">MSTR · Strategy</button>
+        <button class="cobtn" data-co="ASST">ASST · Strive</button>
+        <span class="calc-snap" id="calc-snap"></span>
+      </div>
+      <div class="calc-inputs">
+        <label>BTC Price Target <span class="unit">$</span><input type="number" id="ci-btc" value="150000" step="5000" min="1000"></label>
+        <label>Horizon <span class="unit">months</span><input type="number" id="ci-months" value="12" step="6" min="1" max="120"></label>
+        <label>Preferred Issued <span class="unit">$M / mo</span><input type="number" id="ci-pref" value="0" step="50" min="0"></label>
+        <label>Common Issued <span class="unit">$M / mo</span><input type="number" id="ci-common" value="0" step="50" min="0"></label>
+        <label>Dividend Rate <span class="unit">% / yr</span><input type="number" id="ci-rate" value="12" step="0.5" min="0"></label>
+        <label>Dividends Funded By
+          <select id="ci-fund"><option value="common">Issuing common stock</option><option value="btc">Selling BTC</option></select></label>
+        <label>Ending mNAV <span class="unit">× CEBE NAV</span><input type="number" id="ci-mnav" value="1.00" step="0.05" min="0.05"></label>
+      </div>
+      <div class="calc-out" id="calc-out"></div>
+      <div class="chartwrap" style="height:260px; padding: 0 16px 14px;"><canvas id="ch-calc"></canvas></div>
+      <p class="footnote" style="padding:0 18px 14px; margin:0;">A model, not a forecast: BTC and mNAV move linearly to your targets; issuance is constant per month. Stock return decomposes as BTC move × CEBE-per-share accretion × mNAV re-rate.</p>
+    </div>
   </section>
 
   <!-- 7. Company Actions -->
@@ -848,7 +899,7 @@ function renderActions(){
   }).join("");
 }
 
-function renderAll(){ renderPriceHeader(); renderCompany(); renderHoldings(); renderCost(); renderPerShare(); renderValuation(); renderCapital(); renderActions(); }
+function renderAll(){ renderPriceHeader(); renderCompany(); renderHoldings(); renderCost(); renderPerShare(); renderValuation(); renderCapital(); renderActions(); if(typeof runCalc==="function") runCalc(); }
 
 // ---------- charts (Chart.js) ----------
 const CHARTS = {};
@@ -1113,7 +1164,100 @@ async function loadData(){
   if(!DATA.stockHistory && SEED.stockHistory) DATA.stockHistory = SEED.stockHistory;
   renderAll();
   renderCharts();
+  initCalc();
   fetchBtcPrice();
+}
+
+// ---------- implied price calculator ----------
+// Month-by-month engine (per the CEBE framework): implied price = CEBE NAV/share × mNAV.
+// Preferred/common issuance buys BTC at that month's (linear-path) price; dividends are
+// funded by issuing common or selling BTC; mNAV interpolates linearly to the ending target.
+let calcCo = "MSTR";
+function calcSnapshot(co){
+  const o = DATA.companies[co];
+  return { px:o.stockPrice, sharesM:o.sharesOutstanding, hold:o.holdings,
+           cash:o.cash, debt:o.seniorDebt, pref:o.prefNotional, btc:btcPrice };
+}
+function simulate(s, cfg){
+  const cebeShare = (hold,b,pref,sharesM)=> (hold*b/1e6 - (s.debt+pref-s.cash)) / sharesM;
+  const cebe0 = cebeShare(s.hold, s.btc, s.pref, s.sharesM);
+  if(cebe0<=0) return null;
+  const mnav0 = s.px / cebe0;
+  let hold=s.hold, sharesM=s.sharesM, pref=s.pref, p=s.px;
+  const idxStock=[100], idxBtc=[100], labels=["0"];
+  for(let m=1;m<=cfg.months;m++){
+    const b  = s.btc + (cfg.btcTarget - s.btc)*m/cfg.months;
+    const mn = mnav0 + (cfg.endMnav - mnav0)*m/cfg.months;
+    pref += cfg.prefMo;  hold += cfg.prefMo*1e6/b;              // preferred ATM -> BTC
+    p = Math.max(cebeShare(hold,b,pref,sharesM)*mn, 0.01);
+    if(cfg.commonMo>0){ sharesM += cfg.commonMo/p; hold += cfg.commonMo*1e6/b; }   // common ATM -> BTC
+    const div = pref*cfg.rate/100/12;                            // service dividends
+    if(cfg.fund==="btc") hold -= div*1e6/b;
+    else { p = Math.max(cebeShare(hold,b,pref,sharesM)*mn, 0.01); sharesM += div/p; }
+    p = Math.max(cebeShare(hold,b,pref,sharesM)*mn, 0.01);
+    idxStock.push(p/s.px*100); idxBtc.push(b/s.btc*100); labels.push(String(m));
+  }
+  const cebeEnd = cebeShare(hold, cfg.btcTarget, pref, sharesM);
+  return { implied:p, stockX:p/s.px, btcX:cfg.btcTarget/s.btc,
+           cebe0, cebeEnd, cebeX:cebeEnd/cebe0, mnav0, mnavX:cfg.endMnav/mnav0,
+           endHold:hold, endSharesM:sharesM, endPref:pref,
+           endClaims:(s.debt+pref-s.cash)/(hold*cfg.btcTarget/1e6)*100,
+           idxStock, idxBtc, labels };
+}
+function runCalc(){
+  const out=document.getElementById("calc-out"); if(!out || !DATA.companies) return;
+  const s = calcSnapshot(calcCo);
+  const gv = id => parseFloat(document.getElementById(id).value)||0;
+  const cfg = { btcTarget:gv("ci-btc"), months:Math.max(1,Math.round(gv("ci-months"))),
+    prefMo:gv("ci-pref"), commonMo:gv("ci-common"), rate:gv("ci-rate"),
+    fund:document.getElementById("ci-fund").value, endMnav:gv("ci-mnav") };
+  const r = simulate(s, cfg);
+  const o = DATA.companies[calcCo];
+  document.getElementById("calc-snap").textContent =
+    `Starting today: $${fmt(s.px,2)} · ₿${fmt(s.hold)} · BTC $${fmt(s.btc)} · CEBE mNAV ${r?fmt(r.mnav0,2):"—"}x`;
+  if(!r){ out.innerHTML = '<div class="calc-decomp">Net senior claims currently exceed the BTC NAV — CEBE is negative, model unavailable.</div>'; return; }
+  const cls = r.stockX>=1 ? "pos":"neg";
+  out.innerHTML = `
+    <div class="calc-cell"><div class="k">Implied ${calcCo} Price</div>
+      <div class="v" style="color:${o.accent}">$${fmt(r.implied,2)}</div>
+      <div class="s">in ${cfg.months} months</div></div>
+    <div class="calc-cell"><div class="k">Stock Return</div>
+      <div class="v ${cls}">${fmt(r.stockX,2)}x</div>
+      <div class="s">${sig((r.stockX-1)*100)}${fmt((r.stockX-1)*100,0)}%</div></div>
+    <div class="calc-cell"><div class="k">BTC Return</div>
+      <div class="v">${fmt(r.btcX,2)}x</div>
+      <div class="s">${sig((r.btcX-1)*100)}${fmt((r.btcX-1)*100,0)}%</div></div>
+    <div class="calc-cell"><div class="k">Amplification</div>
+      <div class="v ${r.stockX>=r.btcX?"pos":"neg"}">${fmt(r.stockX/r.btcX,2)}x</div>
+      <div class="s">vs holding BTC</div></div>
+    <div class="calc-decomp">Decomposition: BTC <b>${fmt(r.btcX,2)}x</b> × CEBE/share accretion <b>${fmt(r.cebeX,2)}x</b> × mNAV re-rate <b>${fmt(r.mnavX,2)}x</b> = <b>${fmt(r.stockX,2)}x</b>
+      &nbsp;·&nbsp; Ending: ₿${fmt(Math.round(r.endHold))} held · ${fmt(r.endSharesM,1)}M shares · CEBE NAV $${fmt(r.cebeEnd,2)}/sh · claims ${fmt(r.endClaims,1)}% of NAV</div>`;
+  if(typeof Chart!=="undefined"){
+    const mnOpts = baseOpts({ scales:{
+      x:{ title:{display:true,text:"months",color:AX,font:{size:11}}, ticks:{color:AX,font:{size:11},autoSkip:true,maxTicksLimit:10}, grid:{color:GRID} },
+      y:{ ticks:{color:AX,font:{size:11},callback:v=>v+""}, grid:{color:GRID},
+          title:{display:true,text:"indexed (start = 100)",color:AX,font:{size:11}} } }});
+    mkChart("ch-calc", { type:"line", data:{ labels:r.labels, datasets:[
+      {label:calcCo+" (implied)", data:r.idxStock, borderColor:o.accent, backgroundColor:o.accent+"18", borderWidth:2, tension:.15, pointRadius:0},
+      {label:"BTC", data:r.idxBtc, borderColor:"#f7931a", backgroundColor:"transparent", borderWidth:2, tension:.15, pointRadius:0} ]},
+      options: mnOpts });
+  }
+}
+function initCalc(){
+  if(!document.getElementById("calc-out")) return;
+  document.querySelectorAll(".cobtn").forEach(b => b.addEventListener("click", () => {
+    calcCo = b.dataset.co;
+    document.querySelectorAll(".cobtn").forEach(x=>x.classList.toggle("active", x===b));
+    const o = DATA.companies[calcCo];
+    document.getElementById("ci-rate").value = o.prefNotional>0 ? Math.round(o.annualObligations/o.prefNotional*1000)/10 : 12;
+    runCalc();
+  }));
+  ["ci-btc","ci-months","ci-pref","ci-common","ci-rate","ci-mnav"].forEach(id =>
+    document.getElementById(id).addEventListener("input", runCalc));
+  document.getElementById("ci-fund").addEventListener("change", runCalc);
+  const o = DATA.companies.MSTR;
+  document.getElementById("ci-rate").value = o.prefNotional>0 ? Math.round(o.annualObligations/o.prefNotional*1000)/10 : 12;
+  runCalc();
 }
 
 // real-time equity layer: the tracker's light feed (CORS-open, ~140KB) carries live
