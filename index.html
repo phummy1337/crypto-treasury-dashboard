@@ -1245,18 +1245,22 @@ function runCalc(){
 }
 function initCalc(){
   if(!document.getElementById("calc-out")) return;
+  const setDefaults = () => {
+    const o = DATA.companies[calcCo];
+    document.getElementById("ci-rate").value = calcCo==="MSTR" ? 12 : 13;
+    document.getElementById("ci-pref").value = (o.trail3m && o.trail3m.prefMo) || 0;     // trailing 3-mo pace
+    document.getElementById("ci-common").value = (o.trail3m && o.trail3m.commonMo) || 0;
+  };
   document.querySelectorAll(".cobtn").forEach(b => b.addEventListener("click", () => {
     calcCo = b.dataset.co;
     document.querySelectorAll(".cobtn").forEach(x=>x.classList.toggle("active", x===b));
-    const o = DATA.companies[calcCo];
-    document.getElementById("ci-rate").value = o.prefNotional>0 ? Math.round(o.annualObligations/o.prefNotional*1000)/10 : 12;
+    setDefaults();
     runCalc();
   }));
   ["ci-btc","ci-months","ci-pref","ci-common","ci-rate","ci-mnav"].forEach(id =>
     document.getElementById(id).addEventListener("input", runCalc));
   document.getElementById("ci-fund").addEventListener("change", runCalc);
-  const o = DATA.companies.MSTR;
-  document.getElementById("ci-rate").value = o.prefNotional>0 ? Math.round(o.annualObligations/o.prefNotional*1000)/10 : 12;
+  setDefaults();
   runCalc();
 }
 

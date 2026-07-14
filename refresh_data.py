@@ -652,6 +652,22 @@ def _mstr_dividends_paid(data, start, end):
 _ATM_LABEL = {"STRC": "STRC", "STRF": "STRF", "STRK": "STRK", "STRD": "STRD", "MSTR": "common stock"}
 
 
+def _atm_netM(text):
+    """Per-filing ATM net proceeds ($mm): preferred series vs common."""
+    out = {"pref": 0.0, "common": 0.0}
+    for ser in ("STRC", "STRF", "STRK", "STRD", "STRE", "MSTR"):
+        m = re.search(rf"{ser} (?:ATM|Stock)\s*(.*?)(?=(?:STRC|STRF|STRK|STRD|STRE|MSTR)\s+(?:ATM|Stock)|Total)", text)
+        if not m:
+            continue
+        seg = m.group(1)
+        if "billion of" in seg:
+            seg = seg[:seg.rfind("$", 0, seg.find("billion of"))]
+        nums = [float(x.replace(",", "")) for x in re.findall(r"\$\s*([\d,.]+)", seg)]
+        if len(nums) >= 2 and nums[-2] >= 0.5:
+            out["common" if ser == "MSTR" else "pref"] += nums[-2]
+    return out
+
+
 def _mstr_actions(text, rec, fl):
     """Readable weekly actions from an MSTR 8-K."""
     items = []
@@ -760,6 +776,7 @@ def fetch_holdings(data, max_points=60):
                     yield (base + r["primaryDocument"][i], base)
 
         if tk == "MSTR":
+            t3 = {"pref": 0.0, "common": 0.0}
             anchor = datetime.date.fromisoformat(MSTR_CASH_FILED[0])
             flows = {"raised": 0.0, "btcSpent": 0.0, "btcSold": 0.0}
             flow_asof = anchor
@@ -780,6 +797,9 @@ def fetch_holdings(data, max_points=60):
                     ai = _mstr_actions(t8, rec, fl) if t8 else []
                     if ai:
                         acts.append({"d": rec[1].isoformat(), "co": "MSTR", "items": ai})
+                    if t8 and rec[1] > datetime.date.today() - datetime.timedelta(days=92):
+                        bd = _atm_netM(t8)
+                        t3["pref"] += bd["pref"]; t3["common"] += bd["common"]
                     if len(pts) >= max_points: break
                 if fetched >= max_points * 3: break
                 time.sleep(0.12)
@@ -810,6 +830,7 @@ def fetch_holdings(data, max_points=60):
                                "asOf": flow_asof.isoformat()}
             co["cashFiled"] = MSTR_CASH_FILED[1]
             co["cash"] = round(est)
+            co["trail3m"] = {"prefMo": round(t3["pref"] / 3), "commonMo": round(t3["common"] / 3)}
             log(f"MSTR cash est: {MSTR_CASH_FILED[1]} filed + {flows['raised']:,.0f} raised "
                 f"+ {flows['btcSold']:,.0f} BTC sold - {flows['btcSpent']:,.0f} BTC bought "
                 f"- {divs:,.0f} divs = ${est:,.0f}M (as of {flow_asof})")
@@ -817,6 +838,10 @@ def fetch_holdings(data, max_points=60):
             allobs, fetched = {}, 0
             cash_usd = strc_sh = None
             snaps = {}
+            t3c = 0.0     # trailing-92d common $ raised (shares issued x that week's price)
+            cutoff92 = datetime.date.today() - datetime.timedelta(days=92)
+            _sh = data.get("stockHistory") or {}
+            pxmap = dict(zip(_sh.get("dates") or [], _sh.get("ASST") or []))
             for url, base in docs():
                 try:
                     t8 = _edgar_text(url)
@@ -848,6 +873,13 @@ def fetch_holdings(data, max_points=60):
                             pass
                     if ai and obs_dates:
                         acts.append({"d": max(obs_dates).isoformat(), "co": "ASST", "items": ai})
+                    if obs_dates and max(obs_dates) > cutoff92:
+                        shm = re.search(r"Class A common stock\s*[\d,]+\s*[\d,]+\s*([\d,]+)", t8)
+                        if shm:
+                            dsh = int(shm.group(1).replace(",", ""))
+                            px8 = pxmap.get(max(obs_dates).strftime("%b %-d")) or data["companies"]["ASST"].get("stockPrice") or 0
+                            if 1000 < dsh < 5e7 and px8:
+                                t3c += dsh * px8 / 1e6
                     if sn and sn[0]:
                         snaps[sn[0]] = sn[1]
                         allobs.setdefault(sn[0], sn[1]["btc"])
@@ -872,6 +904,12 @@ def fetch_holdings(data, max_points=60):
                 if strc_px:     # reserve = USD cash + STRC marked at the live price
                     co["cash"] = round(cash_usd + strc_sh * strc_px / 1e6)
                 log(f"ASST cash: ${cash_usd}M USD + {strc_sh:,} STRC @ ${strc_px} -> ${co['cash']}M")
+            # trailing-3-month issuance pace (calculator defaults)
+            co = data["companies"][tk]
+            ph = co.get("prefHistory") or {}
+            no = [x for x in (ph.get("notional") or []) if x is not None]
+            pref3 = round((no[-1] - no[-64]) / 3) if len(no) > 64 else 0
+            co["trail3m"] = {"prefMo": max(pref3, 0), "commonMo": round(t3c / 3)}
             # genesis anchor: Strive announced its bitcoin treasury pivot on
             # Sep 9, 2025 with no BTC held; lets the first buys register as deltas
             allobs.setdefault(datetime.date(2025, 9, 9), 0)
