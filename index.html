@@ -167,6 +167,15 @@
   .bar { height:5px; background: var(--panel-2); border-radius:99px; overflow:hidden; margin-top:6px; }
   .bar > span { display:block; height:100%; border-radius:99px; }
 
+  /* top tab bar */
+  .tabs { display:flex; gap:28px; border-bottom:1px solid var(--border); margin: -8px 0 30px; }
+  .tabbtn { background:none; border:none; font:inherit; font-size:15px; font-weight:700; color:var(--faint);
+    padding: 4px 2px 12px; cursor:pointer; border-bottom: 2px solid transparent; letter-spacing:.2px; }
+  .tabbtn:hover { color: var(--muted); }
+  .tabbtn.active { color:#fff; border-bottom-color: var(--red); }
+  body.tab-calc section:not(#calc), body.tab-calc .sources { display:none; }
+  body:not(.tab-calc) #calc { display:none; }
+
   /* implied price calculator */
   .calcbox { padding-top: 4px; }
   .calc-co { display:flex; align-items:center; gap:10px; padding: 14px 18px 4px; flex-wrap: wrap; }
@@ -282,6 +291,11 @@
     </div>
   </header>
 
+  <nav class="tabs">
+    <button class="tabbtn active" data-tab="dash">Dashboard</button>
+    <button class="tabbtn" data-tab="calc">Implied Price Calculator</button>
+  </nav>
+
   <!-- 0. Company Stats -->
   <section id="company">
     <div class="sec-head"><h2>Company Stats</h2><span class="tag stub" id="tag-company">seed data</span></div>
@@ -390,7 +404,7 @@
   <!-- Implied Price Calculator -->
   <section id="calc">
     <div class="sec-head"><h2>Implied Price Calculator</h2><span class="tag" style="color:var(--btc);border-color:rgba(247,147,26,0.4)">model</span></div>
-    <p class="sec-note">Set your own assumptions — where bitcoin goes, how much capital gets raised, how dividends are funded, and what mNAV the market pays — and see the implied share price. The engine runs month by month: preferred and common issuance buys BTC, dividends are serviced, and the implied price each month is CEBE&nbsp;NAV per share × mNAV. Starting balance sheet is today's live data.</p>
+    <p class="sec-note">Set your own assumptions — where bitcoin goes, how much capital gets raised, how dividends are funded, and what mNAV the market pays — and see the implied share price. The engine runs month by month: preferred and common issuance buys BTC, dividends are serviced, and the implied price each month is CEBE&nbsp;NAV per share × mNAV. Starting balance sheet is today's live data, and the Preferred / Common issuance inputs default to each company's <b>rolling 3-month average pace</b> from its filings (override anything you like).</p>
     <div class="grid calcbox">
       <div class="calc-co">
         <button class="cobtn active" data-co="MSTR">MSTR · Strategy</button>
@@ -1245,6 +1259,16 @@ function runCalc(){
 }
 function initCalc(){
   if(!document.getElementById("calc-out")) return;
+  document.querySelectorAll(".tabbtn").forEach(b => b.addEventListener("click", () => {
+    document.querySelectorAll(".tabbtn").forEach(x=>x.classList.toggle("active", x===b));
+    document.body.classList.toggle("tab-calc", b.dataset.tab==="calc");
+    window.scrollTo(0,0);
+    if(b.dataset.tab==="calc") runCalc();   // re-render the chart once visible
+    history.replaceState(null, "", b.dataset.tab==="calc" ? "#calc" : "#");
+  }));
+  if(location.hash === "#calc"){
+    document.querySelector('.tabbtn[data-tab="calc"]').click();
+  }
   const setDefaults = () => {
     const o = DATA.companies[calcCo];
     document.getElementById("ci-rate").value = calcCo==="MSTR" ? 12 : 13;
