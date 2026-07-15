@@ -1356,7 +1356,7 @@ async function shareCard(){
         plugins:{ legend:{ labels:{ color:AXC, font:{size:13*SCALE, family:"'Google Sans Flex',sans-serif"}, boxWidth:13*SCALE, boxHeight:13*SCALE } }, tooltip:{enabled:false} },
         scales:{
           x:{ title:{display:true,text:"months",color:AXC,font:{size:12*SCALE}}, ticks:{color:AXC,font:{size:12*SCALE},maxTicksLimit:9,maxRotation:0}, grid:{color:GRC} },
-          y:{ title:{display:true,text:"indexed (start = 100)",color:AXC,font:{size:12*SCALE}}, ticks:{color:AXC,font:{size:12*SCALE}}, grid:{color:GRC} } } } });
+          y:{ title:{display:true,text:"indexed (start = 100%)",color:AXC,font:{size:12*SCALE}}, ticks:{color:AXC,font:{size:12*SCALE},callback:v=>v+"%"}, grid:{color:GRC} } } } });
     await new Promise(res=>setTimeout(res,80));
     x.drawImage(oc, 652, 222, 480, 344);
     tmp.destroy();
