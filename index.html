@@ -410,7 +410,7 @@
   <!-- Implied Price Calculator -->
   <section id="calc">
     <div class="sec-head"><h2>Implied Price Calculator</h2><span class="tag" style="color:var(--btc);border-color:rgba(247,147,26,0.4)">model</span></div>
-    <p class="sec-note">Set your own assumptions — where bitcoin goes, how much capital gets raised, how dividends are funded, and what mNAV the market pays — and see the implied share price. The engine runs month by month: preferred and common issuance buys BTC, dividends are serviced, and the implied price each month is CEBE&nbsp;NAV per share × mNAV. Starting balance sheet is today's live data, and issuance inputs default to each company's <b>rolling 3-month average pace</b> from its filings — except MSTR preferred, which defaults to $0 while the STRC ATM is paused below par (override anything you like).</p>
+    <p class="sec-note">Set your own assumptions — where bitcoin goes, how much capital gets raised, how dividends are funded, and what mNAV the market pays — and see the implied share price. The engine runs month by month: preferred and common issuance buys BTC, dividends are serviced, and each month the market cap backs out of your EV&nbsp;mNAV (mcap = mNAV × BTC NAV − debt − preferred + cash). Starting balance sheet is today's live data, and issuance inputs default to each company's <b>rolling 3-month average pace</b> from its filings — except MSTR preferred, which defaults to $0 while the STRC ATM is paused below par (override anything you like).</p>
     <div class="grid calcbox">
       <div class="calc-co">
         <button class="cobtn active" data-co="MSTR">MSTR · Strategy</button>
@@ -426,7 +426,7 @@
         <label>Dividend Rate (% / yr)<input type="number" id="ci-rate" value="12" step="0.5" min="0"></label>
         <label>Dividends Funded By
           <select id="ci-fund"><option value="common">Issuing common stock</option><option value="btc">Selling BTC</option></select></label>
-        <label>Ending mNAV (× CEBE NAV)<input type="number" id="ci-mnav" value="1.00" step="0.05" min="0.05"></label>
+        <label>Ending EV mNAV (× BTC NAV)<input type="number" id="ci-mnav" value="1.00" step="0.05" min="0.05"></label>
       </div>
       <div class="calc-out" id="calc-out"></div>
       <div class="chartwrap" style="height:260px; padding: 0 16px 14px;"><canvas id="ch-calc"></canvas></div>
@@ -1200,29 +1200,39 @@ function calcSnapshot(co){
            cash:o.cash, debt:o.seniorDebt, pref:o.prefNotional, btc:btcPrice };
 }
 function simulate(s, cfg){
-  const cebeShare = (hold,b,pref,sharesM)=> (hold*b/1e6 - (s.debt+pref-s.cash)) / sharesM;
+  // EV mNAV framing: mNAV = (mcap + debt + pref - cash) / BTC NAV, so each month
+  // market cap backs out as mNAV x NAV - claims and price = mcap / shares.
+  const nav = (hold,b)=> hold*b/1e6;                                   // $mm
+  const claims = pref => s.debt + pref - s.cash;                       // $mm
+  const priceAt = (hold,b,pref,sh,mn)=> Math.max((mn*nav(hold,b) - claims(pref)) / sh, 0.01);
+  const cebeShare = (hold,b,pref,sh)=> (nav(hold,b) - claims(pref)) / sh;
+  const nav0 = nav(s.hold, s.btc);
+  if(nav0<=0) return null;
+  const mnav0 = (s.px*s.sharesM + claims(s.pref)) / nav0;              // current EV mNAV
   const cebe0 = cebeShare(s.hold, s.btc, s.pref, s.sharesM);
-  if(cebe0<=0) return null;
-  const mnav0 = s.px / cebe0;
   let hold=s.hold, sharesM=s.sharesM, pref=s.pref, p=s.px;
   const idxStock=[100], idxBtc=[100], labels=["0"];
   for(let m=1;m<=cfg.months;m++){
     const b  = s.btc + (cfg.btcTarget - s.btc)*m/cfg.months;
     const mn = mnav0 + (cfg.endMnav - mnav0)*m/cfg.months;
-    pref += cfg.prefMo;  hold += cfg.prefMo*1e6/b;              // preferred ATM -> BTC
-    p = Math.max(cebeShare(hold,b,pref,sharesM)*mn, 0.01);
+    pref += cfg.prefMo;  hold += cfg.prefMo*1e6/b;                     // preferred ATM -> BTC
+    p = priceAt(hold,b,pref,sharesM,mn);
     if(cfg.commonMo>0){ sharesM += cfg.commonMo/p; hold += cfg.commonMo*1e6/b; }   // common ATM -> BTC
-    const div = pref*cfg.rate/100/12;                            // service dividends
+    const div = pref*cfg.rate/100/12;                                  // service dividends
     if(cfg.fund==="btc") hold -= div*1e6/b;
-    else { p = Math.max(cebeShare(hold,b,pref,sharesM)*mn, 0.01); sharesM += div/p; }
-    p = Math.max(cebeShare(hold,b,pref,sharesM)*mn, 0.01);
+    else { p = priceAt(hold,b,pref,sharesM,mn); sharesM += div/p; }
+    p = priceAt(hold,b,pref,sharesM,mn);
     idxStock.push(p/s.px*100); idxBtc.push(b/s.btc*100); labels.push(String(m));
   }
   const cebeEnd = cebeShare(hold, cfg.btcTarget, pref, sharesM);
-  return { implied:p, stockX:p/s.px, btcX:cfg.btcTarget/s.btc,
-           cebe0, cebeEnd, cebeX:cebeEnd/cebe0, mnav0, mnavX:cfg.endMnav/mnav0,
+  const stockX = p/s.px, btcX = cfg.btcTarget/s.btc;
+  // sats-per-share accretion (BTC-denominated, so the decomposition is exact:
+  // stock = BTC move x CEBE accretion x residual mNAV re-rate)
+  const satsAcc = cebe0>0 && cebeEnd>0 ? (cebeEnd/cfg.btcTarget)/(cebe0/s.btc) : 1;
+  return { implied:p, stockX, btcX,
+           cebe0, cebeEnd, cebeX:satsAcc, mnav0, mnavX:stockX/(btcX*satsAcc),
            endHold:hold, endSharesM:sharesM, endPref:pref,
-           endClaims:(s.debt+pref-s.cash)/(hold*cfg.btcTarget/1e6)*100,
+           endClaims:claims(pref)/nav(hold,cfg.btcTarget)*100,
            idxStock, idxBtc, labels };
 }
 function runCalc(){
@@ -1235,8 +1245,8 @@ function runCalc(){
   const r = simulate(s, cfg);
   const o = DATA.companies[calcCo];
   document.getElementById("calc-snap").textContent =
-    `Starting today: $${fmt(s.px,2)} · ₿${fmt(s.hold)} · BTC $${fmt(s.btc)} · CEBE mNAV ${r?fmt(r.mnav0,2):"—"}x`;
-  if(!r){ out.innerHTML = '<div class="calc-decomp">Net senior claims currently exceed the BTC NAV — CEBE is negative, model unavailable.</div>'; return; }
+    `Starting today: $${fmt(s.px,2)} · ₿${fmt(s.hold)} · BTC $${fmt(s.btc)} · EV mNAV ${r?fmt(r.mnav0,2):"—"}x`;
+  if(!r){ out.innerHTML = '<div class="calc-decomp">BTC NAV is unavailable — model cannot run.</div>'; return; }
   const cls = r.stockX>=1 ? "pos":"neg";
   out.innerHTML = `
     <div class="calc-cell"><div class="k">Implied ${calcCo} Price</div>
