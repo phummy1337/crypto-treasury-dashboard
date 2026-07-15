@@ -1304,11 +1304,15 @@ async function shareCard(){
   x.strokeStyle="rgba(255,255,255,0.18)"; x.fillStyle="rgba(255,255,255,0.02)";
   x.fillRect(640,210,504,368); x.strokeRect(640,210,504,368);
   if(ch && ch.width>0){ x.drawImage(ch, 652, 222, 480, 344); }
-  // logo (same-origin svg)
+  // "Powered by" + APYX logo, top right
   try{
     const img = new Image();
     await new Promise((res,rej)=>{ img.onload=res; img.onerror=rej; img.src="apyx-logo.svg"; });
-    x.drawImage(img, W-206, 34, 150, 31);
+    x.textAlign="right";
+    x.font=F("400 15px"); x.fillStyle="#9aa0a6";
+    x.fillText("Powered by", W-56, 52);
+    x.textAlign="left";
+    x.drawImage(img, W-56-150, 62, 150, 31);
   }catch(e){}
   // footer
   x.font=F("400 16px"); x.fillStyle="#9aa0a6";
@@ -1340,9 +1344,9 @@ function initCalc(){
     document.getElementById("ci-pref").value = calcCo==="MSTR" ? 0 : ((o.trail3m && o.trail3m.prefMo) || 0);
     document.getElementById("ci-common").value = (o.trail3m && o.trail3m.commonMo) || 0;
   };
-  document.querySelectorAll(".cobtn").forEach(b => b.addEventListener("click", () => {
+  document.querySelectorAll(".cobtn[data-co]").forEach(b => b.addEventListener("click", () => {
     calcCo = b.dataset.co;
-    document.querySelectorAll(".cobtn").forEach(x=>x.classList.toggle("active", x===b));
+    document.querySelectorAll(".cobtn[data-co]").forEach(x=>x.classList.toggle("active", x===b));
     setDefaults();
     runCalc();
   }));
