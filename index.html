@@ -61,7 +61,10 @@
     border-bottom: 1px solid var(--border);
   }
   .masthead { display:flex; align-items:flex-start; justify-content:space-between; gap:24px; }
-  .masthead img.logo { height: 30px; margin-top: 4px; }
+  .masthead .poweredby { display:flex; flex-direction:column; align-items:flex-end; gap:7px; margin-top:4px; text-decoration:none; }
+  .masthead .poweredby span { color: var(--faint); font-size: 13px; }
+  .masthead .poweredby:hover { text-decoration:none; }
+  .masthead img.logo { height: 30px; }
   .title .eyebrow { color: var(--faint); font-size: 14px; margin: 0 0 10px; letter-spacing: .2px; }
   .title h1 {
     margin: 0; font-weight: 700; font-size: 34px; letter-spacing: .5px; line-height: 1.12;
@@ -259,7 +262,10 @@
           <span><span class="dot" style="background:var(--asst)"></span>Strive — <b>ASST</b> common · <b>SATA</b> preferred</span>
         </div>
       </div>
-      <a href="https://apyx.fi" target="_blank" rel="noopener"><img class="logo" src="apyx-logo.svg" alt="APYX"></a>
+      <a href="https://apyx.fi" target="_blank" rel="noopener" class="poweredby">
+        <span>Powered by</span>
+        <img class="logo" src="apyx-logo.svg" alt="APYX">
+      </a>
     </div>
     <div class="statbar">
       <div class="statbox" style="--bx:var(--btc)">
