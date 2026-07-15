@@ -404,22 +404,23 @@
   <!-- Implied Price Calculator -->
   <section id="calc">
     <div class="sec-head"><h2>Implied Price Calculator</h2><span class="tag" style="color:var(--btc);border-color:rgba(247,147,26,0.4)">model</span></div>
-    <p class="sec-note">Set your own assumptions — where bitcoin goes, how much capital gets raised, how dividends are funded, and what mNAV the market pays — and see the implied share price. The engine runs month by month: preferred and common issuance buys BTC, dividends are serviced, and the implied price each month is CEBE&nbsp;NAV per share × mNAV. Starting balance sheet is today's live data, and the Preferred / Common issuance inputs default to each company's <b>rolling 3-month average pace</b> from its filings (override anything you like).</p>
+    <p class="sec-note">Set your own assumptions — where bitcoin goes, how much capital gets raised, how dividends are funded, and what mNAV the market pays — and see the implied share price. The engine runs month by month: preferred and common issuance buys BTC, dividends are serviced, and the implied price each month is CEBE&nbsp;NAV per share × mNAV. Starting balance sheet is today's live data, and issuance inputs default to each company's <b>rolling 3-month average pace</b> from its filings — except MSTR preferred, which defaults to $0 while the STRC ATM is paused below par (override anything you like).</p>
     <div class="grid calcbox">
       <div class="calc-co">
         <button class="cobtn active" data-co="MSTR">MSTR · Strategy</button>
         <button class="cobtn" data-co="ASST">ASST · Strive</button>
         <span class="calc-snap" id="calc-snap"></span>
+        <button class="cobtn" id="ci-share" title="Download a shareable image of these assumptions and results">&#128247; Share Card</button>
       </div>
       <div class="calc-inputs">
-        <label>BTC Price Target <span class="unit">$</span><input type="number" id="ci-btc" value="150000" step="5000" min="1000"></label>
-        <label>Horizon <span class="unit">months</span><input type="number" id="ci-months" value="12" step="6" min="1" max="120"></label>
-        <label>Preferred Issued <span class="unit">$M / mo</span><input type="number" id="ci-pref" value="0" step="50" min="0"></label>
-        <label>Common Issued <span class="unit">$M / mo</span><input type="number" id="ci-common" value="0" step="50" min="0"></label>
-        <label>Dividend Rate <span class="unit">% / yr</span><input type="number" id="ci-rate" value="12" step="0.5" min="0"></label>
+        <label>BTC Price Target ($)<input type="number" id="ci-btc" value="150000" step="5000" min="1000"></label>
+        <label>Horizon (months)<input type="number" id="ci-months" value="12" step="6" min="1" max="120"></label>
+        <label>Preferred Issued ($M / mo)<input type="number" id="ci-pref" value="0" step="50" min="0"></label>
+        <label>Common Issued ($M / mo)<input type="number" id="ci-common" value="0" step="50" min="0"></label>
+        <label>Dividend Rate (% / yr)<input type="number" id="ci-rate" value="12" step="0.5" min="0"></label>
         <label>Dividends Funded By
           <select id="ci-fund"><option value="common">Issuing common stock</option><option value="btc">Selling BTC</option></select></label>
-        <label>Ending mNAV <span class="unit">× CEBE NAV</span><input type="number" id="ci-mnav" value="1.00" step="0.05" min="0.05"></label>
+        <label>Ending mNAV (× CEBE NAV)<input type="number" id="ci-mnav" value="1.00" step="0.05" min="0.05"></label>
       </div>
       <div class="calc-out" id="calc-out"></div>
       <div class="chartwrap" style="height:260px; padding: 0 16px 14px;"><canvas id="ch-calc"></canvas></div>
@@ -1257,6 +1258,72 @@ function runCalc(){
       options: mnOpts });
   }
 }
+async function shareCard(){
+  const btn = document.getElementById("ci-share");
+  const gv = id => parseFloat(document.getElementById(id).value)||0;
+  const cfg = { btcTarget:gv("ci-btc"), months:Math.max(1,Math.round(gv("ci-months"))),
+    prefMo:gv("ci-pref"), commonMo:gv("ci-common"), rate:gv("ci-rate"),
+    fund:document.getElementById("ci-fund").value, endMnav:gv("ci-mnav") };
+  const snap = calcSnapshot(calcCo), r = simulate(snap, cfg), o = DATA.companies[calcCo];
+  if(!r) return;
+  const W=1200, H=675, cv=document.createElement("canvas"); cv.width=W; cv.height=H;
+  const x = cv.getContext("2d");
+  x.fillStyle="#0a0a0b"; x.fillRect(0,0,W,H);
+  const g = x.createRadialGradient(W*0.96,0,60,W*0.96,0,560);
+  g.addColorStop(0,"rgba(220,20,60,0.18)"); g.addColorStop(1,"rgba(220,20,60,0)");
+  x.fillStyle=g; x.fillRect(0,0,W,H);
+  const F = w => `${w} 'Google Sans Flex','Google Sans',sans-serif`;
+  // header
+  x.fillStyle="#9aa0a6"; x.font=F("600 19px"); x.fillText("APYX  ·  BTC TREASURY & DIGITAL CREDIT TRACKER", 56, 62);
+  x.font=F("italic 700 62px"); x.fillStyle="#ffffff";
+  x.fillText(`${calcCo} → `, 56, 138);
+  const w1 = x.measureText(`${calcCo} → `).width;
+  x.fillStyle=o.accent; x.fillText(`$${fmt(r.implied,2)}`, 56+w1, 138);
+  x.fillStyle="#b9bdc2"; x.font=F("400 22px");
+  x.fillText(`implied in ${cfg.months} months  ·  stock ${fmt(r.stockX,2)}x vs BTC ${fmt(r.btcX,2)}x  ·  amplification ${fmt(r.stockX/r.btcX,2)}x`, 56, 178);
+  // assumptions
+  const rows = [
+    ["BTC Price Target", "$"+fmt(cfg.btcTarget)],
+    ["Horizon", cfg.months+" months"],
+    ["Preferred Issued", "$"+fmt(cfg.prefMo)+"M / mo"],
+    ["Common Issued", "$"+fmt(cfg.commonMo)+"M / mo"],
+    ["Dividend Rate", fmt(cfg.rate,1)+"% / yr"],
+    ["Dividends Funded By", cfg.fund==="btc"?"Selling BTC":"Issuing common"],
+    ["Ending mNAV", fmt(cfg.endMnav,2)+"x  (now "+fmt(r.mnav0,2)+"x)"],
+    ["Starting Today", "$"+fmt(snap.px,2)+"  ·  ₿"+fmt(snap.hold)+"  ·  BTC $"+fmt(snap.btc)],
+  ];
+  let y=248;
+  x.font=F("700 15px"); x.fillStyle="#ed1946"; x.fillText("ASSUMPTIONS", 56, y); y+=30;
+  for(const [k,v] of rows){
+    x.font=F("400 19px"); x.fillStyle="#9aa0a6"; x.fillText(k, 56, y);
+    x.font=F("700 19px"); x.fillStyle="#f5f6f7"; x.fillText(v, 290, y);
+    y+=34;
+  }
+  // chart panel
+  const ch = document.getElementById("ch-calc");
+  x.strokeStyle="rgba(255,255,255,0.18)"; x.fillStyle="rgba(255,255,255,0.02)";
+  x.fillRect(640,210,504,368); x.strokeRect(640,210,504,368);
+  if(ch && ch.width>0){ x.drawImage(ch, 652, 222, 480, 344); }
+  // logo (same-origin svg)
+  try{
+    const img = new Image();
+    await new Promise((res,rej)=>{ img.onload=res; img.onerror=rej; img.src="apyx-logo.svg"; });
+    x.drawImage(img, W-206, 34, 150, 31);
+  }catch(e){}
+  // footer
+  x.font=F("400 16px"); x.fillStyle="#9aa0a6";
+  x.fillText("phummy1337.github.io/crypto-treasury-dashboard  ·  a model, not investment advice  ·  "+new Date().toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}), 56, H-34);
+  cv.toBlob(async blob => {
+    try{ await navigator.clipboard.write([new ClipboardItem({"image/png": blob})]); }catch(e){}
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `apyx-${calcCo.toLowerCase()}-implied-price.png`;
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
+    if(btn){ const t=btn.innerHTML; btn.innerHTML="Saved &#10003;"; setTimeout(()=>btn.innerHTML=t, 2500); }
+  }, "image/png");
+}
+
 function initCalc(){
   if(!document.getElementById("calc-out")) return;
   document.querySelectorAll(".tabbtn").forEach(b => b.addEventListener("click", () => {
@@ -1268,7 +1335,9 @@ function initCalc(){
   const setDefaults = () => {
     const o = DATA.companies[calcCo];
     document.getElementById("ci-rate").value = calcCo==="MSTR" ? 12 : 13;
-    document.getElementById("ci-pref").value = (o.trail3m && o.trail3m.prefMo) || 0;     // trailing 3-mo pace
+    // STRC ATM is paused (trading below par), so MSTR preferred defaults to $0;
+    // ASST keeps its rolling 3-month SATA pace
+    document.getElementById("ci-pref").value = calcCo==="MSTR" ? 0 : ((o.trail3m && o.trail3m.prefMo) || 0);
     document.getElementById("ci-common").value = (o.trail3m && o.trail3m.commonMo) || 0;
   };
   document.querySelectorAll(".cobtn").forEach(b => b.addEventListener("click", () => {
@@ -1280,6 +1349,7 @@ function initCalc(){
   ["ci-btc","ci-months","ci-pref","ci-common","ci-rate","ci-mnav"].forEach(id =>
     document.getElementById(id).addEventListener("input", runCalc));
   document.getElementById("ci-fund").addEventListener("change", runCalc);
+  document.getElementById("ci-share").addEventListener("click", shareCard);
   setDefaults();
   runCalc();
 }
