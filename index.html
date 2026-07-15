@@ -1015,9 +1015,14 @@ function renderCharts(){
       const _start = co==="ASST" ? Math.max(0, SH.dates.findIndex(d=>d.startsWith("Jan")))
                                  : Math.max(0, SH.dates.findIndex(d=>d.startsWith("Oct")));
       const labels = SH.dates.slice(_start), px = SH[co].slice(_start);
+      // align by full ISO date when available — year-less labels like "Jul 15"
+      // collide across years once the price window wraps around
+      const isoLabels = (SH.iso||[]).slice(_start);
       const dtcMap = {}, siMap = {};
-      si.dates.forEach((d,i)=>{ dtcMap[d]=si.dtc[i]; siMap[d]=si.si[i]; });
-      const dtcAligned = labels.map(d => d in dtcMap ? dtcMap[d] : null);
+      const useIso = si.iso && isoLabels.length===labels.length && isoLabels.length>0;
+      (useIso ? si.iso : si.dates).forEach((d,i)=>{ dtcMap[d]=si.dtc[i]; siMap[d]=si.si[i]; });
+      const keyAt = i => useIso ? isoLabels[i] : labels[i];
+      const dtcAligned = labels.map((_,i) => keyAt(i) in dtcMap ? dtcMap[keyAt(i)] : null);
       const siOpts = baseOpts({ scales:{
         x:{ ticks:{color:AX,font:{size:11},autoSkip:true,maxTicksLimit:8,maxRotation:0}, grid:{color:GRID} },
         yP:axis("","left",{ticks:{color:c,font:{size:11},callback:v=>"$"+(+v).toFixed(0)}}),
@@ -1025,7 +1030,7 @@ function renderCharts(){
       siOpts.plugins.tooltip.callbacks = { label: ctx => {
         if(ctx.parsed.y==null) return null;
         if(ctx.dataset.yAxisID==="yD"){
-          const s = siMap[ctx.label];
+          const s = siMap[keyAt(ctx.dataIndex)];
           return "Days to cover: "+(+ctx.parsed.y).toFixed(2) + (s?"  ·  "+(s/1e6).toFixed(1)+"M shares short":"");
         }
         return co+": $"+(+ctx.parsed.y).toFixed(2);

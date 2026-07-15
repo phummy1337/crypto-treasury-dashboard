@@ -367,6 +367,7 @@ def fetch_strategytracker(data):
         md, mp = mh["dates"][-365:], mh["stock_prices"][-365:]
         data["stockHistory"] = {
             "illustrative": False, "daily": True,
+            "iso": md,
             "dates": [_iso_lbl(x, "%b %-d") for x in md],
             "MSTR": [round(v, 2) if v is not None else None for v in mp],
             "ASST": [round(adict.get(x), 2) if adict.get(x) is not None else None for x in md],
@@ -1019,14 +1020,15 @@ def fetch_short_interest(data):
             raw = urllib.request.urlopen(req, timeout=25, context=_SSL_CTX).read().decode("utf-8", "ignore")
             rows = json.loads(raw)["data"]["shortInterestTable"]["rows"]
             rows = list(reversed(rows))            # oldest -> newest
-            dts, dtc, si = [], [], []
+            dts, isod, dtc, si = [], [], [], []
             for r in rows:
                 d = datetime.datetime.strptime(r["settlementDate"], "%m/%d/%Y").date()
-                dts.append(d.strftime("%b %-d"))    # matches stockHistory date labels
+                dts.append(d.strftime("%b %-d"))
+                isod.append(d.isoformat())
                 dtc.append(round(float(r["daysToCover"]), 2))
                 si.append(int(str(r["interest"]).replace(",", "")))
             if dtc:
-                co["shortInterest"] = {"dates": dts, "dtc": dtc, "si": si}
+                co["shortInterest"] = {"dates": dts, "iso": isod, "dtc": dtc, "si": si}
                 co["daysToCover"] = dtc[-1]
                 log(f"[short interest] {sym}: {len(dtc)} pts, latest DTC {dtc[-1]}")
         except Exception as e:
