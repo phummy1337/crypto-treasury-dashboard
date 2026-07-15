@@ -195,6 +195,8 @@
     font: inherit; font-size: 15.5px; color: var(--text); background: rgba(255,255,255,0.04);
     border: 1px solid var(--border); border-radius: 4px; padding: 8px 10px; font-variant-numeric: tabular-nums; }
   .calc-inputs input:focus, .calc-inputs select:focus { outline: none; border-color: rgba(255,255,255,0.4); }
+  .calc-inputs input[type="range"] { padding: 0; border: none; background: transparent; accent-color: var(--red); height: 34px; }
+  .calc-inputs .mixlbl { color: var(--text); font-size: 13px; text-transform: none; letter-spacing: 0; margin-top: -2px; }
   .calc-out { display:grid; grid-template-columns: repeat(4, 1fr); gap: 12px; padding: 14px 18px 6px; }
   .calc-cell { border: 1px solid var(--border); border-radius: 4px; padding: 11px 13px; background: rgba(255,255,255,0.02); }
   .calc-cell .k { font-size: 11.5px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted); }
@@ -424,8 +426,9 @@
         <label>Preferred Issued ($M / mo)<input type="number" id="ci-pref" value="0" step="50" min="0"></label>
         <label>Common Issued ($M / mo)<input type="number" id="ci-common" value="0" step="50" min="0"></label>
         <label>Dividend Rate (% / yr)<input type="number" id="ci-rate" value="12" step="0.5" min="0"></label>
-        <label>Dividends Funded By
-          <select id="ci-fund"><option value="common">Issuing common stock</option><option value="btc">Selling BTC</option></select></label>
+        <label>Dividend Funding Mix
+          <input type="range" id="ci-fund" min="0" max="100" step="5" value="0">
+          <span class="mixlbl" id="ci-fund-lbl">100% common issuance</span></label>
         <label>Ending EV mNAV (× BTC NAV)<input type="number" id="ci-mnav" value="1.00" step="0.05" min="0.05"></label>
       </div>
       <div class="calc-out" id="calc-out"></div>
@@ -1224,8 +1227,11 @@ function simulate(s, cfg){
     p = priceAt(hold,b,pref,sharesM,mn);
     if(cfg.commonMo>0){ sharesM += cfg.commonMo/p; hold += cfg.commonMo*1e6/b; }   // common ATM -> BTC
     const div = pref*cfg.rate/100/12;                                  // service dividends
-    if(cfg.fund==="btc") hold -= div*1e6/b;
-    else { p = priceAt(hold,b,pref,sharesM,mn); sharesM += div/p; }
+    if(div>0){                                                         // pro-rata funding mix
+      if(cfg.fundMix>0) hold -= div*cfg.fundMix*1e6/b;                 // BTC-sale share
+      const dc = div*(1-cfg.fundMix);                                  // common-issuance share
+      if(dc>0){ p = priceAt(hold,b,pref,sharesM,mn); sharesM += dc/p; }
+    }
     p = priceAt(hold,b,pref,sharesM,mn);
     idxStock.push(p/s.px*100); idxBtc.push(b/s.btc*100); labels.push(String(m));
   }
@@ -1246,7 +1252,10 @@ function runCalc(){
   const gv = id => parseFloat(document.getElementById(id).value)||0;
   const cfg = { btcTarget:gv("ci-btc"), months:Math.max(1,Math.round(gv("ci-months"))),
     prefMo:gv("ci-pref"), commonMo:gv("ci-common"), rate:gv("ci-rate"),
-    fund:document.getElementById("ci-fund").value, endMnav:gv("ci-mnav") };
+    fundMix:gv("ci-fund")/100, endMnav:gv("ci-mnav") };
+  const lbl = document.getElementById("ci-fund-lbl");
+  if(lbl){ const m=Math.round(cfg.fundMix*100);
+    lbl.textContent = m===0 ? "100% common issuance" : m===100 ? "100% BTC sales" : m+"% BTC sales · "+(100-m)+"% common"; }
   const r = simulate(s, cfg);
   const o = DATA.companies[calcCo];
   document.getElementById("calc-snap").textContent =
@@ -1284,7 +1293,7 @@ async function shareCard(){
   const gv = id => parseFloat(document.getElementById(id).value)||0;
   const cfg = { btcTarget:gv("ci-btc"), months:Math.max(1,Math.round(gv("ci-months"))),
     prefMo:gv("ci-pref"), commonMo:gv("ci-common"), rate:gv("ci-rate"),
-    fund:document.getElementById("ci-fund").value, endMnav:gv("ci-mnav") };
+    fundMix:gv("ci-fund")/100, endMnav:gv("ci-mnav") };
   const snap = calcSnapshot(calcCo), r = simulate(snap, cfg), o = DATA.companies[calcCo];
   if(!r) return;
   const W=1200, H=675, SCALE=2;                 // render 2x for crisp social images
@@ -1302,7 +1311,17 @@ async function shareCard(){
   const w1 = x.measureText(`${calcCo} → `).width;
   x.fillStyle=o.accent; x.fillText(`$${fmt(r.implied,2)}`, 56+w1, 138);
   x.fillStyle="#b9bdc2"; x.font=F("400 22px");
-  x.fillText(`implied in ${cfg.months} months  ·  stock ${fmt(r.stockX,2)}x vs BTC ${fmt(r.btcX,2)}x  ·  amplification ${fmt(r.stockX/r.btcX,2)}x`, 56, 178);
+  x.fillText(`implied in ${cfg.months} months`, 56, 178);
+  // stat boxes beside the price: stock return (BTC subtly noted) + amplification
+  const statBox = (bx, label, val, valColor, sub) => {
+    x.strokeStyle="rgba(255,255,255,0.18)"; x.fillStyle="rgba(255,255,255,0.02)";
+    x.fillRect(bx,70,215,96); x.strokeRect(bx,70,215,96);
+    x.font=F("700 12px"); x.fillStyle="#9aa0a6"; x.fillText(label, bx+16, 96);
+    x.font=F("italic 700 30px"); x.fillStyle=valColor; x.fillText(val, bx+16, 133);
+    x.font=F("400 14px"); x.fillStyle="#9aa0a6"; x.fillText(sub, bx+16, 155);
+  };
+  statBox(660, "STOCK RETURN", fmt(r.stockX,2)+"x", r.stockX>=1?"#34d399":"#ff7a7a", "BTC "+fmt(r.btcX,2)+"x over same period");
+  statBox(895, "AMPLIFICATION", fmt(r.stockX/r.btcX,2)+"x", r.stockX>=r.btcX?"#34d399":"#ff7a7a", "vs holding BTC");
   // assumptions
   const rows = [
     ["BTC Price Target", "$"+fmt(cfg.btcTarget)],
@@ -1310,7 +1329,7 @@ async function shareCard(){
     ["Preferred Issued", "$"+fmt(cfg.prefMo)+"M / mo"],
     ["Common Issued", "$"+fmt(cfg.commonMo)+"M / mo"],
     ["Dividend Rate", fmt(cfg.rate,1)+"% / yr"],
-    ["Dividends Funded By", cfg.fund==="btc"?"Selling BTC":"Issuing common"],
+    ["Dividend Funding Mix", Math.round(cfg.fundMix*100)+"% BTC sales / "+Math.round((1-cfg.fundMix)*100)+"% common"],
     ["Ending mNAV", fmt(cfg.endMnav,2)+"x  (now "+fmt(r.mnav0,2)+"x)"],
     ["Starting Today", "$"+fmt(snap.px,2)+"  ·  ₿"+fmt(snap.hold)+"  ·  BTC $"+fmt(snap.btc)],
   ];
@@ -1342,15 +1361,15 @@ async function shareCard(){
     x.drawImage(oc, 652, 222, 480, 344);
     tmp.destroy();
   }
-  // "Powered by" + APYX logo, top right
+  // "Powered by" + APYX logo, bottom right (top right now holds the stat boxes)
   try{
     const img = new Image();
     await new Promise((res,rej)=>{ img.onload=res; img.onerror=rej; img.src="apyx-logo.svg"; });
     x.textAlign="right";
     x.font=F("400 15px"); x.fillStyle="#9aa0a6";
-    x.fillText("Powered by", W-56, 52);
+    x.fillText("Powered by", W-56, H-62);
     x.textAlign="left";
-    x.drawImage(img, W-56-150, 62, 150, 31);
+    x.drawImage(img, W-56-150, H-52, 150, 31);
   }catch(e){}
   // footer
   x.font=F("400 16px"); x.fillStyle="#9aa0a6";
@@ -1390,7 +1409,7 @@ function initCalc(){
   }));
   ["ci-btc","ci-months","ci-pref","ci-common","ci-rate","ci-mnav"].forEach(id =>
     document.getElementById(id).addEventListener("input", runCalc));
-  document.getElementById("ci-fund").addEventListener("change", runCalc);
+  document.getElementById("ci-fund").addEventListener("input", runCalc);
   document.getElementById("ci-share").addEventListener("click", shareCard);
   setDefaults();
   runCalc();
