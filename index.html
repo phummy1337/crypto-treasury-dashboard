@@ -1282,8 +1282,9 @@ async function shareCard(){
     fund:document.getElementById("ci-fund").value, endMnav:gv("ci-mnav") };
   const snap = calcSnapshot(calcCo), r = simulate(snap, cfg), o = DATA.companies[calcCo];
   if(!r) return;
-  const W=1200, H=675, cv=document.createElement("canvas"); cv.width=W; cv.height=H;
-  const x = cv.getContext("2d");
+  const W=1200, H=675, SCALE=2;                 // render 2x for crisp social images
+  const cv=document.createElement("canvas"); cv.width=W*SCALE; cv.height=H*SCALE;
+  const x = cv.getContext("2d"); x.scale(SCALE, SCALE);
   x.fillStyle="#0a0a0b"; x.fillRect(0,0,W,H);
   const g = x.createRadialGradient(W*0.96,0,60,W*0.96,0,560);
   g.addColorStop(0,"rgba(220,20,60,0.18)"); g.addColorStop(1,"rgba(220,20,60,0)");
@@ -1315,11 +1316,27 @@ async function shareCard(){
     x.font=F("700 19px"); x.fillStyle="#f5f6f7"; x.fillText(v, 290, y);
     y+=34;
   }
-  // chart panel
-  const ch = document.getElementById("ch-calc");
+  // chart panel: render a dedicated high-res chart (copying the small on-page
+  // canvas produces an unreadable, pixelated chart)
   x.strokeStyle="rgba(255,255,255,0.18)"; x.fillStyle="rgba(255,255,255,0.02)";
   x.fillRect(640,210,504,368); x.strokeRect(640,210,504,368);
-  if(ch && ch.width>0){ x.drawImage(ch, 652, 222, 480, 344); }
+  if(typeof Chart !== "undefined"){
+    const oc = document.createElement("canvas");
+    oc.width = 480*SCALE; oc.height = 344*SCALE;
+    const AXC="#b9bdc2", GRC="rgba(255,255,255,0.09)";
+    const tmp = new Chart(oc.getContext("2d"), { type:"line",
+      data:{ labels:r.labels, datasets:[
+        {label:calcCo+" (implied)", data:r.idxStock, borderColor:o.accent, borderWidth:2*SCALE, tension:.15, pointRadius:0},
+        {label:"BTC", data:r.idxBtc, borderColor:"#f7931a", borderWidth:2*SCALE, tension:.15, pointRadius:0} ]},
+      options:{ responsive:false, animation:false, devicePixelRatio:1,
+        plugins:{ legend:{ labels:{ color:AXC, font:{size:13*SCALE, family:"'Google Sans Flex',sans-serif"}, boxWidth:13*SCALE, boxHeight:13*SCALE } }, tooltip:{enabled:false} },
+        scales:{
+          x:{ title:{display:true,text:"months",color:AXC,font:{size:12*SCALE}}, ticks:{color:AXC,font:{size:12*SCALE},maxTicksLimit:9,maxRotation:0}, grid:{color:GRC} },
+          y:{ title:{display:true,text:"indexed (start = 100)",color:AXC,font:{size:12*SCALE}}, ticks:{color:AXC,font:{size:12*SCALE}}, grid:{color:GRC} } } } });
+    await new Promise(res=>setTimeout(res,80));
+    x.drawImage(oc, 652, 222, 480, 344);
+    tmp.destroy();
+  }
   // "Powered by" + APYX logo, top right
   try{
     const img = new Image();
