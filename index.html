@@ -179,6 +179,10 @@
   body.tab-calc section:not(#calc), body.tab-calc .sources { display:none; }
   body:not(.tab-calc) #calc { display:none; }
 
+  .calc-how { margin: -4px 0 14px; padding-left: 18px; max-width: 760px; }
+  .calc-how li { color: var(--muted); font-size: 14px; margin: 3px 0; line-height: 1.45; }
+  .calc-how b { color: var(--text); font-weight: 600; }
+
   /* implied price calculator */
   .calcbox { padding-top: 4px; }
   .calc-co { display:flex; align-items:center; gap:10px; padding: 14px 18px 4px; flex-wrap: wrap; }
@@ -412,7 +416,12 @@
   <!-- Implied Price Calculator -->
   <section id="calc">
     <div class="sec-head"><h2>Implied Price Calculator</h2><span class="tag" style="color:var(--btc);border-color:rgba(247,147,26,0.4)">model</span></div>
-    <p class="sec-note">Set your own assumptions — where bitcoin goes, how much capital gets raised, how dividends are funded, and what mNAV the market pays — and see the implied share price. The engine runs month by month: preferred and common issuance buys BTC, dividends are serviced, and each month the market cap backs out of your EV&nbsp;mNAV (mcap = mNAV × BTC NAV − debt − preferred + cash). Starting balance sheet is today's live data, and issuance inputs default to each company's <b>rolling 3-month average pace</b> from its filings — except MSTR preferred, which defaults to $0 while the STRC ATM is paused below par (override anything you like).</p>
+    <p class="sec-note">Set your assumptions, get an implied share price.</p>
+    <ul class="calc-how">
+      <li><b>Month-by-month engine</b> — issuance buys BTC, dividends get serviced, and each month's price backs out of your EV&nbsp;mNAV.</li>
+      <li><b>Starts from today's live balance sheet.</b></li>
+      <li><b>Defaults are real</b> — issuance uses each company's rolling 3-month pace from its filings (MSTR preferred sits at $0 while the STRC ATM is paused below par). Override anything.</li>
+    </ul>
     <div class="grid calcbox">
       <div class="calc-co">
         <button class="cobtn active" data-co="MSTR">MSTR · Strategy</button>
