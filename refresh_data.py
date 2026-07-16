@@ -287,6 +287,24 @@ def fetch_strategytracker(data):
             od.append(_iso_lbl(dts[-1], "%b '%y")); ov.append(round(bps[-1] * 1e8))
         co["bpsHistory"] = {"dates": od, "sats": ov}
 
+        # beta to BTC: regression of trailing-1y daily stock returns on BTC returns
+        try:
+            sp = hd["stock_prices"][-253:]
+            bp = hd["btc_prices"][-253:]
+            rs, rb = [], []
+            for i in range(1, min(len(sp), len(bp))):
+                if sp[i] and sp[i-1] and bp[i] and bp[i-1]:
+                    rs.append(sp[i]/sp[i-1] - 1)
+                    rb.append(bp[i]/bp[i-1] - 1)
+            if len(rb) > 60:
+                mb = sum(rb)/len(rb); ms = sum(rs)/len(rs)
+                cov = sum((rb[i]-mb)*(rs[i]-ms) for i in range(len(rb)))/len(rb)
+                var = sum((x-mb)**2 for x in rb)/len(rb)
+                if var > 0:
+                    co["betaBtc"] = round(cov/var, 2)
+        except Exception:
+            pass
+
         # ---- daily EV mNAV history: (mcap + debt + pref notional − cash) / BTC NAV ----
         try:
             start = MNAV_START[tk]
@@ -643,7 +661,8 @@ def _mstr_dividends_paid(data, start, end):
         d += datetime.timedelta(days=1)
         nxt = d + datetime.timedelta(days=1)
         if nxt.day == 1:                                   # d is a month end
-            total += (_step(steps, d.isoformat()) or 0) * STRC_DIV_RATE / 12   # STRC monthly
+            rate = (data["companies"]["MSTR"].get("strcRate") or STRC_DIV_RATE * 100) / 100
+            total += (_step(steps, d.isoformat()) or 0) * rate / 12   # STRC monthly
             if d.month in (3, 6, 9, 12):                   # quarter-end payers
                 total += QTRLY_PREF_DIV + stre * .10 / 4
         total += CONVERT_COUPONS.get(d.strftime("%m-%d"), 0)
@@ -778,6 +797,7 @@ def fetch_holdings(data, max_points=60):
 
         if tk == "MSTR":
             t3 = {"pref": 0.0, "common": 0.0}
+            strc_rate = None
             anchor = datetime.date.fromisoformat(MSTR_CASH_FILED[0])
             flows = {"raised": 0.0, "btcSpent": 0.0, "btcSold": 0.0}
             flow_asof = anchor
@@ -801,6 +821,11 @@ def fetch_holdings(data, max_points=60):
                     if t8 and rec[1] > datetime.date.today() - datetime.timedelta(days=92):
                         bd = _atm_netM(t8)
                         t3["pref"] += bd["pref"]; t3["common"] += bd["common"]
+                    if strc_rate is None and t8:
+                        rm = (re.search(r"dividend rate per annum on[^.]{0,140}?STRC[^.]{0,200}?to ([\d.]+)%", t8)
+                              or re.search(r"maintained[^.]{0,140}?STRC[^.]{0,140}?at ([\d.]+)%", t8))
+                        if rm:
+                            strc_rate = float(rm.group(1))
                     if len(pts) >= max_points: break
                 if fetched >= max_points * 3: break
                 time.sleep(0.12)
@@ -832,6 +857,19 @@ def fetch_holdings(data, max_points=60):
             co["cashFiled"] = MSTR_CASH_FILED[1]
             co["cash"] = round(est)
             co["trail3m"] = {"prefMo": round(t3["pref"] / 3), "commonMo": round(t3["common"] / 3)}
+            # the tracker's STRC dividendRate lags rate-change 8-Ks; the filings win
+            if strc_rate:
+                co["strcRate"] = strc_rate
+                fixed = {"STRK": 8.0, "STRF": 10.0, "STRD": 10.0, "STRE": 10.0, "STRC": strc_rate}
+                bd = co.get("prefBreakdown") or []
+                pref_div = 0.0
+                for row in bd:
+                    if row[0] == "STRC":
+                        row[1] = f"Stretch · {strc_rate:g}% var"
+                    pref_div += row[2] * fixed.get(row[0], 10.0) / 100
+                coup = sum(x["principal"] * x["coupon"] / 100 for x in (co.get("debtSchedule") or []))
+                co["annualObligations"] = round(pref_div + coup)
+                log(f"MSTR STRC rate from 8-K: {strc_rate}% -> annualObligations {co['annualObligations']}")
             log(f"MSTR cash est: {MSTR_CASH_FILED[1]} filed + {flows['raised']:,.0f} raised "
                 f"+ {flows['btcSold']:,.0f} BTC sold - {flows['btcSpent']:,.0f} BTC bought "
                 f"- {divs:,.0f} divs = ${est:,.0f}M (as of {flow_asof})")

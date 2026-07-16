@@ -1,9 +1,9 @@
 {
   "asOf": "2026-07-15",
   "priceAsOf": "2026-07-15",
-  "btcPriceUsd": 64869,
+  "btcPriceUsd": 64442,
   "btcSupply": 21000000,
-  "btcCirculating": 20056843,
+  "btcCirculating": 20056903,
   "companies": {
     "MSTR": {
       "name": "Strategy",
@@ -13,11 +13,11 @@
       "asset": "BTC",
       "accent": "#ed1946",
       "stockPrice": 97.47,
-      "dayChangePct": -0.11,
+      "dayChangePct": 0.0,
       "sharesOutstanding": 371.61,
-      "betaBtc": 1.61,
+      "betaBtc": 1.28,
       "week52Low": 82.31,
-      "week52High": 455.9,
+      "week52High": 451.34,
       "prefPrice": 87.78,
       "holdings": 843775,
       "pctSupply": 4.018,
@@ -36,10 +36,10 @@
       "satsPer100": 119000,
       "mnav": 1.01,
       "cebeMnav": 1.28,
-      "cash": 4352,
+      "cash": 4340,
       "seniorDebt": 8214,
       "prefNotional": 15461,
-      "annualObligations": 1710,
+      "annualObligations": 1762,
       "staking": 0,
       "prefChangePct": -0.49,
       "yearEnd": {
@@ -53,7 +53,7 @@
       "prefBreakdown": [
         [
           "STRC",
-          "Stretch \u00b7 11.5% var",
+          "Stretch \u00b7 12% var",
           10489
         ],
         [
@@ -136,7 +136,7 @@
       "capStructAsOf": "2026-03-31 (10-Q)",
       "dilutedShares": 401.29,
       "marketCapBasic": 29540,
-      "navPremiumBasic": 0.663,
+      "navPremiumBasic": 0.665,
       "treasuryDate": "2026-07-06",
       "bpsHistory": {
         "dates": [
@@ -2149,7 +2149,8 @@
           "Jul 12",
           "Jul 13",
           "Jul 14",
-          "Jul 15"
+          "Jul 15",
+          "Jul 16"
         ],
         "px": [
           338.41,
@@ -2439,6 +2440,7 @@
           94.64,
           92.1,
           97.58,
+          97.47,
           97.47
         ],
         "mnav": [
@@ -2729,7 +2731,8 @@
           1.022,
           1.02,
           1.014,
-          1.017
+          1.02,
+          1.02
         ]
       },
       "strcNotionalSteps": [
@@ -2796,7 +2799,7 @@
         "raised": 8429,
         "btcSold": 216,
         "btcSpent": 6091,
-        "divs": 409,
+        "divs": 421,
         "asOf": "2026-07-12"
       },
       "cashFiled": 2207.2,
@@ -2813,13 +2816,18 @@
           [
             "2026-07-13",
             4352
+          ],
+          [
+            "2026-07-15",
+            4340
           ]
         ]
       },
       "trail3m": {
         "prefMo": 1375,
         "commonMo": 1101
-      }
+      },
+      "strcRate": 12.0
     },
     "ASST": {
       "name": "Strive",
@@ -2829,9 +2837,9 @@
       "asset": "BTC",
       "accent": "#4c9fff",
       "stockPrice": 12.61,
-      "dayChangePct": 1.61,
+      "dayChangePct": 0.0,
       "sharesOutstanding": 83.23,
-      "betaBtc": 1.29,
+      "betaBtc": 1.35,
       "week52Low": 7.16,
       "week52High": 178.2,
       "prefPrice": 98.76,
@@ -2872,7 +2880,7 @@
       "capStructAsOf": "2026-06-18 (8-K)",
       "dilutedShares": 112.53,
       "marketCapBasic": 925,
-      "navPremiumBasic": 0.814,
+      "navPremiumBasic": 0.817,
       "treasuryDate": "2026-07-10",
       "bpsHistory": {
         "dates": [
@@ -3882,7 +3890,8 @@
           "Jul 12",
           "Jul 13",
           "Jul 14",
-          "Jul 15"
+          "Jul 15",
+          "Jul 16"
         ],
         "px": [
           14.76,
@@ -4080,6 +4089,7 @@
           12.36,
           11.83,
           12.41,
+          12.61,
           12.61
         ],
         "mnav": [
@@ -4278,7 +4288,8 @@
           1.272,
           1.266,
           1.251,
-          1.268
+          1.271,
+          1.271
         ]
       },
       "cashUsd": 154.1,
@@ -4293,7 +4304,6 @@
     "illustrative": false,
     "daily": true,
     "iso": [
-      "2025-07-16",
       "2025-07-17",
       "2025-07-18",
       "2025-07-19",
@@ -4657,10 +4667,10 @@
       "2026-07-12",
       "2026-07-13",
       "2026-07-14",
-      "2026-07-15"
+      "2026-07-15",
+      "2026-07-16"
     ],
     "dates": [
-      "Jul 16",
       "Jul 17",
       "Jul 18",
       "Jul 19",
@@ -5024,10 +5034,10 @@
       "Jul 12",
       "Jul 13",
       "Jul 14",
-      "Jul 15"
+      "Jul 15",
+      "Jul 16"
     ],
     "MSTR": [
-      455.9,
       451.34,
       423.22,
       423.22,
@@ -5391,10 +5401,10 @@
       94.64,
       92.1,
       97.58,
+      97.47,
       97.47
     ],
     "ASST": [
-      118.8,
       102.0,
       90.4,
       90.4,
@@ -5758,6 +5768,7 @@
       12.36,
       11.83,
       12.41,
+      12.61,
       12.61
     ]
   },
