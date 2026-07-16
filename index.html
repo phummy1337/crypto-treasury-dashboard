@@ -1483,7 +1483,8 @@ async function repollData(){
 
 // cadence: every minute during market hours -> live stock px + BTC (all derived
 // metrics re-render with them); every 15 minutes -> full data.json repoll
-setInterval(() => { if(marketOpenET()){ fetchLiveEquity(); fetchBtcPrice(); } }, 60000);
+setInterval(() => { if(marketOpenET()) fetchLiveEquity(); }, 60000);
+setInterval(fetchBtcPrice, 60000);          // BTC trades 24/7 — tick every minute always
 setInterval(() => { if(marketOpenET()) repollData(); }, 15*60*1000);
 </script>
 </body>
