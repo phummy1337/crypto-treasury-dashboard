@@ -1,7 +1,7 @@
 {
   "asOf": "2026-07-16",
   "priceAsOf": "2026-07-16",
-  "btcPriceUsd": 64148,
+  "btcPriceUsd": 64152,
   "btcSupply": 21000000,
   "btcCirculating": 20057109,
   "companies": {
@@ -136,7 +136,7 @@
       "capStructAsOf": "2026-03-31 (10-Q)",
       "dilutedShares": 401.29,
       "marketCapBasic": 29540,
-      "navPremiumBasic": 0.669,
+      "navPremiumBasic": 0.671,
       "treasuryDate": "2026-07-06",
       "bpsHistory": {
         "dates": [
@@ -2732,7 +2732,7 @@
           1.02,
           1.014,
           1.018,
-          1.026
+          1.029
         ]
       },
       "strcNotionalSteps": [
@@ -2880,7 +2880,7 @@
       "capStructAsOf": "2026-06-18 (8-K)",
       "dilutedShares": 112.53,
       "marketCapBasic": 925,
-      "navPremiumBasic": 0.821,
+      "navPremiumBasic": 0.824,
       "treasuryDate": "2026-07-10",
       "bpsHistory": {
         "dates": [
@@ -4289,7 +4289,7 @@
           1.266,
           1.251,
           1.269,
-          1.279
+          1.284
         ]
       },
       "cashUsd": 154.1,

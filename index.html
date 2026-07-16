@@ -1382,7 +1382,7 @@ async function shareCard(){
   }catch(e){}
   // footer
   x.font=F("400 16px"); x.fillStyle="#9aa0a6";
-  x.fillText("phummy1337.github.io/crypto-treasury-dashboard  ·  a model, not investment advice  ·  "+new Date().toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}), 56, H-34);
+  x.fillText("treasurytracker.xyz  ·  a model, not investment advice  ·  "+new Date().toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}), 56, H-34);
   cv.toBlob(async blob => {
     try{ await navigator.clipboard.write([new ClipboardItem({"image/png": blob})]); }catch(e){}
     const a = document.createElement("a");
