@@ -1,7 +1,7 @@
 {
   "asOf": "2026-07-16",
   "priceAsOf": "2026-07-16",
-  "btcPriceUsd": 64141,
+  "btcPriceUsd": 64147,
   "btcSupply": 21000000,
   "btcCirculating": 20057212,
   "companies": {
@@ -2735,7 +2735,7 @@
           1.02,
           1.014,
           1.018,
-          1.003
+          1.004
         ]
       },
       "strcNotionalSteps": [
