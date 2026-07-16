@@ -278,7 +278,6 @@
         <div class="lbl">Bitcoin</div>
         <div class="val" id="btcVal">—</div>
         <div class="sub" id="btcSub">loading…</div>
-        <span class="refresh" id="refreshBtn">↻ Refresh</span>
       </div>
       <div class="statbox" style="--bx:var(--mstr)">
         <div class="lbl">MSTR mNAV</div>
@@ -1447,7 +1446,6 @@ async function fetchLiveEquity(){
   }catch(e){ /* keep last refresh's values */ }
 }
 
-document.getElementById("refreshBtn").addEventListener("click", () => { fetchBtcPrice(); fetchLiveEquity(); });
 loadData().then(fetchLiveEquity);
 // previous close derived from the cron snapshot (px and day-change at refresh time)
 function derivePrevClose(){
