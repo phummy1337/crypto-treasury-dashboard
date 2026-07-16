@@ -6,7 +6,7 @@ on:
   schedule:
     # off-peak minutes — GitHub delays/drops crons scheduled on :00/:30
     - cron: "40 10 * * 1-5"         # ~6:40 am ET pre-market (UTC-4)
-    - cron: "10,40 13-21 * * 1-5"   # ~every 30 min, 9:10 am – 5:40 pm ET, weekdays
+    - cron: "7,17,27,37,47,57 13-20 * * 1-5"   # ~every 10 min during US market hours
   workflow_dispatch:               # manual "Run workflow" button
 
 permissions:
