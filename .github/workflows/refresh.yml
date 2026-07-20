@@ -7,6 +7,7 @@ on:
     # off-peak minutes — GitHub delays/drops crons scheduled on :00/:30
     - cron: "40 10 * * 1-5"         # ~6:40 am ET pre-market (UTC-4)
     - cron: "7,17,27,37,47,57 13-20 * * 1-5"   # ~every 10 min during US market hours
+    - cron: "7 22 * * 5"            # Fri ~5pm EST / 6pm EDT — recapture the settled close so a late after-hours print isn't frozen all weekend
   workflow_dispatch:               # manual "Run workflow" button
 
 permissions:
