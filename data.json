@@ -1,9 +1,9 @@
 {
-  "asOf": "2026-07-17",
-  "priceAsOf": "2026-07-17",
-  "btcPriceUsd": 64060,
+  "asOf": "2026-07-20",
+  "priceAsOf": "2026-07-20",
+  "btcPriceUsd": 64787,
   "btcSupply": 21000000,
-  "btcCirculating": 20057631,
+  "btcCirculating": 20058756,
   "companies": {
     "MSTR": {
       "name": "Strategy",
@@ -13,9 +13,9 @@
       "asset": "BTC",
       "accent": "#ed1946",
       "stockPrice": 94.85,
-      "dayChangePct": 0.87,
+      "dayChangePct": 0.0,
       "sharesOutstanding": 371.61,
-      "betaBtc": 1.28,
+      "betaBtc": 1.29,
       "week52Low": 82.31,
       "week52High": 426.4,
       "prefPrice": 85.29,
@@ -136,7 +136,7 @@
       "capStructAsOf": "2026-03-31 (10-Q)",
       "dilutedShares": 401.29,
       "marketCapBasic": 29540,
-      "navPremiumBasic": 0.652,
+      "navPremiumBasic": 0.645,
       "treasuryDate": "2026-07-06",
       "bpsHistory": {
         "dates": [
@@ -570,6 +570,7 @@
           "Jun '26",
           "Jun '26",
           "Jun '26",
+          "Jul '26",
           "Jul '26",
           "Jul '26",
           "Jul '26",
@@ -1007,6 +1008,7 @@
           236105,
           227656,
           227656,
+          227057,
           227057,
           227057,
           227057
@@ -2157,7 +2159,10 @@
           "Jul 14",
           "Jul 15",
           "Jul 16",
-          "Jul 17"
+          "Jul 17",
+          "Jul 18",
+          "Jul 19",
+          "Jul 20"
         ],
         "px": [
           338.41,
@@ -2449,6 +2454,9 @@
           97.58,
           97.47,
           94.03,
+          94.85,
+          94.85,
+          94.85,
           94.85
         ],
         "mnav": [
@@ -2741,7 +2749,10 @@
           1.014,
           1.018,
           1.009,
-          1.009
+          1.013,
+          0.999,
+          0.999,
+          0.999
         ]
       },
       "strcNotionalSteps": [
@@ -2833,8 +2844,8 @@
         ]
       },
       "trail3m": {
-        "prefMo": 1375,
-        "commonMo": 1101
+        "prefMo": 650,
+        "commonMo": 979
       },
       "strcRate": 12.0
     },
@@ -2846,12 +2857,12 @@
       "asset": "BTC",
       "accent": "#4c9fff",
       "stockPrice": 11.86,
-      "dayChangePct": 1.8,
+      "dayChangePct": 0.0,
       "sharesOutstanding": 83.23,
       "betaBtc": 1.36,
       "week52Low": 7.16,
       "week52High": 178.2,
-      "prefPrice": 98.97,
+      "prefPrice": 97.73,
       "holdings": 19900,
       "pctSupply": 0.0948,
       "netChangeYtd": 12273,
@@ -2874,7 +2885,7 @@
       "prefNotional": 783,
       "annualObligations": 102,
       "staking": 0,
-      "prefChangePct": 1.56,
+      "prefChangePct": 0.29,
       "yearEnd": {
         "2025": 7627
       },
@@ -2889,7 +2900,7 @@
       "capStructAsOf": "2026-06-18 (8-K)",
       "dilutedShares": 112.53,
       "marketCapBasic": 925,
-      "navPremiumBasic": 0.774,
+      "navPremiumBasic": 0.766,
       "treasuryDate": "2026-07-10",
       "bpsHistory": {
         "dates": [
@@ -2977,6 +2988,7 @@
           "Jun '26",
           "Jun '26",
           "Jun '26",
+          "Jul '26",
           "Jul '26",
           "Jul '26",
           "Jul '26",
@@ -3068,6 +3080,7 @@
           24353,
           24241,
           24034,
+          23910,
           23910,
           23910,
           23910
@@ -3180,7 +3193,7 @@
         ]
       },
       "daysToCover": 3.77,
-      "prefMarket": 775,
+      "prefMarket": 765,
       "prefHistory": {
         "dates": [
           "Nov 6",
@@ -3907,7 +3920,10 @@
           "Jul 14",
           "Jul 15",
           "Jul 16",
-          "Jul 17"
+          "Jul 17",
+          "Jul 18",
+          "Jul 19",
+          "Jul 20"
         ],
         "px": [
           14.76,
@@ -4107,6 +4123,9 @@
           12.41,
           12.61,
           11.65,
+          11.86,
+          11.86,
+          11.86,
           11.86
         ],
         "mnav": [
@@ -4307,7 +4326,10 @@
           1.251,
           1.269,
           1.225,
-          1.232
+          1.236,
+          1.219,
+          1.219,
+          1.219
         ]
       },
       "cashUsd": 154.1,
@@ -4322,9 +4344,6 @@
     "illustrative": false,
     "daily": true,
     "iso": [
-      "2025-07-18",
-      "2025-07-19",
-      "2025-07-20",
       "2025-07-21",
       "2025-07-22",
       "2025-07-23",
@@ -4686,12 +4705,12 @@
       "2026-07-14",
       "2026-07-15",
       "2026-07-16",
-      "2026-07-17"
+      "2026-07-17",
+      "2026-07-18",
+      "2026-07-19",
+      "2026-07-20"
     ],
     "dates": [
-      "Jul 18",
-      "Jul 19",
-      "Jul 20",
       "Jul 21",
       "Jul 22",
       "Jul 23",
@@ -5053,12 +5072,12 @@
       "Jul 14",
       "Jul 15",
       "Jul 16",
-      "Jul 17"
+      "Jul 17",
+      "Jul 18",
+      "Jul 19",
+      "Jul 20"
     ],
     "MSTR": [
-      423.22,
-      423.22,
-      423.22,
       426.28,
       426.4,
       412.67,
@@ -5420,12 +5439,12 @@
       97.58,
       97.47,
       94.03,
+      94.85,
+      94.85,
+      94.85,
       94.85
     ],
     "ASST": [
-      90.4,
-      90.4,
-      90.4,
       87.4,
       86.2,
       99.8,
@@ -5787,6 +5806,9 @@
       12.41,
       12.61,
       11.65,
+      11.86,
+      11.86,
+      11.86,
       11.86
     ]
   },
