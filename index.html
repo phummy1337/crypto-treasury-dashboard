@@ -1410,12 +1410,19 @@ async function shareCard(){
 
 function initCalc(){
   if(!document.getElementById("calc-out")) return;
-  document.querySelectorAll(".tabbtn").forEach(b => b.addEventListener("click", () => {
-    document.querySelectorAll(".tabbtn").forEach(x=>x.classList.toggle("active", x===b));
-    document.body.classList.toggle("tab-calc", b.dataset.tab==="calc");
+  const setTab = tab => {
+    document.querySelectorAll(".tabbtn").forEach(x=>x.classList.toggle("active", x.dataset.tab===tab));
+    document.body.classList.toggle("tab-calc", tab==="calc");
     window.scrollTo(0,0);
-    if(b.dataset.tab==="calc") runCalc();   // re-render the chart once visible
-  }));
+    if(tab==="calc") runCalc();   // re-render the chart once visible
+    const want = tab==="calc" ? "#calc" : "";
+    if(location.hash !== want)
+      try{ history.replaceState(null, "", location.pathname + want); }catch(e){}
+  };
+  document.querySelectorAll(".tabbtn").forEach(b => b.addEventListener("click", () => setTab(b.dataset.tab)));
+  // deep link: /#calc or /#calculator (the /calculator path redirects here)
+  const hashTab = () => /^#calc(ulator)?$/i.test(location.hash) ? "calc" : "dash";
+  window.addEventListener("hashchange", () => setTab(hashTab()));
   const setDefaults = () => {
     const o = DATA.companies[calcCo];
     document.getElementById("ci-rate").value = calcCo==="MSTR" ? 12 : 13;
@@ -1436,6 +1443,7 @@ function initCalc(){
   document.getElementById("ci-share").addEventListener("click", shareCard);
   setDefaults();
   runCalc();
+  if(hashTab()==="calc") setTab("calc");   // arrived via /calculator or /#calc
 }
 
 // real-time equity layer: the tracker's light feed (CORS-open, ~140KB) carries live
