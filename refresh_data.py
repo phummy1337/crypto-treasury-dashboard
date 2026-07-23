@@ -1115,6 +1115,15 @@ def _dtc20(sih, volhist):
     return out
 
 
+def _dtc_live(sih, volhist):
+    """Live DTC: latest reported shorts / the 20 trading days of volume ending today."""
+    last = sorted(volhist)[-20:]
+    if len(last) < 5:
+        return None
+    avg = sum(v for _, v in last) / len(last)
+    return round(sih["si"][-1] / avg, 2) if avg else None
+
+
 def _nasdaq_si(sym):
     """Semi-monthly short-interest history for one symbol from Nasdaq."""
     url = f"https://api.nasdaq.com/api/quote/{sym}/short-interest?assetClass=stocks"
@@ -1158,6 +1167,7 @@ def fetch_short_interest(data):
                     except Exception:
                         vols = _yahoo_vol(sym)
                     sih["dtc20"] = _dtc20(sih, vols)
+                    sih["dtcLive"] = _dtc_live(sih, vols)
                 except Exception as e:
                     log(f"[skip] {sym} volume for DTC-20d: {e} — falling back to Nasdaq DTC")
                 co["shortInterest"] = sih
@@ -1181,6 +1191,7 @@ def fetch_short_interest(data):
                     sih["pctFloat"] = pct
                     if pref in _VOL_HIST:
                         sih["dtc20"] = _dtc20(sih, _VOL_HIST[pref])
+                        sih["dtcLive"] = _dtc_live(sih, _VOL_HIST[pref])
                     co["prefShortInterest"] = sih
                     log(f"[short interest] {pref}: {len(sih['dtc'])} pts, latest {sih['si'][-1]:,} sh "
                         f"({pct[-1]}% of float)")

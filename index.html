@@ -479,21 +479,25 @@
       <div class="chartcard">
         <h3><span class="dot" style="background:var(--mstr)"></span>MSTR — Short Interest</h3>
         <div class="ch-sub">Bars: shorts % of float (left) · Line: days to cover, 20d avg volume (right)</div>
+        <div class="ch-sub short-live" id="short-live-MSTR"></div>
         <div class="chartwrap"><canvas id="ch-short-MSTR"></canvas></div>
       </div>
       <div class="chartcard">
         <h3><span class="dot" style="background:var(--asst)"></span>ASST — Short Interest</h3>
         <div class="ch-sub">Bars: shorts % of float (left) · Line: days to cover, 20d avg volume (right)</div>
+        <div class="ch-sub short-live" id="short-live-ASST"></div>
         <div class="chartwrap"><canvas id="ch-short-ASST"></canvas></div>
       </div>
       <div class="chartcard">
         <h3><span class="dot" style="background:var(--mstr)"></span>STRC — Short Interest</h3>
         <div class="ch-sub">Bars: shorts % of float (left) · Line: days to cover, 20d avg volume (right)</div>
+        <div class="ch-sub short-live" id="short-live-STRC"></div>
         <div class="chartwrap"><canvas id="ch-short-STRC"></canvas></div>
       </div>
       <div class="chartcard">
         <h3><span class="dot" style="background:var(--asst)"></span>SATA — Short Interest</h3>
         <div class="ch-sub">Bars: shorts % of float (left) · Line: days to cover, 20d avg volume (right)</div>
+        <div class="ch-sub short-live" id="short-live-SATA"></div>
         <div class="chartwrap"><canvas id="ch-short-SATA"></canvas></div>
       </div>
     </div>
@@ -1146,6 +1150,10 @@ function renderCharts(){
   shortSpecs.forEach(([sym, si, ac]) => {
     if(!si || !si.pctFloat) return;
     anyShorts = true;
+    const lv = document.getElementById("short-live-"+sym);
+    if(lv) lv.innerHTML = si.dtcLive!=null
+      ? `Live: <b style="color:#fff">${(+si.dtcLive).toFixed(2)} days to cover</b> — latest shorts (${si.dates[si.dates.length-1]}) ÷ 20d avg volume through today`
+      : "";
     const dtc = si.dtc20 || si.dtc;                  // trailing-20d basis, Nasdaq DTC fallback
     const shOpts = baseOpts({ scales:{
       x:{ ticks:{color:AX,font:{size:11},autoSkip:true,maxTicksLimit:10,maxRotation:0}, grid:{color:GRID} },
