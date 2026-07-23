@@ -1154,7 +1154,12 @@ function renderCharts(){
     if(lv) lv.innerHTML = si.dtcLive!=null
       ? `Live: <b style="color:#fff">${(+si.dtcLive).toFixed(2)} days to cover</b> — latest shorts (${si.dates[si.dates.length-1]}) ÷ 20d avg volume through today`
       : "";
-    const dtc = si.dtc20 || si.dtc;                  // trailing-20d basis, Nasdaq DTC fallback
+    // extend the DTC line with a live "Today" point: latest shorts / 20d volume through today
+    const hasLive = si.dtcLive != null;
+    const labels = hasLive ? si.dates.concat(["Today"]) : si.dates;
+    const bars   = hasLive ? si.pctFloat.concat([null]) : si.pctFloat;
+    const line   = hasLive ? (si.dtc20 || si.dtc).concat([si.dtcLive]) : (si.dtc20 || si.dtc);
+    const lastIdx = labels.length - 1;
     const shOpts = baseOpts({ scales:{
       x:{ ticks:{color:AX,font:{size:11},autoSkip:true,maxTicksLimit:10,maxRotation:0}, grid:{color:GRID} },
       yF:axis("% float","left",{ticks:{color:ac,font:{size:11},callback:v=>(+v).toFixed(1)+"%"}, beginAtZero:true}),
@@ -1164,13 +1169,19 @@ function renderCharts(){
       const i = ctx.dataIndex;
       if(ctx.dataset.yAxisID==="yF")
         return "Shorts: "+(+ctx.parsed.y).toFixed(1)+"% of float  ·  "+(si.si[i]/1e6).toFixed(2)+"M sh";
+      if(hasLive && i===lastIdx)
+        return "Live days to cover: "+(+ctx.parsed.y).toFixed(2)+"  (latest shorts ÷ 20d volume through today)";
       return "Days to cover: "+(+ctx.parsed.y).toFixed(2)+(si.dtc20?"  (20d avg volume)":"");
     }};
-    mkChart("ch-short-"+sym, { data:{ labels: si.dates, datasets:[
-      {type:"bar", label:"Shorts % of Float", data:si.pctFloat, yAxisID:"yF",
+    mkChart("ch-short-"+sym, { data:{ labels, datasets:[
+      {type:"bar", label:"Shorts % of Float", data:bars, yAxisID:"yF",
         backgroundColor:ac+"99", borderWidth:0, borderRadius:2, barThickness:8, order:2},
-      {type:"line", label:"Days to Cover", data:dtc, yAxisID:"yD", borderColor:"rgba(255,255,255,0.85)",
-        backgroundColor:"transparent", borderWidth:2, tension:.2, pointRadius:2, spanGaps:true, order:1} ]},
+      {type:"line", label:"Days to Cover", data:line, yAxisID:"yD", borderColor:"rgba(255,255,255,0.85)",
+        backgroundColor:"transparent", borderWidth:2, tension:.2, spanGaps:true, order:1,
+        pointRadius: hasLive ? labels.map((_,i)=> i===lastIdx ? 5 : 2) : 2,
+        pointBackgroundColor: hasLive ? labels.map((_,i)=> i===lastIdx ? "#34d399" : "rgba(255,255,255,0.85)") : "rgba(255,255,255,0.85)",
+        pointBorderColor: hasLive ? labels.map((_,i)=> i===lastIdx ? "#34d399" : "rgba(255,255,255,0.85)") : "rgba(255,255,255,0.85)",
+        segment:{ borderDash: c => hasLive && c.p1DataIndex===lastIdx ? [5,4] : undefined }} ]},
       options: shOpts });
   });
   setStatus("shorts", !anyShorts);
