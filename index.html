@@ -1152,7 +1152,7 @@ function renderCharts(){
     anyShorts = true;
     const lv = document.getElementById("short-live-"+sym);
     if(lv) lv.innerHTML = si.dtcLive!=null
-      ? `Live: <b style="color:#fff">${(+si.dtcLive).toFixed(2)} days to cover</b> — latest shorts (${si.dates[si.dates.length-1]}) ÷ 20d avg volume through today`
+      ? `Live: <b style="color:#fff">${(+si.dtcLive).toFixed(2)} days to cover starting today</b> — latest shorts (${si.dates[si.dates.length-1]}) ÷ trailing 20d avg volume`
       : "";
     // extend the DTC line with a live "Today" point: latest shorts / 20d volume through today
     const hasLive = si.dtcLive != null;
@@ -1170,7 +1170,7 @@ function renderCharts(){
       if(ctx.dataset.yAxisID==="yF")
         return "Shorts: "+(+ctx.parsed.y).toFixed(1)+"% of float  ·  "+(si.si[i]/1e6).toFixed(2)+"M sh";
       if(hasLive && i===lastIdx)
-        return "Live days to cover: "+(+ctx.parsed.y).toFixed(2)+"  (latest shorts ÷ 20d volume through today)";
+        return "Days to cover starting today: "+(+ctx.parsed.y).toFixed(2)+"  (latest shorts ÷ trailing 20d volume)";
       return "Days to cover: "+(+ctx.parsed.y).toFixed(2)+(si.dtc20?"  (20d avg volume)":"");
     }};
     mkChart("ch-short-"+sym, { data:{ labels, datasets:[
