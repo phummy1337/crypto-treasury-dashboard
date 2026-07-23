@@ -175,6 +175,20 @@ def _step(steps, iso):
 # The tracker carries a stale fixed conversion ($899mm), so we override it.
 STRE_EUR_NOTIONAL = 775.0
 
+# Insider super-voting Class B shares (millions) — never part of the float.
+# From the 2026-03-31 10-Q covers (iXBRL dei:EntityCommonStockSharesOutstanding):
+# MSTR 19,640,250 (unchanged for years) · ASST 9,870,636. Update on a B->A conversion.
+CLASS_B_SHARES_M = {"MSTR": 19.640250, "ASST": 9.870636}
+
+# Nasdaq reports historical short interest in as-traded (unadjusted) shares.
+# ASST ran a 1-for-20 reverse split effective 2026-02-06 (8-K dp240990), so
+# settlements before that date are divided by 20 to match today's share count.
+SI_SPLITS = {"ASST": [("2026-02-06", 20)]}
+
+# daily shares-outstanding history (millions) per ticker, filled by
+# fetch_strategytracker (mcap / price) and used for per-date float below
+_SHARES_HIST = {}
+
 PREF_LABEL = {"STRC": "Stretch · {r}% var", "STRK": "Strike · {r}%", "STRF": "Strife · {r}%",
               "STRD": "Stride · {r}%", "STRE": "STRE · {r}% (EUR)", "SATA": "Strive pref · {r}%"}
 
@@ -210,6 +224,12 @@ def fetch_strategytracker(data):
         co["stockPrice"]    = round(pm["stockPrice"], 2)
         co["dayChangePct"]  = round(pm["stockPriceDelta"]["percent"], 2)
         co["sharesOutstanding"] = round(pm["latestTotalShares"] / 1e6, 2)
+        co["floatSharesM"] = round(co["sharesOutstanding"] - CLASS_B_SHARES_M.get(tk, 0), 2)
+        # daily shares outstanding (split-adjusted, millions) for per-date float
+        _SHARES_HIST[tk] = sorted(
+            (dt, mc / px / 1e6)
+            for dt, mc, px in zip(hd["dates"], hd["market_cap_basic"], hd["stock_prices"])
+            if mc and px)
         co["dilutedShares"] = round(pm["latestDilutedShares"] / 1e6, 2)
         co["satsPerShareBasic"]   = round(pm["btcPerShare"] * 1e8)
         co["satsPerShareDiluted"] = round(pm["btcPerDilutedShare"] * 1e8)
@@ -253,9 +273,10 @@ def fetch_strategytracker(data):
                         chg = [{"effective_date": d, "notional_millions": n}
                                for d, n in STRC_BACKFILL if d < first] + chg
                         co["strcNotionalSteps"] = [[e["effective_date"], e["notional_millions"]] for e in chg]
-                    dts, px, no = [], [], []
+                    dts, isod, px, no = [], [], [], []
                     for q in hp:
                         dts.append(_iso_lbl(q["date"], "%b %-d"))
+                        isod.append(q["date"])
                         px.append(round(q["close"], 2))
                         n = None
                         for e in chg:
@@ -265,7 +286,7 @@ def fetch_strategytracker(data):
                                 break
                         no.append(round(n) if n is not None else None)
                     if px:
-                        co["prefHistory"] = {"dates": dts, "px": px, "notional": no}
+                        co["prefHistory"] = {"dates": dts, "iso": isod, "px": px, "notional": no}
             bd.sort(key=lambda x: -x[2])
             co["prefBreakdown"] = bd
             co["prefNotional"] = round(sum(x[2] for x in bd))
@@ -1049,28 +1070,58 @@ NASDAQ_UA = {"User-Agent": UA["User-Agent"], "Accept": "application/json",
              "Origin": "https://www.nasdaq.com", "Referer": "https://www.nasdaq.com/"}
 
 
+def _nasdaq_si(sym):
+    """Semi-monthly short-interest history for one symbol from Nasdaq."""
+    url = f"https://api.nasdaq.com/api/quote/{sym}/short-interest?assetClass=stocks"
+    req = urllib.request.Request(url, headers=NASDAQ_UA)
+    raw = urllib.request.urlopen(req, timeout=25, context=_SSL_CTX).read().decode("utf-8", "ignore")
+    rows = list(reversed(json.loads(raw)["data"]["shortInterestTable"]["rows"]))  # oldest -> newest
+    dts, isod, dtc, si = [], [], [], []
+    for r in rows:
+        d = datetime.datetime.strptime(r["settlementDate"], "%m/%d/%Y").date()
+        shares = int(str(r["interest"]).replace(",", ""))
+        for eff, ratio in SI_SPLITS.get(sym, []):     # normalize pre-split settlements
+            if d.isoformat() < eff:
+                shares = round(shares / ratio)
+        dts.append(d.strftime("%b %-d"))
+        isod.append(d.isoformat())
+        dtc.append(round(float(r["daysToCover"]), 2))
+        si.append(shares)
+    return {"dates": dts, "iso": isod, "dtc": dtc, "si": si} if dtc else None
+
+
 def fetch_short_interest(data):
-    """Days to cover + short interest history from Nasdaq (both tickers)."""
+    """Days to cover + short interest history from Nasdaq (common + preferred)."""
     for sym, co in data["companies"].items():
         try:
-            url = f"https://api.nasdaq.com/api/quote/{sym}/short-interest?assetClass=stocks"
-            req = urllib.request.Request(url, headers=NASDAQ_UA)
-            raw = urllib.request.urlopen(req, timeout=25, context=_SSL_CTX).read().decode("utf-8", "ignore")
-            rows = json.loads(raw)["data"]["shortInterestTable"]["rows"]
-            rows = list(reversed(rows))            # oldest -> newest
-            dts, isod, dtc, si = [], [], [], []
-            for r in rows:
-                d = datetime.datetime.strptime(r["settlementDate"], "%m/%d/%Y").date()
-                dts.append(d.strftime("%b %-d"))
-                isod.append(d.isoformat())
-                dtc.append(round(float(r["daysToCover"]), 2))
-                si.append(int(str(r["interest"]).replace(",", "")))
-            if dtc:
-                co["shortInterest"] = {"dates": dts, "iso": isod, "dtc": dtc, "si": si}
-                co["daysToCover"] = dtc[-1]
-                log(f"[short interest] {sym}: {len(dtc)} pts, latest DTC {dtc[-1]}")
+            sih = _nasdaq_si(sym)
+            if sih:
+                # % of float at each settlement: shares outstanding on that date
+                # (tracker daily history) minus the insider Class B block
+                b = CLASS_B_SHARES_M.get(sym, 0)
+                sh = _SHARES_HIST.get(sym) or []
+                pct = []
+                for iso, s in zip(sih["iso"], sih["si"]):
+                    past = [v for k, v in sh if k <= iso]
+                    tot = past[-1] if past else co.get("sharesOutstanding")
+                    flt = (tot - b) if tot else 0
+                    pct.append(round(s / (flt * 1e6) * 100, 2) if flt > 0.5 else None)
+                sih["pctFloat"] = pct
+                co["shortInterest"] = sih
+                co["daysToCover"] = sih["dtc"][-1]
+                log(f"[short interest] {sym}: {len(sih['dtc'])} pts, latest DTC {sih['dtc'][-1]}, "
+                    f"{pct[-1]}% of float")
         except Exception as e:
             log(f"[skip] short interest {sym}: {e} — keeping existing values")
+        pref = co.get("prefTicker")
+        if pref:
+            try:
+                sih = _nasdaq_si(pref)
+                if sih:
+                    co["prefShortInterest"] = sih
+                    log(f"[short interest] {pref}: {len(sih['dtc'])} pts, latest {sih['si'][-1]:,} sh")
+            except Exception as e:
+                log(f"[skip] short interest {pref}: {e} — keeping existing values")
 
 
 # --------------------------------------------------------------------------- #

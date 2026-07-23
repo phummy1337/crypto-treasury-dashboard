@@ -329,22 +329,22 @@
     <div class="charts">
       <div class="chartcard">
         <h3><span class="dot" style="background:var(--mstr)"></span>MSTR — Daily Close</h3>
-        <div class="ch-sub">Line: daily close (left) · Bars: days to cover, shorts (right)</div>
+        <div class="ch-sub">Line: daily close (left) · Bars: shorts % of float (right)</div>
         <div class="chartwrap"><canvas id="ch-si-MSTR"></canvas></div>
       </div>
       <div class="chartcard">
         <h3><span class="dot" style="background:var(--asst)"></span>ASST — Daily Close</h3>
-        <div class="ch-sub">Line: daily close since Jan 1, 2026 (left) · Bars: days to cover, shorts (right)</div>
+        <div class="ch-sub">Line: daily close since Jan 1, 2026 (left) · Bars: shorts % of float (right)</div>
         <div class="chartwrap"><canvas id="ch-si-ASST"></canvas></div>
       </div>
       <div class="chartcard">
         <h3><span class="dot" style="background:var(--mstr)"></span>STRC — Preferred Daily Close</h3>
-        <div class="ch-sub">Line: daily close (left) · Steps: notional outstanding (right)</div>
+        <div class="ch-sub">Line: daily close (left) · Bars: shorts % of float (right)</div>
         <div class="chartwrap"><canvas id="ch-pref-MSTR"></canvas></div>
       </div>
       <div class="chartcard">
         <h3><span class="dot" style="background:var(--asst)"></span>SATA — Preferred Daily Close</h3>
-        <div class="ch-sub">Line: daily close (left) · Steps: notional outstanding (right)</div>
+        <div class="ch-sub">Line: daily close (left) · Bars: shorts % of float (right)</div>
         <div class="chartwrap"><canvas id="ch-pref-ASST"></canvas></div>
       </div>
     </div>
@@ -1048,51 +1048,71 @@ function renderCharts(){
       // align by full ISO date when available — year-less labels like "Jul 15"
       // collide across years once the price window wraps around
       const isoLabels = (SH.iso||[]).slice(_start);
-      const dtcMap = {}, siMap = {};
+      // shorts as % of float: per-settlement-date float (shares outstanding then,
+      // minus insider Class B) computed by the refresh; flat current float as fallback
+      const flt = (DATA.companies[co].floatSharesM || DATA.companies[co].sharesOutstanding) * 1e6;
+      const pctMap = {}, siMap = {};
       const useIso = si.iso && isoLabels.length===labels.length && isoLabels.length>0;
-      (useIso ? si.iso : si.dates).forEach((d,i)=>{ dtcMap[d]=si.dtc[i]; siMap[d]=si.si[i]; });
+      (useIso ? si.iso : si.dates).forEach((d,i)=>{
+        pctMap[d] = si.pctFloat ? si.pctFloat[i] : si.si[i]/flt*100;
+        siMap[d] = si.si[i]; });
       const keyAt = i => useIso ? isoLabels[i] : labels[i];
-      const dtcAligned = labels.map((_,i) => keyAt(i) in dtcMap ? dtcMap[keyAt(i)] : null);
+      const pctAligned = labels.map((_,i) => keyAt(i) in pctMap ? pctMap[keyAt(i)] : null);
       const siOpts = baseOpts({ scales:{
         x:{ ticks:{color:AX,font:{size:11},autoSkip:true,maxTicksLimit:8,maxRotation:0}, grid:{color:GRID} },
         yP:axis("","left",{ticks:{color:c,font:{size:11},callback:v=>"$"+(+v).toFixed(0)}}),
-        yD:axis("days","right",{ticks:{color:"#ffffff",font:{size:11},callback:v=>(+v).toFixed(1)}}) } });
+        yS:axis("% float","right",{ticks:{color:"#ffffff",font:{size:11},callback:v=>(+v).toFixed(1)+"%"}}) } });
       siOpts.plugins.tooltip.callbacks = { label: ctx => {
         if(ctx.parsed.y==null) return null;
-        if(ctx.dataset.yAxisID==="yD"){
+        if(ctx.dataset.yAxisID==="yS"){
           const s = siMap[keyAt(ctx.dataIndex)];
-          return "Days to cover: "+(+ctx.parsed.y).toFixed(2) + (s?"  ·  "+(s/1e6).toFixed(1)+"M shares short":"");
+          return "Shorts: "+(+ctx.parsed.y).toFixed(1)+"% of float" + (s?"  ·  "+(s/1e6).toFixed(1)+"M sh":"");
         }
         return co+": $"+(+ctx.parsed.y).toFixed(2);
       }};
       mkChart("ch-si-"+co, { data:{ labels, datasets:[
         {type:"line", label:"Price", data:px, yAxisID:"yP", borderColor:c, backgroundColor:c+"18",
           borderWidth:2, tension:.2, pointRadius:0, fill:false, order:1},
-        {type:"bar", label:"Days to Cover (Shorts)", data:dtcAligned, yAxisID:"yD",
+        {type:"bar", label:"Shorts % of Float", data:pctAligned, yAxisID:"yS",
           backgroundColor:"rgba(255,255,255,0.5)", borderWidth:0,
           borderRadius:2, barThickness:6, order:2} ]},
         options: siOpts });
     }
 
-    // 4. Preferred price + notional outstanding (STRC / SATA)
+    // 4. Preferred price + shorts % of float (STRC / SATA); float = notional / $100 par
     const ph = DATA.companies[co].prefHistory;
     if(ph){
       const pt = DATA.companies[co].prefTicker;
+      const psi = DATA.companies[co].prefShortInterest;
+      // place each semi-monthly settlement on the nearest chart date at or before it
+      const barAt = {};
+      if(psi && ph.iso){
+        psi.iso.forEach((d,i)=>{
+          let idx=-1;
+          for(let j=0;j<ph.iso.length;j++){ if(ph.iso[j]<=d) idx=j; else break; }
+          const n = idx>=0 ? ph.notional[idx] : null;             // $M outstanding -> n*1e4 shares
+          if(n) barAt[idx] = { pct: psi.si[i]/(n*1e4)*100, si: psi.si[i] };
+        });
+      }
+      const pctAligned = ph.px.map((_,i)=> barAt[i] ? barAt[i].pct : null);
       const prefOpts = baseOpts({ scales:{
         x:{ ticks:{color:AX,font:{size:11},autoSkip:true,maxTicksLimit:8,maxRotation:0}, grid:{color:GRID} },
         yP:axis("","left",{ticks:{color:c,font:{size:11},callback:v=>"$"+(+v).toFixed(0)}}),
-        yN:axis("notional","right",{ticks:{color:"#ffffff",font:{size:11},callback:v=>capFmt(v)}}) } });
+        yS:axis("% float","right",{ticks:{color:"#ffffff",font:{size:11},callback:v=>(+v).toFixed(1)+"%"}}) } });
       prefOpts.plugins.tooltip.callbacks = { label: ctx => {
         if(ctx.parsed.y==null) return null;
-        return ctx.dataset.yAxisID==="yN" ? "Notional: "+capFmt(ctx.parsed.y)
-                                          : pt+": $"+(+ctx.parsed.y).toFixed(2);
+        if(ctx.dataset.yAxisID==="yS"){
+          const b = barAt[ctx.dataIndex];
+          return "Shorts: "+(+ctx.parsed.y).toFixed(1)+"% of float" + (b?"  ·  "+(b.si/1e6).toFixed(2)+"M sh":"");
+        }
+        return pt+": $"+(+ctx.parsed.y).toFixed(2);
       }};
       mkChart("ch-pref-"+co, { type:"line", data:{ labels: ph.dates, datasets:[
         {label:pt+" Price", data:ph.px, yAxisID:"yP", borderColor:c, backgroundColor:c+"18",
           borderWidth:2, tension:.2, pointRadius:0, fill:false, order:1},
-        {label:"Notional Outstanding", data:ph.notional, yAxisID:"yN", borderColor:"rgba(255,255,255,0.75)",
-          backgroundColor:"rgba(255,255,255,0.08)", borderWidth:2, stepped:true, pointRadius:0,
-          spanGaps:true, fill:true, order:2} ]},
+        {type:"bar", label:"Shorts % of Float", data:pctAligned, yAxisID:"yS",
+          backgroundColor:"rgba(255,255,255,0.5)", borderWidth:0,
+          borderRadius:2, barThickness:6, order:2} ]},
         options: prefOpts });
     }
 
