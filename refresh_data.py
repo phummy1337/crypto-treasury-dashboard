@@ -188,6 +188,9 @@ SI_SPLITS = {"ASST": [("2026-02-06", 20)]}
 # daily shares-outstanding history (millions) per ticker, filled by
 # fetch_strategytracker (mcap / price) and used for per-date float below
 _SHARES_HIST = {}
+# daily share volume per ticker: preferreds from the tracker's price log,
+# commons from Yahoo — used for trailing-20-day days-to-cover
+_VOL_HIST = {}
 
 PREF_LABEL = {"STRC": "Stretch · {r}% var", "STRK": "Strike · {r}%", "STRF": "Strife · {r}%",
               "STRD": "Stride · {r}%", "STRE": "STRE · {r}% (EUR)", "SATA": "Strive pref · {r}%"}
@@ -273,6 +276,7 @@ def fetch_strategytracker(data):
                         chg = [{"effective_date": d, "notional_millions": n}
                                for d, n in STRC_BACKFILL if d < first] + chg
                         co["strcNotionalSteps"] = [[e["effective_date"], e["notional_millions"]] for e in chg]
+                    _VOL_HIST[t] = [(q["date"], q.get("volume") or 0) for q in hp]
                     dts, isod, px, no = [], [], [], []
                     for q in hp:
                         dts.append(_iso_lbl(q["date"], "%b %-d"))
@@ -378,7 +382,7 @@ def fetch_strategytracker(data):
                 pref_at = lambda d: _step(sata_st, d) or 0
                 cash_at = lambda d, i: _ff[i]
                 debt_at = lambda d, i: (db[i] or 0) / 1e6 if i < len(db) else 0
-            dts_m, px_m, mnv = [], [], []
+            dts_m, px_m, mnv, cbv = [], [], [], []
             for i, d in enumerate(hd["dates"]):
                 if d < start:
                     continue
@@ -387,13 +391,17 @@ def fetch_strategytracker(data):
                 if not (mc and b and bp and sp):
                     continue
                 nav = b * bp / 1e6
-                ev = mc / 1e6 + debt_at(d, i) + pref_at(d) - cash_at(d, i)
+                claims = debt_at(d, i) + pref_at(d) - cash_at(d, i)
+                ev = mc / 1e6 + claims
                 dts_m.append(_iso_lbl(d, "%b %-d"))
                 px_m.append(round(sp, 2))
                 mnv.append(round(ev / nav, 3))
+                # CEBE mNAV: what the common pays per $ of BTC equity left after claims
+                cebe_nav = nav - claims
+                cbv.append(round(mc / 1e6 / cebe_nav, 3) if cebe_nav > 0 else None)
             if mnv:
-                co["mnavHistory"] = {"dates": dts_m, "px": px_m, "mnav": mnv}
-                log(f"{tk} mNAV history: {len(mnv)} pts, latest {mnv[-1]}x")
+                co["mnavHistory"] = {"dates": dts_m, "px": px_m, "mnav": mnv, "cebe": cbv}
+                log(f"{tk} mNAV history: {len(mnv)} pts, latest {mnv[-1]}x (CEBE {cbv[-1]}x)")
         except Exception as e:
             log(f"[skip] mNAV history {tk}: {e} — keeping existing series")
         hist[tk] = hd
@@ -1070,6 +1078,43 @@ NASDAQ_UA = {"User-Agent": UA["User-Agent"], "Accept": "application/json",
              "Origin": "https://www.nasdaq.com", "Referer": "https://www.nasdaq.com/"}
 
 
+def _nasdaq_vol(sym, days=420):
+    """Daily share volume [(iso date, volume), ...] from Nasdaq (split-adjusted)."""
+    frm = (datetime.date.today() - datetime.timedelta(days=days)).isoformat()
+    url = (f"https://api.nasdaq.com/api/quote/{sym}/historical?assetclass=stocks"
+           f"&limit=9999&fromdate={frm}&todate={datetime.date.today().isoformat()}")
+    req = urllib.request.Request(url, headers=NASDAQ_UA)
+    raw = urllib.request.urlopen(req, timeout=25, context=_SSL_CTX).read().decode("utf-8", "ignore")
+    rows = ((json.loads(raw)["data"] or {}).get("tradesTable") or {}).get("rows") or []
+    out = []
+    for r in rows:
+        d = datetime.datetime.strptime(r["date"], "%m/%d/%Y").date().isoformat()
+        v = str(r.get("volume") or "").replace(",", "")
+        if v.isdigit() and int(v):
+            out.append((d, int(v)))
+    return sorted(out)
+
+
+def _yahoo_vol(symbol):
+    """Daily share volume [(iso date, volume), ...] from Yahoo's 1y chart."""
+    res = _yahoo_chart(symbol)["chart"]["result"][0]
+    ts = res["timestamp"]
+    vols = res["indicators"]["quote"][0]["volume"]
+    return sorted((datetime.datetime.utcfromtimestamp(t).date().isoformat(), int(v))
+                  for t, v in zip(ts, vols) if v)
+
+
+def _dtc20(sih, volhist):
+    """Days to cover on the trailing 20-trading-day average volume at each settlement."""
+    vols = sorted(volhist)
+    out = []
+    for iso, s in zip(sih["iso"], sih["si"]):
+        past = [v for d, v in vols if d <= iso][-20:]
+        avg = sum(past) / len(past) if len(past) >= 5 else None
+        out.append(round(s / avg, 2) if avg else None)
+    return out
+
+
 def _nasdaq_si(sym):
     """Semi-monthly short-interest history for one symbol from Nasdaq."""
     url = f"https://api.nasdaq.com/api/quote/{sym}/short-interest?assetClass=stocks"
@@ -1107,6 +1152,14 @@ def fetch_short_interest(data):
                     flt = (tot - b) if tot else 0
                     pct.append(round(s / (flt * 1e6) * 100, 2) if flt > 0.5 else None)
                 sih["pctFloat"] = pct
+                try:                                   # trailing-20d days to cover
+                    try:
+                        vols = _nasdaq_vol(sym)
+                    except Exception:
+                        vols = _yahoo_vol(sym)
+                    sih["dtc20"] = _dtc20(sih, vols)
+                except Exception as e:
+                    log(f"[skip] {sym} volume for DTC-20d: {e} — falling back to Nasdaq DTC")
                 co["shortInterest"] = sih
                 co["daysToCover"] = sih["dtc"][-1]
                 log(f"[short interest] {sym}: {len(sih['dtc'])} pts, latest DTC {sih['dtc'][-1]}, "
@@ -1118,8 +1171,19 @@ def fetch_short_interest(data):
             try:
                 sih = _nasdaq_si(pref)
                 if sih:
+                    # % of float: preferred float = notional outstanding / $100 par
+                    ph = co.get("prefHistory") or {}
+                    steps = [(d, n) for d, n in zip(ph.get("iso") or [], ph.get("notional") or []) if n]
+                    pct = []
+                    for iso, s in zip(sih["iso"], sih["si"]):
+                        ns = [n for d2, n in steps if d2 <= iso]
+                        pct.append(round(s / (ns[-1] * 1e4) * 100, 2) if ns else None)
+                    sih["pctFloat"] = pct
+                    if pref in _VOL_HIST:
+                        sih["dtc20"] = _dtc20(sih, _VOL_HIST[pref])
                     co["prefShortInterest"] = sih
-                    log(f"[short interest] {pref}: {len(sih['dtc'])} pts, latest {sih['si'][-1]:,} sh")
+                    log(f"[short interest] {pref}: {len(sih['dtc'])} pts, latest {sih['si'][-1]:,} sh "
+                        f"({pct[-1]}% of float)")
             except Exception as e:
                 log(f"[skip] short interest {pref}: {e} — keeping existing values")
 

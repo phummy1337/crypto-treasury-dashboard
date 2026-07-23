@@ -329,22 +329,22 @@
     <div class="charts">
       <div class="chartcard">
         <h3><span class="dot" style="background:var(--mstr)"></span>MSTR — Daily Close</h3>
-        <div class="ch-sub">Line: daily close (left) · Bars: shorts % of float (right)</div>
+        <div class="ch-sub">Line: daily close (left) · Line: EV mNAV (right)</div>
         <div class="chartwrap"><canvas id="ch-si-MSTR"></canvas></div>
       </div>
       <div class="chartcard">
         <h3><span class="dot" style="background:var(--asst)"></span>ASST — Daily Close</h3>
-        <div class="ch-sub">Line: daily close since Jan 1, 2026 (left) · Bars: shorts % of float (right)</div>
+        <div class="ch-sub">Line: daily close since Jan 1, 2026 (left) · Line: EV mNAV (right)</div>
         <div class="chartwrap"><canvas id="ch-si-ASST"></canvas></div>
       </div>
       <div class="chartcard">
         <h3><span class="dot" style="background:var(--mstr)"></span>STRC — Preferred Daily Close</h3>
-        <div class="ch-sub">Line: daily close (left) · Bars: shorts % of float (right)</div>
+        <div class="ch-sub">Line: daily close (left) · Steps: shares outstanding (right)</div>
         <div class="chartwrap"><canvas id="ch-pref-MSTR"></canvas></div>
       </div>
       <div class="chartcard">
         <h3><span class="dot" style="background:var(--asst)"></span>SATA — Preferred Daily Close</h3>
-        <div class="ch-sub">Line: daily close (left) · Bars: shorts % of float (right)</div>
+        <div class="ch-sub">Line: daily close (left) · Steps: shares outstanding (right)</div>
         <div class="chartwrap"><canvas id="ch-pref-ASST"></canvas></div>
       </div>
     </div>
@@ -406,12 +406,12 @@
     <div class="charts">
       <div class="chartcard">
         <h3><span class="dot" style="background:var(--mstr)"></span>MSTR — Price vs. mNAV</h3>
-        <div class="ch-sub">Line: daily close (left) · Line: EV mNAV (right) · debt, preferred &amp; cash from filings</div>
+        <div class="ch-sub">Line: daily close (left) · Line: CEBE mNAV (right) · price ÷ BTC equity left for common after debt, preferred &amp; cash</div>
         <div class="chartwrap"><canvas id="ch-mnav-MSTR"></canvas></div>
       </div>
       <div class="chartcard">
         <h3><span class="dot" style="background:var(--asst)"></span>ASST — Price vs. mNAV</h3>
-        <div class="ch-sub">Line: daily close (left) · Line: EV mNAV (right) · debt, preferred &amp; cash from filings</div>
+        <div class="ch-sub">Line: daily close (left) · Line: CEBE mNAV (right) · price ÷ BTC equity left for common after debt, preferred &amp; cash</div>
         <div class="chartwrap"><canvas id="ch-mnav-ASST"></canvas></div>
       </div>
     </div>
@@ -469,6 +469,34 @@
     <div class="sec-head"><h2>Company Actions</h2><span class="tag" style="color:var(--pos);border-color:rgba(52,211,153,0.45)">live</span></div>
     <p class="sec-note">A running log of what each company actually did, week by week, straight from their SEC filings — raises, buys, sales, and dividend changes. Newest first; scroll for history.</p>
     <div class="grid actionsbox" id="grid-actions"></div>
+  </section>
+
+  <!-- 8. Short Interest -->
+  <section id="shorts">
+    <div class="sec-head"><h2>Short Interest</h2><span class="tag stub" id="tag-shorts">seed data</span></div>
+    <p class="sec-note">How crowded the short side is, instrument by instrument — semi-monthly FINRA settlement data via Nasdaq. Bars: shares short as a % of float (common float = shares outstanding on that settlement date minus insider Class B; preferred float = notional ÷ $100 par). Line: days to cover on the trailing 20-trading-day average volume.</p>
+    <div class="charts">
+      <div class="chartcard">
+        <h3><span class="dot" style="background:var(--mstr)"></span>MSTR — Short Interest</h3>
+        <div class="ch-sub">Bars: shorts % of float (left) · Line: days to cover, 20d avg volume (right)</div>
+        <div class="chartwrap"><canvas id="ch-short-MSTR"></canvas></div>
+      </div>
+      <div class="chartcard">
+        <h3><span class="dot" style="background:var(--asst)"></span>ASST — Short Interest</h3>
+        <div class="ch-sub">Bars: shorts % of float (left) · Line: days to cover, 20d avg volume (right)</div>
+        <div class="chartwrap"><canvas id="ch-short-ASST"></canvas></div>
+      </div>
+      <div class="chartcard">
+        <h3><span class="dot" style="background:var(--mstr)"></span>STRC — Short Interest</h3>
+        <div class="ch-sub">Bars: shorts % of float (left) · Line: days to cover, 20d avg volume (right)</div>
+        <div class="chartwrap"><canvas id="ch-short-STRC"></canvas></div>
+      </div>
+      <div class="chartcard">
+        <h3><span class="dot" style="background:var(--asst)"></span>SATA — Short Interest</h3>
+        <div class="ch-sub">Bars: shorts % of float (left) · Line: days to cover, 20d avg volume (right)</div>
+        <div class="chartwrap"><canvas id="ch-short-SATA"></canvas></div>
+      </div>
+    </div>
   </section>
 
   <div class="sources">
@@ -1038,104 +1066,106 @@ function renderCharts(){
         borderWidth:2, tension:.25, pointRadius:0, fill:true} ]},
       options: bpsOpts });
 
-    // 3. Company Stats price chart — daily close (left) + days to cover bars (right, semi-monthly)
-    const si = DATA.companies[co].shortInterest;
-    if(si && SH){
+    // 3. Company Stats price chart — daily close (left) + EV mNAV (right)
+    const mhs = DATA.companies[co].mnavHistory;
+    if(mhs){
       // MSTR from Oct 2025; ASST from Jan 1, 2026
-      const _start = co==="ASST" ? Math.max(0, SH.dates.findIndex(d=>d.startsWith("Jan")))
-                                 : Math.max(0, SH.dates.findIndex(d=>d.startsWith("Oct")));
-      const labels = SH.dates.slice(_start), px = SH[co].slice(_start);
-      // align by full ISO date when available — year-less labels like "Jul 15"
-      // collide across years once the price window wraps around
-      const isoLabels = (SH.iso||[]).slice(_start);
-      // shorts as % of float: per-settlement-date float (shares outstanding then,
-      // minus insider Class B) computed by the refresh; flat current float as fallback
-      const flt = (DATA.companies[co].floatSharesM || DATA.companies[co].sharesOutstanding) * 1e6;
-      const pctMap = {}, siMap = {};
-      const useIso = si.iso && isoLabels.length===labels.length && isoLabels.length>0;
-      (useIso ? si.iso : si.dates).forEach((d,i)=>{
-        pctMap[d] = si.pctFloat ? si.pctFloat[i] : si.si[i]/flt*100;
-        siMap[d] = si.si[i]; });
-      const keyAt = i => useIso ? isoLabels[i] : labels[i];
-      const pctAligned = labels.map((_,i) => keyAt(i) in pctMap ? pctMap[keyAt(i)] : null);
+      const _start = co==="ASST" ? Math.max(0, mhs.dates.findIndex(d=>d.startsWith("Jan"))) : 0;
+      const labels = mhs.dates.slice(_start), px = mhs.px.slice(_start), mn = mhs.mnav.slice(_start);
       const siOpts = baseOpts({ scales:{
         x:{ ticks:{color:AX,font:{size:11},autoSkip:true,maxTicksLimit:8,maxRotation:0}, grid:{color:GRID} },
         yP:axis("","left",{ticks:{color:c,font:{size:11},callback:v=>"$"+(+v).toFixed(0)}}),
-        yS:axis("% float","right",{ticks:{color:"#ffffff",font:{size:11},callback:v=>(+v).toFixed(1)+"%"}}) } });
+        yM:axis("EV mNAV","right",{ticks:{color:"#ffffff",font:{size:11},callback:v=>(+v).toFixed(2)+"x"}}) } });
       siOpts.plugins.tooltip.callbacks = { label: ctx => {
         if(ctx.parsed.y==null) return null;
-        if(ctx.dataset.yAxisID==="yS"){
-          const s = siMap[keyAt(ctx.dataIndex)];
-          return "Shorts: "+(+ctx.parsed.y).toFixed(1)+"% of float" + (s?"  ·  "+(s/1e6).toFixed(1)+"M sh":"");
-        }
-        return co+": $"+(+ctx.parsed.y).toFixed(2);
+        return ctx.dataset.yAxisID==="yM" ? "EV mNAV: "+(+ctx.parsed.y).toFixed(2)+"x"
+                                          : co+": $"+(+ctx.parsed.y).toFixed(2);
       }};
-      mkChart("ch-si-"+co, { data:{ labels, datasets:[
-        {type:"line", label:"Price", data:px, yAxisID:"yP", borderColor:c, backgroundColor:c+"18",
+      mkChart("ch-si-"+co, { type:"line", data:{ labels, datasets:[
+        {label:"Price", data:px, yAxisID:"yP", borderColor:c, backgroundColor:c+"18",
           borderWidth:2, tension:.2, pointRadius:0, fill:false, order:1},
-        {type:"bar", label:"Shorts % of Float", data:pctAligned, yAxisID:"yS",
-          backgroundColor:"rgba(255,255,255,0.5)", borderWidth:0,
-          borderRadius:2, barThickness:6, order:2} ]},
+        {label:"EV mNAV", data:mn, yAxisID:"yM", borderColor:"rgba(255,255,255,0.85)",
+          backgroundColor:"transparent", borderWidth:2, tension:.2, pointRadius:0, fill:false, order:2} ]},
         options: siOpts });
     }
 
-    // 4. Preferred price + shorts % of float (STRC / SATA); float = notional / $100 par
+    // 4. Preferred price + shares outstanding (STRC / SATA); shares = notional / $100 par
     const ph = DATA.companies[co].prefHistory;
     if(ph){
       const pt = DATA.companies[co].prefTicker;
-      const psi = DATA.companies[co].prefShortInterest;
-      // place each semi-monthly settlement on the nearest chart date at or before it
-      const barAt = {};
-      if(psi && ph.iso){
-        psi.iso.forEach((d,i)=>{
-          let idx=-1;
-          for(let j=0;j<ph.iso.length;j++){ if(ph.iso[j]<=d) idx=j; else break; }
-          const n = idx>=0 ? ph.notional[idx] : null;             // $M outstanding -> n*1e4 shares
-          if(n) barAt[idx] = { pct: psi.si[i]/(n*1e4)*100, si: psi.si[i] };
-        });
-      }
-      const pctAligned = ph.px.map((_,i)=> barAt[i] ? barAt[i].pct : null);
+      const shOut = ph.notional.map(n => n ? n/100 : null);       // $M notional -> M shares
       const prefOpts = baseOpts({ scales:{
         x:{ ticks:{color:AX,font:{size:11},autoSkip:true,maxTicksLimit:8,maxRotation:0}, grid:{color:GRID} },
         yP:axis("","left",{ticks:{color:c,font:{size:11},callback:v=>"$"+(+v).toFixed(0)}}),
-        yS:axis("% float","right",{ticks:{color:"#ffffff",font:{size:11},callback:v=>(+v).toFixed(1)+"%"}}) } });
+        yS:axis("shares out","right",{ticks:{color:"#ffffff",font:{size:11},callback:v=>(+v).toFixed(0)+"M"}}) } });
       prefOpts.plugins.tooltip.callbacks = { label: ctx => {
         if(ctx.parsed.y==null) return null;
-        if(ctx.dataset.yAxisID==="yS"){
-          const b = barAt[ctx.dataIndex];
-          return "Shorts: "+(+ctx.parsed.y).toFixed(1)+"% of float" + (b?"  ·  "+(b.si/1e6).toFixed(2)+"M sh":"");
-        }
-        return pt+": $"+(+ctx.parsed.y).toFixed(2);
+        return ctx.dataset.yAxisID==="yS" ? "Shares outstanding: "+(+ctx.parsed.y).toFixed(1)+"M"
+                                          : pt+": $"+(+ctx.parsed.y).toFixed(2);
       }};
       mkChart("ch-pref-"+co, { type:"line", data:{ labels: ph.dates, datasets:[
         {label:pt+" Price", data:ph.px, yAxisID:"yP", borderColor:c, backgroundColor:c+"18",
           borderWidth:2, tension:.2, pointRadius:0, fill:false, order:1},
-        {type:"bar", label:"Shorts % of Float", data:pctAligned, yAxisID:"yS",
-          backgroundColor:"rgba(255,255,255,0.5)", borderWidth:0,
-          borderRadius:2, barThickness:6, order:2} ]},
+        {label:"Shares Outstanding", data:shOut, yAxisID:"yS", borderColor:"rgba(255,255,255,0.75)",
+          backgroundColor:"rgba(255,255,255,0.08)", borderWidth:2, stepped:true, pointRadius:0,
+          spanGaps:true, fill:true, order:2} ]},
         options: prefOpts });
     }
 
-    // 5. Valuation: price (left) vs daily EV mNAV (right)
+    // 5. Valuation: price (left) vs daily CEBE mNAV (right) — the common's multiple
+    // on the BTC equity left after debt, preferred & cash claims
     const mh = DATA.companies[co].mnavHistory;
     if(mh){
+      const cebeSeries = mh.cebe || mh.mnav;
       const mnOpts = baseOpts({ scales:{
         x:{ ticks:{color:AX,font:{size:11},autoSkip:true,maxTicksLimit:8,maxRotation:0}, grid:{color:GRID} },
         yP:axis("","left",{ticks:{color:c,font:{size:11},callback:v=>"$"+(+v).toFixed(0)}}),
-        yM:axis("mNAV","right",{ticks:{color:"#ffffff",font:{size:11},callback:v=>(+v).toFixed(2)+"x"}}) } });
+        yM:axis("CEBE mNAV","right",{ticks:{color:"#ffffff",font:{size:11},callback:v=>(+v).toFixed(2)+"x"}}) } });
       mnOpts.plugins.tooltip.callbacks = { label: ctx => {
         if(ctx.parsed.y==null) return null;
-        return ctx.dataset.yAxisID==="yM" ? "mNAV: "+(+ctx.parsed.y).toFixed(2)+"x"
+        return ctx.dataset.yAxisID==="yM" ? "CEBE mNAV: "+(+ctx.parsed.y).toFixed(2)+"x"
                                           : co+": $"+(+ctx.parsed.y).toFixed(2);
       }};
       mkChart("ch-mnav-"+co, { type:"line", data:{ labels: mh.dates, datasets:[
         {label:"Price", data:mh.px, yAxisID:"yP", borderColor:c, backgroundColor:c+"18",
           borderWidth:2, tension:.2, pointRadius:0, fill:false, order:1},
-        {label:"mNAV", data:mh.mnav, yAxisID:"yM", borderColor:"rgba(255,255,255,0.85)",
+        {label:"CEBE mNAV", data:cebeSeries, yAxisID:"yM", borderColor:"rgba(255,255,255,0.85)",
           backgroundColor:"transparent", borderWidth:2, tension:.2, pointRadius:0, fill:false, order:2} ]},
         options: mnOpts });
     }
   });
+
+  // 6. Short Interest section — bars: shorts % of float · line: days to cover (20d avg volume)
+  const shortSpecs = [
+    ["MSTR", DATA.companies.MSTR.shortInterest,     acc.MSTR],
+    ["ASST", DATA.companies.ASST.shortInterest,     acc.ASST],
+    ["STRC", DATA.companies.MSTR.prefShortInterest, acc.MSTR],
+    ["SATA", DATA.companies.ASST.prefShortInterest, acc.ASST],
+  ];
+  let anyShorts = false;
+  shortSpecs.forEach(([sym, si, ac]) => {
+    if(!si || !si.pctFloat) return;
+    anyShorts = true;
+    const dtc = si.dtc20 || si.dtc;                  // trailing-20d basis, Nasdaq DTC fallback
+    const shOpts = baseOpts({ scales:{
+      x:{ ticks:{color:AX,font:{size:11},autoSkip:true,maxTicksLimit:10,maxRotation:0}, grid:{color:GRID} },
+      yF:axis("% float","left",{ticks:{color:ac,font:{size:11},callback:v=>(+v).toFixed(1)+"%"}, beginAtZero:true}),
+      yD:axis("days to cover","right",{ticks:{color:"#ffffff",font:{size:11},callback:v=>(+v).toFixed(1)}, beginAtZero:true}) } });
+    shOpts.plugins.tooltip.callbacks = { label: ctx => {
+      if(ctx.parsed.y==null) return null;
+      const i = ctx.dataIndex;
+      if(ctx.dataset.yAxisID==="yF")
+        return "Shorts: "+(+ctx.parsed.y).toFixed(1)+"% of float  ·  "+(si.si[i]/1e6).toFixed(2)+"M sh";
+      return "Days to cover: "+(+ctx.parsed.y).toFixed(2)+(si.dtc20?"  (20d avg volume)":"");
+    }};
+    mkChart("ch-short-"+sym, { data:{ labels: si.dates, datasets:[
+      {type:"bar", label:"Shorts % of Float", data:si.pctFloat, yAxisID:"yF",
+        backgroundColor:ac+"99", borderWidth:0, borderRadius:2, barThickness:8, order:2},
+      {type:"line", label:"Days to Cover", data:dtc, yAxisID:"yD", borderColor:"rgba(255,255,255,0.85)",
+        backgroundColor:"transparent", borderWidth:2, tension:.2, pointRadius:2, spanGaps:true, order:1} ]},
+      options: shOpts });
+  });
+  setStatus("shorts", !anyShorts);
 }
 
 // ---------- generic hover breakdown tooltip (position:fixed, not clipped by the grid) ----------
