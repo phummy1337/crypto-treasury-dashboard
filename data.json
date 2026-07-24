@@ -1,9 +1,9 @@
 {
   "asOf": "2026-07-24",
   "priceAsOf": "2026-07-24",
-  "btcPriceUsd": 64109,
+  "btcPriceUsd": 64103,
   "btcSupply": 21000000,
-  "btcCirculating": 20060803,
+  "btcCirculating": 20060821,
   "companies": {
     "MSTR": {
       "name": "Strategy",
@@ -3667,22 +3667,22 @@
         "dtcLive": 3.36
       },
       "borrowFee": {
-        "pct": 0.28,
+        "pct": 0.27,
         "avail": 8900000,
-        "asOf": "2026-07-24 17:12:07"
+        "asOf": "2026-07-24 19:01:22"
       },
       "borrowFeeHist": {
         "iso": [
           "2026-07-24"
         ],
         "pct": [
-          0.28
+          0.27
         ]
       },
       "prefBorrowFee": {
         "pct": 1.04,
         "avail": 4600000,
-        "asOf": "2026-07-24 17:12:07"
+        "asOf": "2026-07-24 19:01:22"
       },
       "prefBorrowFeeHist": {
         "iso": [
@@ -5774,29 +5774,29 @@
         "dtcLive": 6.26
       },
       "borrowFee": {
-        "pct": 1.01,
+        "pct": 1.03,
         "avail": 1700000,
-        "asOf": "2026-07-24 17:12:07"
+        "asOf": "2026-07-24 19:01:22"
       },
       "borrowFeeHist": {
         "iso": [
           "2026-07-24"
         ],
         "pct": [
-          1.01
+          1.03
         ]
       },
       "prefBorrowFee": {
-        "pct": 40.99,
+        "pct": 41.68,
         "avail": 30000,
-        "asOf": "2026-07-24 17:12:07"
+        "asOf": "2026-07-24 19:01:22"
       },
       "prefBorrowFeeHist": {
         "iso": [
           "2026-07-24"
         ],
         "pct": [
-          40.99
+          41.68
         ]
       }
     }
