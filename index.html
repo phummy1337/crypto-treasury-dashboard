@@ -490,32 +490,32 @@
   <!-- 8. Short Interest -->
   <section id="shorts">
     <div class="sec-head"><h2>Short Interest</h2><span class="tag stub" id="tag-shorts">seed data</span></div>
-    <p class="sec-note">How crowded the short side is, instrument by instrument — semi-monthly FINRA settlement data via Nasdaq. Bars: shares short as a % of float (common float = shares outstanding on that settlement date minus insider Class B; preferred float = notional ÷ $100 par). Line: days to cover on the trailing 20-trading-day average volume. Cost to short is Interactive Brokers' indicative annualized borrow rate, refreshed with the data.</p>
+    <p class="sec-note">How crowded the short side is, instrument by instrument — semi-monthly FINRA settlement data via Nasdaq. Bars: shares short as a % of float (common float = shares outstanding on that settlement date minus insider Class B; preferred float = notional ÷ $100 par). Line: days to cover on the trailing 10-trading-day average volume (≈ FINRA’s own reporting window). Cost to short is Interactive Brokers' indicative annualized borrow rate, refreshed with the data.</p>
     <div class="charts">
       <div class="chartcard">
         <h3><span class="dot" style="background:var(--mstr)"></span>MSTR — Short Interest</h3>
-        <div class="ch-sub">Bars: shorts % of float (left) · Line: days to cover, 20d avg volume (right)</div>
+        <div class="ch-sub">Bars: shorts % of float (left) · Line: days to cover, 10d avg volume (right)</div>
         <div class="ch-sub short-live" id="short-live-MSTR"></div>
         <div class="ch-sub short-live" id="short-fee-MSTR"></div>
         <div class="chartwrap"><canvas id="ch-short-MSTR"></canvas></div>
       </div>
       <div class="chartcard">
         <h3><span class="dot" style="background:var(--asst)"></span>ASST — Short Interest</h3>
-        <div class="ch-sub">Bars: shorts % of float (left) · Line: days to cover, 20d avg volume (right)</div>
+        <div class="ch-sub">Bars: shorts % of float (left) · Line: days to cover, 10d avg volume (right)</div>
         <div class="ch-sub short-live" id="short-live-ASST"></div>
         <div class="ch-sub short-live" id="short-fee-ASST"></div>
         <div class="chartwrap"><canvas id="ch-short-ASST"></canvas></div>
       </div>
       <div class="chartcard">
         <h3><span class="dot" style="background:var(--mstr)"></span>STRC — Short Interest</h3>
-        <div class="ch-sub">Bars: shorts % of float (left) · Line: days to cover, 20d avg volume (right)</div>
+        <div class="ch-sub">Bars: shorts % of float (left) · Line: days to cover, 10d avg volume (right)</div>
         <div class="ch-sub short-live" id="short-live-STRC"></div>
         <div class="ch-sub short-live" id="short-fee-STRC"></div>
         <div class="chartwrap"><canvas id="ch-short-STRC"></canvas></div>
       </div>
       <div class="chartcard">
         <h3><span class="dot" style="background:var(--asst)"></span>SATA — Short Interest</h3>
-        <div class="ch-sub">Bars: shorts % of float (left) · Line: days to cover, 20d avg volume (right)</div>
+        <div class="ch-sub">Bars: shorts % of float (left) · Line: days to cover, 10d avg volume (right)</div>
         <div class="ch-sub short-live" id="short-live-SATA"></div>
         <div class="ch-sub short-live" id="short-fee-SATA"></div>
         <div class="chartwrap"><canvas id="ch-short-SATA"></canvas></div>
@@ -1198,7 +1198,7 @@ function renderCharts(){
     }
   });
 
-  // 6. Short Interest section — bars: shorts % of float · line: days to cover (20d avg volume)
+  // 6. Short Interest section — bars: shorts % of float · line: days to cover (10d avg volume)
   const shortSpecs = [
     ["MSTR", DATA.companies.MSTR.shortInterest,     acc.MSTR, DATA.companies.MSTR.borrowFee],
     ["ASST", DATA.companies.ASST.shortInterest,     acc.ASST, DATA.companies.ASST.borrowFee],
@@ -1211,18 +1211,18 @@ function renderCharts(){
     anyShorts = true;
     const lv = document.getElementById("short-live-"+sym);
     if(lv) lv.innerHTML = si.dtcLive!=null
-      ? `Live: <b style="color:#fff">${(+si.dtcLive).toFixed(2)} days to cover starting today</b> — latest shorts (${si.dates[si.dates.length-1]}) ÷ trailing 20d avg volume`
+      ? `Live: <b style="color:#fff">${(+si.dtcLive).toFixed(2)} days to cover starting today</b> — latest shorts (${si.dates[si.dates.length-1]}) ÷ trailing 10d avg volume`
       : "";
     const fe = document.getElementById("short-fee-"+sym);
     if(fe) fe.innerHTML = fee && fee.pct!=null
       ? `Cost to short: <b style="color:#fff">${fmt(fee.pct, fee.pct>=10?1:2)}%/yr</b> · ${
           fee.avail>=1e6 ? fmt(fee.avail/1e6,1)+"M" : fmt(Math.round(fee.avail/1e3))+"k"} shares borrowable · IBKR indicative rate`
       : "";
-    // extend the DTC line with a live "Today" point: latest shorts / 20d volume through today
+    // extend the DTC line with a live "Today" point: latest shorts / 10d volume through today
     const hasLive = si.dtcLive != null;
     const labels = hasLive ? si.dates.concat(["Today"]) : si.dates;
     const bars   = hasLive ? si.pctFloat.concat([null]) : si.pctFloat;
-    const line   = hasLive ? (si.dtc20 || si.dtc).concat([si.dtcLive]) : (si.dtc20 || si.dtc);
+    const line   = hasLive ? (si.dtc10 || si.dtc20 || si.dtc).concat([si.dtcLive]) : (si.dtc10 || si.dtc20 || si.dtc);
     const lastIdx = labels.length - 1;
     const shOpts = baseOpts({ scales:{
       x:{ ticks:{color:AX,font:{size:11},autoSkip:true,maxTicksLimit:10,maxRotation:0}, grid:{color:GRID} },
@@ -1234,8 +1234,8 @@ function renderCharts(){
       if(ctx.dataset.yAxisID==="yF")
         return "Shorts: "+(+ctx.parsed.y).toFixed(1)+"% of float  ·  "+(si.si[i]/1e6).toFixed(2)+"M sh";
       if(hasLive && i===lastIdx)
-        return "Days to cover starting today: "+(+ctx.parsed.y).toFixed(2)+"  (latest shorts ÷ trailing 20d volume)";
-      return "Days to cover: "+(+ctx.parsed.y).toFixed(2)+(si.dtc20?"  (20d avg volume)":"");
+        return "Days to cover starting today: "+(+ctx.parsed.y).toFixed(2)+"  (latest shorts ÷ trailing 10d volume)";
+      return "Days to cover: "+(+ctx.parsed.y).toFixed(2)+((si.dtc10||si.dtc20)?"  (10d avg volume)":"");
     }};
     mkChart("ch-short-"+sym, { data:{ labels, datasets:[
       {type:"bar", label:"Shorts % of Float", data:bars, yAxisID:"yF",

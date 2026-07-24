@@ -1116,20 +1116,20 @@ def _yahoo_vol(symbol):
                   for t, v in zip(ts, vols) if v)
 
 
-def _dtc20(sih, volhist):
-    """Days to cover on the trailing 20-trading-day average volume at each settlement."""
+def _dtc10(sih, volhist):
+    """Days to cover on the trailing 10-trading-day average volume at each settlement."""
     vols = sorted(volhist)
     out = []
     for iso, s in zip(sih["iso"], sih["si"]):
-        past = [v for d, v in vols if d <= iso][-20:]
+        past = [v for d, v in vols if d <= iso][-10:]
         avg = sum(past) / len(past) if len(past) >= 5 else None
         out.append(round(s / avg, 2) if avg else None)
     return out
 
 
 def _dtc_live(sih, volhist):
-    """Live DTC: latest reported shorts / the 20 trading days of volume ending today."""
-    last = sorted(volhist)[-20:]
+    """Live DTC: latest reported shorts / the 10 trading days of volume ending today."""
+    last = sorted(volhist)[-10:]
     if len(last) < 5:
         return None
     avg = sum(v for _, v in last) / len(last)
@@ -1173,15 +1173,15 @@ def fetch_short_interest(data):
                     flt = (tot - b) if tot else 0
                     pct.append(round(s / (flt * 1e6) * 100, 2) if flt > 0.5 else None)
                 sih["pctFloat"] = pct
-                try:                                   # trailing-20d days to cover
+                try:                                   # trailing-10d days to cover
                     try:
                         vols = _nasdaq_vol(sym)
                     except Exception:
                         vols = _yahoo_vol(sym)
-                    sih["dtc20"] = _dtc20(sih, vols)
+                    sih["dtc10"] = _dtc10(sih, vols)
                     sih["dtcLive"] = _dtc_live(sih, vols)
                 except Exception as e:
-                    log(f"[skip] {sym} volume for DTC-20d: {e} — falling back to Nasdaq DTC")
+                    log(f"[skip] {sym} volume for DTC-10d: {e} — falling back to Nasdaq DTC")
                 co["shortInterest"] = sih
                 co["daysToCover"] = sih["dtc"][-1]
                 log(f"[short interest] {sym}: {len(sih['dtc'])} pts, latest DTC {sih['dtc'][-1]}, "
@@ -1202,7 +1202,7 @@ def fetch_short_interest(data):
                         pct.append(round(s / (ns[-1] * 1e4) * 100, 2) if ns else None)
                     sih["pctFloat"] = pct
                     if pref in _VOL_HIST:
-                        sih["dtc20"] = _dtc20(sih, _VOL_HIST[pref])
+                        sih["dtc10"] = _dtc10(sih, _VOL_HIST[pref])
                         sih["dtcLive"] = _dtc_live(sih, _VOL_HIST[pref])
                     co["prefShortInterest"] = sih
                     log(f"[short interest] {pref}: {len(sih['dtc'])} pts, latest {sih['si'][-1]:,} sh "
