@@ -1,9 +1,9 @@
 {
-  "asOf": "2026-07-23",
-  "priceAsOf": "2026-07-23",
-  "btcPriceUsd": 65156,
+  "asOf": "2026-07-24",
+  "priceAsOf": "2026-07-24",
+  "btcPriceUsd": 65009,
   "btcSupply": 21000000,
-  "btcCirculating": 20060325,
+  "btcCirculating": 20060653,
   "companies": {
     "MSTR": {
       "name": "Strategy",
@@ -13,11 +13,11 @@
       "asset": "BTC",
       "accent": "#ed1946",
       "stockPrice": 93.63,
-      "dayChangePct": -6.38,
+      "dayChangePct": 0.0,
       "sharesOutstanding": 371.61,
-      "betaBtc": 1.29,
+      "betaBtc": 1.3,
       "week52Low": 82.31,
-      "week52High": 414.92,
+      "week52High": 405.89,
       "prefPrice": 84.94,
       "holdings": 843775,
       "pctSupply": 4.018,
@@ -136,7 +136,7 @@
       "capStructAsOf": "2026-03-31 (10-Q)",
       "dilutedShares": 401.29,
       "marketCapBasic": 29540,
-      "navPremiumBasic": 0.633,
+      "navPremiumBasic": 0.634,
       "treasuryDate": "2026-07-06",
       "bpsHistory": {
         "dates": [
@@ -1171,7 +1171,7 @@
           2.2,
           1.52
         ],
-        "dtcLive": 1.73
+        "dtcLive": 1.82
       },
       "daysToCover": 1.32,
       "prefMarket": 12763,
@@ -2482,7 +2482,8 @@
           "Jul 20",
           "Jul 21",
           "Jul 22",
-          "Jul 23"
+          "Jul 23",
+          "Jul 24"
         ],
         "px": [
           338.41,
@@ -2780,6 +2781,7 @@
           97.82,
           101.95,
           100.01,
+          93.63,
           93.63
         ],
         "mnav": [
@@ -3078,7 +3080,8 @@
           1.008,
           1.019,
           1.009,
-          0.981
+          0.982,
+          0.982
         ],
         "cebe": [
           1.588,
@@ -3376,7 +3379,8 @@
           1.011,
           1.029,
           1.013,
-          0.97
+          0.972,
+          0.973
         ]
       },
       "strcNotionalSteps": [
@@ -3655,7 +3659,7 @@
       "asset": "BTC",
       "accent": "#4c9fff",
       "stockPrice": 12.09,
-      "dayChangePct": -4.58,
+      "dayChangePct": 0.0,
       "sharesOutstanding": 83.67,
       "betaBtc": 1.35,
       "week52Low": 7.16,
@@ -3698,7 +3702,7 @@
       "capStructAsOf": "2026-06-18 (8-K)",
       "dilutedShares": 112.97,
       "marketCapBasic": 925,
-      "navPremiumBasic": 0.78,
+      "navPremiumBasic": 0.781,
       "treasuryDate": "2026-07-17",
       "bpsHistory": {
         "dates": [
@@ -4041,7 +4045,7 @@
           3.07,
           3.67
         ],
-        "dtcLive": 5.2
+        "dtcLive": 5.41
       },
       "daysToCover": 3.77,
       "prefMarket": 754,
@@ -4968,7 +4972,8 @@
           "Jul 20",
           "Jul 21",
           "Jul 22",
-          "Jul 23"
+          "Jul 23",
+          "Jul 24"
         ],
         "px": [
           14.76,
@@ -5174,6 +5179,7 @@
           12.34,
           13.0,
           12.67,
+          12.09,
           12.09
         ],
         "mnav": [
@@ -5380,7 +5386,8 @@
           1.243,
           1.26,
           1.248,
-          1.229
+          1.23,
+          1.231
         ],
         "cebe": [
           1.214,
@@ -5586,7 +5593,8 @@
           1.441,
           1.465,
           1.444,
-          1.415
+          1.418,
+          1.419
         ]
       },
       "cashUsd": 157.4,
@@ -5713,7 +5721,6 @@
     "illustrative": false,
     "daily": true,
     "iso": [
-      "2025-07-24",
       "2025-07-25",
       "2025-07-26",
       "2025-07-27",
@@ -6077,10 +6084,10 @@
       "2026-07-20",
       "2026-07-21",
       "2026-07-22",
-      "2026-07-23"
+      "2026-07-23",
+      "2026-07-24"
     ],
     "dates": [
-      "Jul 24",
       "Jul 25",
       "Jul 26",
       "Jul 27",
@@ -6444,10 +6451,10 @@
       "Jul 20",
       "Jul 21",
       "Jul 22",
-      "Jul 23"
+      "Jul 23",
+      "Jul 24"
     ],
     "MSTR": [
-      414.92,
       405.89,
       405.89,
       405.89,
@@ -6811,10 +6818,10 @@
       97.82,
       101.95,
       100.01,
+      93.63,
       93.63
     ],
     "ASST": [
-      87.2,
       82.4,
       82.4,
       82.4,
@@ -7178,6 +7185,7 @@
       12.34,
       13.0,
       12.67,
+      12.09,
       12.09
     ]
   },
