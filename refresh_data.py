@@ -1211,6 +1211,60 @@ def fetch_short_interest(data):
                 log(f"[skip] short interest {pref}: {e} — keeping existing values")
 
 
+CE_UA = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+                       "(KHTML, like Gecko) Chrome/126.0 Safari/537.36",
+         "Origin": "https://chartexchange.com"}
+
+
+def _ce_borrow(sym):
+    """Latest IBKR indicative borrow fee for one symbol, via ChartExchange.
+    Two-step: the symbol page embeds a cxuid, then /xhr/tabledata/ serves the
+    borrow_fee table (source: the IBKR shortstock file, updated ~15 min)."""
+    page = f"https://chartexchange.com/symbol/nasdaq-{sym.lower()}/borrow-fee/"
+    req = urllib.request.Request(page, headers={**CE_UA, "Referer": "https://chartexchange.com/"})
+    html = urllib.request.urlopen(req, timeout=25, context=_SSL_CTX).read().decode("utf-8", "ignore")
+    m = re.search(r'"data_adapter":"borrow_fee","data_adapter_opts":\{"cxuid":"(\d+)"', html)
+    if not m:
+        raise ValueError("cxuid not found in page")
+    body = json.dumps({"op": "getpage", "dataname": "borrow_fee", "cxuid": m.group(1),
+                       "page": 1, "perpage": 3, "sort": "desc", "opts": {"bf_source": "ib"}}).encode()
+    req = urllib.request.Request("https://chartexchange.com/xhr/tabledata/", data=body,
+                                 headers={**CE_UA, "Content-Type": "application/json", "Referer": page})
+    rows = (json.loads(urllib.request.urlopen(req, timeout=25, context=_SSL_CTX).read())
+            .get("rows") or [])
+    if not rows:
+        raise ValueError("no borrow_fee rows")
+    r = rows[0]
+    return {"pct": round(float(r["fee"]["value"]), 2), "avail": int(r["avail"]["value"]),
+            "asOf": r["date"]["value"]}
+
+
+def fetch_borrow_fees(data):
+    """Annualized cost to short (IBKR indicative rate) for commons + preferreds.
+    Also accumulates a daily history in data.json (one point per calendar day)."""
+    targets = [("MSTR", "MSTR", "borrowFee"), ("ASST", "ASST", "borrowFee"),
+               ("STRC", "MSTR", "prefBorrowFee"), ("SATA", "ASST", "prefBorrowFee")]
+    for sym, co_tk, key in targets:
+        co = data["companies"].get(co_tk)
+        if not co:
+            continue
+        try:
+            bf = _ce_borrow(sym)
+            co[key] = bf
+            hist = co.setdefault(key + "Hist", {"iso": [], "pct": []})
+            day = bf["asOf"][:10]
+            if hist["iso"] and hist["iso"][-1] == day:
+                hist["pct"][-1] = bf["pct"]
+            else:
+                hist["iso"].append(day)
+                hist["pct"].append(bf["pct"])
+            hist["iso"], hist["pct"] = hist["iso"][-400:], hist["pct"][-400:]
+            log(f"[borrow fee] {sym}: {bf['pct']}%/yr, {bf['avail']:,} shares available")
+        except Exception as e:
+            log(f"[skip] borrow fee {sym}: {e} — keeping existing values")
+        time.sleep(1)                       # be polite: 8 requests total per refresh
+
+
 # --------------------------------------------------------------------------- #
 # main
 # --------------------------------------------------------------------------- #
@@ -1227,6 +1281,7 @@ def main():
     fetch_strategytracker(data)       # PRIMARY: current metrics + real history (both names)
     fetch_holdings(data)             # SEC EDGAR: weekly accumulation (8-K period ranges)
     fetch_short_interest(data)        # Nasdaq: days to cover (semi-monthly)
+    fetch_borrow_fees(data)           # ChartExchange/IBKR: annualized cost to short
     # debt schedule + preferred breakdown are parsed from the 10-Q (see notes);
     # cebe / per-share / valuation are computed live in the dashboard.
 
