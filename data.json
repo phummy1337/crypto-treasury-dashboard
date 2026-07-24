@@ -1,9 +1,9 @@
 {
   "asOf": "2026-07-24",
   "priceAsOf": "2026-07-24",
-  "btcPriceUsd": 63927,
+  "btcPriceUsd": 64089,
   "btcSupply": 21000000,
-  "btcCirculating": 20060728,
+  "btcCirculating": 20060746,
   "companies": {
     "MSTR": {
       "name": "Strategy",
@@ -12,13 +12,13 @@
       "prefTicker": "STRC",
       "asset": "BTC",
       "accent": "#ed1946",
-      "stockPrice": 93.07,
-      "dayChangePct": -0.6,
+      "stockPrice": 93.12,
+      "dayChangePct": -0.55,
       "sharesOutstanding": 371.61,
       "betaBtc": 1.3,
       "week52Low": 82.31,
       "week52High": 405.89,
-      "prefPrice": 86.46,
+      "prefPrice": 86.95,
       "holdings": 843775,
       "pctSupply": 4.018,
       "netChangeYtd": 171275,
@@ -41,7 +41,7 @@
       "prefNotional": 15459,
       "annualObligations": 1762,
       "staking": 0,
-      "prefChangePct": 1.79,
+      "prefChangePct": 2.37,
       "yearEnd": {
         "2020": 70470,
         "2021": 124391,
@@ -136,7 +136,7 @@
       "capStructAsOf": "2026-03-31 (10-Q)",
       "dilutedShares": 401.29,
       "marketCapBasic": 29540,
-      "navPremiumBasic": 0.641,
+      "navPremiumBasic": 0.64,
       "treasuryDate": "2026-07-06",
       "bpsHistory": {
         "dates": [
@@ -1174,7 +1174,7 @@
         "dtcLive": 1.82
       },
       "daysToCover": 1.32,
-      "prefMarket": 12936,
+      "prefMarket": 12983,
       "prefHistory": {
         "dates": [
           "Jul 25",
@@ -1933,7 +1933,7 @@
           88.16,
           87.45,
           84.94,
-          86.38
+          86.96
         ],
         "notional": [
           null,
@@ -2786,7 +2786,7 @@
           101.95,
           100.01,
           93.63,
-          93.07
+          93.12
         ],
         "mnav": [
           1.474,
@@ -3085,7 +3085,7 @@
           1.019,
           1.009,
           0.982,
-          0.995
+          0.993
         ],
         "net": [
           1.6,
@@ -3384,7 +3384,7 @@
           1.029,
           1.013,
           0.972,
-          0.992
+          0.989
         ]
       },
       "strcNotionalSteps": [
@@ -3652,7 +3652,7 @@
           1.13,
           0.77
         ],
-        "dtcLive": 1.75
+        "dtcLive": 1.74
       }
     },
     "ASST": {
@@ -3662,13 +3662,13 @@
       "prefTicker": "SATA",
       "asset": "BTC",
       "accent": "#4c9fff",
-      "stockPrice": 11.75,
-      "dayChangePct": -2.81,
+      "stockPrice": 11.54,
+      "dayChangePct": -4.55,
       "sharesOutstanding": 83.67,
-      "betaBtc": 1.35,
+      "betaBtc": 1.36,
       "week52Low": 7.16,
       "week52High": 178.2,
-      "prefPrice": 96.79,
+      "prefPrice": 96.89,
       "holdings": 19921,
       "pctSupply": 0.0949,
       "netChangeYtd": 12294,
@@ -3691,7 +3691,7 @@
       "prefNotional": 783,
       "annualObligations": 102,
       "staking": 0,
-      "prefChangePct": 0.51,
+      "prefChangePct": 0.61,
       "yearEnd": {
         "2025": 7627
       },
@@ -3706,7 +3706,7 @@
       "capStructAsOf": "2026-06-18 (8-K)",
       "dilutedShares": 112.97,
       "marketCapBasic": 925,
-      "navPremiumBasic": 0.772,
+      "navPremiumBasic": 0.756,
       "treasuryDate": "2026-07-17",
       "bpsHistory": {
         "dates": [
@@ -4052,7 +4052,7 @@
         "dtcLive": 5.41
       },
       "daysToCover": 3.77,
-      "prefMarket": 758,
+      "prefMarket": 759,
       "prefHistory": {
         "dates": [
           "Nov 6",
@@ -4592,7 +4592,7 @@
           98.29,
           98.09,
           96.3,
-          96.79
+          96.99
         ],
         "notional": [
           null,
@@ -5188,7 +5188,7 @@
           13.0,
           12.67,
           12.09,
-          11.75
+          11.54
         ],
         "mnav": [
           1.172,
@@ -5395,7 +5395,7 @@
           1.26,
           1.248,
           1.23,
-          1.229
+          1.212
         ],
         "net": [
           1.214,
@@ -5602,7 +5602,7 @@
           1.465,
           1.444,
           1.418,
-          1.423
+          1.39
         ]
       },
       "cashUsd": 157.4,
@@ -5721,7 +5721,7 @@
           1.84,
           1.49
         ],
-        "dtcLive": 4.63
+        "dtcLive": 4.61
       }
     }
   },
@@ -6827,7 +6827,7 @@
       101.95,
       100.01,
       93.63,
-      93.07
+      93.12
     ],
     "ASST": [
       82.4,
@@ -7194,7 +7194,7 @@
       13.0,
       12.67,
       12.09,
-      11.75
+      11.54
     ]
   },
   "weekly": {
