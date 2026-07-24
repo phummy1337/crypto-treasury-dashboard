@@ -382,7 +382,13 @@ def fetch_strategytracker(data):
                 pref_at = lambda d: _step(sata_st, d) or 0
                 cash_at = lambda d, i: _ff[i]
                 debt_at = lambda d, i: (db[i] or 0) / 1e6 if i < len(db) else 0
-            dts_m, px_m, mnv, cbv = [], [], [], []
+            # Net framework (Strategy, Jul-2026): net mNAV = fully-diluted mcap /
+            # (BTC NAV + cash - OTM converts - preferred). Only out-of-the-money
+            # converts are debt-like claims; in-the-money converts dilute the share
+            # count instead. Uses today's tranche set for the whole window (all six
+            # MSTR tranches were outstanding across it). ASST: all debt is a claim.
+            sched = co.get("debtSchedule") or []
+            dts_m, px_m, mnv, netv = [], [], [], []
             for i, d in enumerate(hd["dates"]):
                 if d < start:
                     continue
@@ -396,12 +402,18 @@ def fetch_strategytracker(data):
                 dts_m.append(_iso_lbl(d, "%b %-d"))
                 px_m.append(round(sp, 2))
                 mnv.append(round(ev / nav, 3))
-                # CEBE mNAV: what the common pays per $ of BTC equity left after claims
-                cebe_nav = nav - claims
-                cbv.append(round(mc / 1e6 / cebe_nav, 3) if cebe_nav > 0 else None)
+                if sched:
+                    otm = sum(t["principal"] for t in sched if sp < t["convPrice"])
+                    itm_sh = sum(t["principal"] * t["convRate"] / 1000
+                                 for t in sched if sp >= t["convPrice"])   # M shares
+                else:
+                    otm, itm_sh = debt_at(d, i), 0.0
+                net_res = nav + cash_at(d, i) - otm - pref_at(d)
+                netv.append(round(sp * (mc / sp / 1e6 + itm_sh) / net_res, 3)
+                            if net_res > 0 else None)
             if mnv:
-                co["mnavHistory"] = {"dates": dts_m, "px": px_m, "mnav": mnv, "cebe": cbv}
-                log(f"{tk} mNAV history: {len(mnv)} pts, latest {mnv[-1]}x (CEBE {cbv[-1]}x)")
+                co["mnavHistory"] = {"dates": dts_m, "px": px_m, "mnav": mnv, "net": netv}
+                log(f"{tk} mNAV history: {len(mnv)} pts, latest EV {mnv[-1]}x / net {netv[-1]}x")
         except Exception as e:
             log(f"[skip] mNAV history {tk}: {e} — keeping existing series")
         hist[tk] = hd

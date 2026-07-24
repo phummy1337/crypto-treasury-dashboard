@@ -90,7 +90,7 @@
   .dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:6px; vertical-align: middle; }
 
   /* header stat bar */
-  .statbar { display:grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+  .statbar { display:grid; grid-template-columns: repeat(7, 1fr); gap: 10px; }
   .statbox {
     background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
     padding: 13px 15px; position: relative; overflow: hidden;
@@ -216,6 +216,9 @@
   .calc-inputs input[type="range"] { padding: 0; border: none; background: transparent; accent-color: var(--red); height: 34px; }
   .calc-inputs .mixlbl { color: var(--text); font-size: 13px; text-transform: none; letter-spacing: 0; margin-top: -2px; }
   .calc-inputs .lblrow { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
+  .calc-inputs .basissel { background:none; border:none; color:var(--muted); font:inherit; font-size:12.5px;
+    text-transform:uppercase; letter-spacing:.8px; padding:0; cursor:pointer; }
+  .calc-inputs .basissel option { color:#000; text-transform:none; }
   .calc-out { display:grid; grid-template-columns: repeat(4, 1fr); gap: 12px; padding: 14px 18px 6px; }
   .calc-cell { border: 1px solid var(--border); border-radius: 4px; padding: 11px 13px; background: rgba(255,255,255,0.02); }
   .calc-cell .k { font-size: 11.5px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted); }
@@ -295,9 +298,14 @@
         <div class="sub" id="btcSub">loading…</div>
       </div>
       <div class="statbox" style="--bx:var(--mstr)">
-        <div class="lbl">MSTR mNAV</div>
+        <div class="lbl">MSTR price</div>
+        <div class="val" id="hdr-px-MSTR">—</div>
+        <div class="sub" id="hdr-px-MSTR-sub">Strategy common</div>
+      </div>
+      <div class="statbox" style="--bx:var(--mstr)">
+        <div class="lbl">MSTR Net mNAV</div>
         <div class="val" id="hdr-mnav-MSTR">—</div>
-        <div class="sub">EV ÷ BTC reserve</div>
+        <div class="sub">mcap ÷ net reserve</div>
       </div>
       <div class="statbox" style="--bx:var(--mstr)">
         <div class="lbl">STRC price</div>
@@ -305,9 +313,14 @@
         <div class="sub" id="hdr-strc-sub">Strategy pref</div>
       </div>
       <div class="statbox" style="--bx:var(--asst)">
-        <div class="lbl">ASST mNAV</div>
+        <div class="lbl">ASST price</div>
+        <div class="val" id="hdr-px-ASST">—</div>
+        <div class="sub" id="hdr-px-ASST-sub">Strive common</div>
+      </div>
+      <div class="statbox" style="--bx:var(--asst)">
+        <div class="lbl">ASST Net mNAV</div>
         <div class="val" id="hdr-mnav-ASST">—</div>
-        <div class="sub">EV ÷ BTC reserve</div>
+        <div class="sub">mcap ÷ net reserve</div>
       </div>
       <div class="statbox" style="--bx:var(--asst)">
         <div class="lbl">SATA price</div>
@@ -329,12 +342,12 @@
     <div class="charts">
       <div class="chartcard">
         <h3><span class="dot" style="background:var(--mstr)"></span>MSTR — Daily Close</h3>
-        <div class="ch-sub">Line: daily close (left) · Line: EV mNAV (right)</div>
+        <div class="ch-sub">Line: daily close (left) · Line: net mNAV (right)</div>
         <div class="chartwrap"><canvas id="ch-si-MSTR"></canvas></div>
       </div>
       <div class="chartcard">
         <h3><span class="dot" style="background:var(--asst)"></span>ASST — Daily Close</h3>
-        <div class="ch-sub">Line: daily close since Jan 1, 2026 (left) · Line: EV mNAV (right)</div>
+        <div class="ch-sub">Line: daily close since Jan 1, 2026 (left) · Line: net mNAV (right)</div>
         <div class="chartwrap"><canvas id="ch-si-ASST"></canvas></div>
       </div>
       <div class="chartcard">
@@ -406,12 +419,12 @@
     <div class="charts">
       <div class="chartcard">
         <h3><span class="dot" style="background:var(--mstr)"></span>MSTR — Price vs. mNAV</h3>
-        <div class="ch-sub">Line: daily close (left) · Line: CEBE mNAV (right) · price ÷ BTC equity left for common after debt, preferred &amp; cash</div>
+        <div class="ch-sub">Line: daily close (left) · Line: EV mNAV (right) · (mcap + debt + preferred − cash) ÷ BTC reserve</div>
         <div class="chartwrap"><canvas id="ch-mnav-MSTR"></canvas></div>
       </div>
       <div class="chartcard">
         <h3><span class="dot" style="background:var(--asst)"></span>ASST — Price vs. mNAV</h3>
-        <div class="ch-sub">Line: daily close (left) · Line: CEBE mNAV (right) · price ÷ BTC equity left for common after debt, preferred &amp; cash</div>
+        <div class="ch-sub">Line: daily close (left) · Line: EV mNAV (right) · (mcap + debt + preferred − cash) ÷ BTC reserve</div>
         <div class="chartwrap"><canvas id="ch-mnav-ASST"></canvas></div>
       </div>
     </div>
@@ -456,11 +469,14 @@
         <label>Div. Cash Runway (months)
           <input type="number" id="ci-runway" value="0" step="3" min="0" max="120" title="Months of preferred dividends pre-funded with issuance cash before proceeds buy BTC">
           <span class="mixlbl" id="ci-runway-lbl">0 — every $ raised buys BTC</span></label>
-        <label><span class="lblrow">Ending EV mNAV (× BTC NAV)<span class="evhint" data-title="MSTR mNAV at prior bull peaks" data-rows="2021 cycle (Feb peak)~≈3.7×|2024 cycle (Nov peak)~≈3.4×">?</span></span><input type="number" id="ci-mnav" value="1.00" step="0.05" min="0.05"></label>
+        <label><span class="lblrow"><select id="ci-basis" class="basissel" title="Choose which multiple your ending target is expressed in">
+            <option value="net">Ending Net mNAV (×)</option>
+            <option value="ev">Ending EV mNAV (×)</option>
+          </select><span class="evhint" data-title="MSTR mNAV at prior bull peaks" data-rows="2021 cycle (Feb peak)~≈3.7×|2024 cycle (Nov peak)~≈3.4×">?</span></span><input type="number" id="ci-mnav" value="1.00" step="0.05" min="0.05"></label>
       </div>
       <div class="calc-out" id="calc-out"></div>
       <div class="chartwrap" style="height:260px; padding: 0 16px 14px;"><canvas id="ch-calc"></canvas></div>
-      <p class="footnote" style="padding:0 18px 14px; margin:0;">A model, not a forecast: BTC and mNAV move linearly to your targets; issuance is constant per month. Stock return decomposes as BTC move × CEBE-per-share accretion × mNAV re-rate. Runway cash offsets claims at face value but never earns the mNAV multiple — only BTC-bought dollars capture the issuance premium.</p>
+      <p class="footnote" style="padding:0 18px 14px; margin:0;">A model, not a forecast: BTC and mNAV move linearly to your targets; issuance is constant per month. EV basis prices the whole structure (mcap = mNAV × BTC NAV − claims); net basis prices the common's residual (mcap = mNAV × net NAV). Converts are held at notional throughout — the model doesn't flip in-the-money tranches into share count. Runway cash offsets claims at face value but never earns the multiple — only BTC-bought dollars capture the issuance premium.</p>
     </div>
   </section>
 
@@ -617,6 +633,27 @@ function evMnav(o){
   const ev   = mcap + o.seniorDebt + o.prefNotional - o.cash;
   const nav  = o.holdings*btcPrice/1e6;                     // BTC reserve, $mm
   return nav ? ev/nav : o.mnav;
+}
+
+// Net framework (Strategy, Jul-2026): net reserve = BTC NAV + USD reserve − OTM
+// convertible debt − preferred. In-the-money converts dilute the share count
+// instead of counting as debt. Net mNAV = fully-diluted mcap ÷ net reserve.
+function netParts(o){
+  const ds = o.debtSchedule || [], px = o.stockPrice;
+  let otm = 0, itmSh = 0;                                   // $mm claims / M shares
+  if(ds.length) ds.forEach(t => { if(px < t.convPrice) otm += t.principal;
+                                  else itmSh += t.principal*t.convRate/1000; });
+  else otm = o.seniorDebt;
+  const nav = o.holdings*btcPrice/1e6;
+  const reserve = nav + o.cash;
+  const netReserve = reserve - otm - o.prefNotional;
+  const shares = o.sharesOutstanding + itmSh;
+  return { nav, reserve, netReserve, shares, mcap: px*shares, otm, itmSh };
+}
+function netMnav(o){
+  if(!(o.stockPrice && o.sharesOutstanding)) return null;
+  const p = netParts(o);
+  return p.netReserve > 0 ? p.mcap/p.netReserve : null;
 }
 
 function unit(v, u){ return `${v}<span class="unit">${u}</span>`; }
@@ -874,27 +911,41 @@ function renderValuation(){
   const cebeBtc = o => o.holdings - claims(o)*1e6/btcPrice;      // BTC owned by common after claims
   const cebeSats = o => Math.round(cebeBtc(o)*100/o.sharesOutstanding);      // sats / share (shares in M)
   const satsPer100 = o => { const mc=mcap(o); return mc>0 ? Math.round(cebeBtc(o)*1e8/(mc*1e6)*100) : null; };
-  const mM=evMnav(M), mA=evMnav(A), cM=cebeMn(M), cA=cebeMn(A);
+  const mM=evMnav(M), mA=evMnav(A), nM=netMnav(M), nA=netMnav(A);
   const cls = v => v>=1?"pos":"neg";
 
   const mnavRows = o => [
     ["Market Cap", bil(mcap(o))], ["+ Senior Debt", bil(o.seniorDebt)],
     ["+ Preferred", bil(o.prefNotional)], ["− USD Reserve", bil(o.cash)],
     ["= Enterprise Value", bil(evv(o))], ["÷ BTC Reserve", bil(nav(o))],
-    ["= mNAV", fmt(evMnav(o),2)+"x"]
+    ["= EV mNAV", fmt(evMnav(o),2)+"x"]
   ].map(r=>r.join("~")).join("|");
-  const cebeRows = o => [
-    ["Market Cap (Common)", bil(mcap(o))], ["BTC Reserve", bil(nav(o))],
-    ["− Senior Claims", bil(claims(o))], ["= CEBE NAV", bil(cebeNav(o))],
-    ["= CEBE mNAV  (mcap ÷ CEBE NAV)", fmt(cebeMn(o),2)+"x"]
-  ].map(r=>r.join("~")).join("|");
+  const netRows = o => { const p = netParts(o); return [
+    ["BTC Reserve", bil(p.nav)], ["+ USD Reserve", bil(o.cash)],
+    ["− OTM Convertible Debt", bil(p.otm)], ["− Preferred", bil(o.prefNotional)],
+    ["= Net Reserve", bil(p.netReserve)],
+    ["Mkt Cap (incl. ITM dilution)", bil(p.mcap)],
+    ["= Net mNAV  (mcap ÷ net reserve)", fmt(netMnav(o),2)+"x"]
+  ].map(r=>r.join("~")).join("|"); };
   const cell = (v,rows,title) => `<span class="evhint" data-title="${title}" data-rows="${rows}"><span class="${cls(v)}">${fmt(v,2)}x</span></span>`;
 
+  // Strategy's Jul-2026 net-framework stats (computed live for both names)
+  const netRes = o => netParts(o).netReserve;
+  const amp = o => { const p=netParts(o); return p.netReserve>0 ? p.reserve/p.netReserve : null; };
+  const durY = o => o.annualObligations>0 ? (nav(o)+o.cash)/o.annualObligations : null;
+  const brkE = o => (nav(o)+o.cash)>0 ? o.annualObligations/(nav(o)+o.cash)*100 : null;
+
   let h = headRow();
-  h += row({label:"mNAV", sub:"hover for math",
-    MSTR:cell(mM,mnavRows(M),"mNAV"), ASST:cell(mA,mnavRows(A),"mNAV")});
-  h += row({label:"CEBE mNAV", sub:"hover for math",
-    MSTR:cell(cM,cebeRows(M),"CEBE mNAV"), ASST:cell(cA,cebeRows(A),"CEBE mNAV")});
+  h += row({label:"EV mNAV", sub:"hover for math",
+    MSTR:cell(mM,mnavRows(M),"EV mNAV"), ASST:cell(mA,mnavRows(A),"EV mNAV")});
+  h += row({label:"Net mNAV", sub:"hover for math",
+    MSTR:cell(nM,netRows(M),"Net mNAV"), ASST:cell(nA,netRows(A),"Net mNAV")});
+  h += row({label:"Net Reserve", sub:"BTC + USD − OTM debt − pref", MSTR:bil(netRes(M)), ASST:bil(netRes(A))});
+  h += row({label:"Amplification", sub:"reserve ÷ net reserve", MSTR:fmt(amp(M),2)+"x", ASST:fmt(amp(A),2)+"x"});
+  h += row({label:"Duration", sub:"reserve ÷ annual obligations", MSTR:fmt(durY(M),1)+" yrs", ASST:fmt(durY(A),1)+" yrs",
+    betterFor: durY(M)>durY(A)?"MSTR":"ASST"});
+  h += row({label:"Breakeven BTC Rate", sub:"obligations ÷ reserve", MSTR:fmt(brkE(M),2)+"%/yr", ASST:fmt(brkE(A),2)+"%/yr",
+    betterFor: brkE(M)<brkE(A)?"MSTR":"ASST"});
   h += row({label:"CEBE", sub:"live", MSTR:fmt(cebeSats(M)), ASST:fmt(cebeSats(A)),
     betterFor: cebeSats(M)>cebeSats(A)?"MSTR":"ASST"});
   h += row({label:"Claims % (Drag)", sub:"live", MSTR:pct(claimsP(M)), ASST:pct(claimsP(A)),
@@ -961,11 +1012,15 @@ function renderPriceHeader(){
   const da=document.getElementById("dataAsOf"); if(da) da.textContent = DATA.asOf || "—";
   const M=DATA.companies.MSTR, A=DATA.companies.ASST;
   const set=(id,v)=>{const e=document.getElementById(id); if(e) e.innerHTML=v;};
-  set("hdr-mnav-MSTR", fmt(evMnav(M),2)+"x");
-  set("hdr-mnav-ASST", fmt(evMnav(A),2)+"x");
+  set("hdr-px-MSTR", usd(M.stockPrice,2));
+  set("hdr-px-ASST", usd(A.stockPrice,2));
+  set("hdr-mnav-MSTR", fmt(netMnav(M),2)+"x");
+  set("hdr-mnav-ASST", fmt(netMnav(A),2)+"x");
   set("hdr-strc", usd(M.prefPrice,2));
   set("hdr-sata", usd(A.prefPrice,2));
   const chg = v => (v==null||isNaN(v)) ? "" : `<span class="${v>=0?'pos':'neg'}">${sig(v)}${fmt(v,2)}%</span> · `;
+  set("hdr-px-MSTR-sub", chg(M.dayChangePct)+"Strategy common");
+  set("hdr-px-ASST-sub", chg(A.dayChangePct)+"Strive common");
   set("hdr-strc-sub", chg(M.prefChangePct)+"Strategy pref");
   set("hdr-sata-sub", chg(A.prefChangePct)+"Strive pref");
 }
@@ -1070,25 +1125,26 @@ function renderCharts(){
         borderWidth:2, tension:.25, pointRadius:0, fill:true} ]},
       options: bpsOpts });
 
-    // 3. Company Stats price chart — daily close (left) + EV mNAV (right)
+    // 3. Company Stats price chart — daily close (left) + net mNAV (right)
     const mhs = DATA.companies[co].mnavHistory;
     if(mhs){
       // MSTR from Oct 2025; ASST from Jan 1, 2026
       const _start = co==="ASST" ? Math.max(0, mhs.dates.findIndex(d=>d.startsWith("Jan"))) : 0;
-      const labels = mhs.dates.slice(_start), px = mhs.px.slice(_start), mn = mhs.mnav.slice(_start);
+      const labels = mhs.dates.slice(_start), px = mhs.px.slice(_start),
+            mn = (mhs.net || mhs.mnav).slice(_start);
       const siOpts = baseOpts({ scales:{
         x:{ ticks:{color:AX,font:{size:11},autoSkip:true,maxTicksLimit:8,maxRotation:0}, grid:{color:GRID} },
         yP:axis("","left",{ticks:{color:c,font:{size:11},callback:v=>"$"+(+v).toFixed(0)}}),
-        yM:axis("EV mNAV","right",{ticks:{color:"#ffffff",font:{size:11},callback:v=>(+v).toFixed(2)+"x"}}) } });
+        yM:axis("net mNAV","right",{ticks:{color:"#ffffff",font:{size:11},callback:v=>(+v).toFixed(2)+"x"}}) } });
       siOpts.plugins.tooltip.callbacks = { label: ctx => {
         if(ctx.parsed.y==null) return null;
-        return ctx.dataset.yAxisID==="yM" ? "EV mNAV: "+(+ctx.parsed.y).toFixed(2)+"x"
+        return ctx.dataset.yAxisID==="yM" ? "Net mNAV: "+(+ctx.parsed.y).toFixed(2)+"x"
                                           : co+": $"+(+ctx.parsed.y).toFixed(2);
       }};
       mkChart("ch-si-"+co, { type:"line", data:{ labels, datasets:[
         {label:"Price", data:px, yAxisID:"yP", borderColor:c, backgroundColor:c+"18",
           borderWidth:2, tension:.2, pointRadius:0, fill:false, order:1},
-        {label:"EV mNAV", data:mn, yAxisID:"yM", borderColor:"rgba(255,255,255,0.85)",
+        {label:"Net mNAV", data:mn, yAxisID:"yM", borderColor:"rgba(255,255,255,0.85)",
           backgroundColor:"transparent", borderWidth:2, tension:.2, pointRadius:0, fill:false, order:2} ]},
         options: siOpts });
     }
@@ -1116,24 +1172,23 @@ function renderCharts(){
         options: prefOpts });
     }
 
-    // 5. Valuation: price (left) vs daily CEBE mNAV (right) — the common's multiple
-    // on the BTC equity left after debt, preferred & cash claims
+    // 5. Valuation: price (left) vs daily EV mNAV (right) — the whole structure's
+    // premium to its BTC reserve (the coverage lens preferred/credit holders care about)
     const mh = DATA.companies[co].mnavHistory;
     if(mh){
-      const cebeSeries = mh.cebe || mh.mnav;
       const mnOpts = baseOpts({ scales:{
         x:{ ticks:{color:AX,font:{size:11},autoSkip:true,maxTicksLimit:8,maxRotation:0}, grid:{color:GRID} },
         yP:axis("","left",{ticks:{color:c,font:{size:11},callback:v=>"$"+(+v).toFixed(0)}}),
-        yM:axis("CEBE mNAV","right",{ticks:{color:"#ffffff",font:{size:11},callback:v=>(+v).toFixed(2)+"x"}}) } });
+        yM:axis("EV mNAV","right",{ticks:{color:"#ffffff",font:{size:11},callback:v=>(+v).toFixed(2)+"x"}}) } });
       mnOpts.plugins.tooltip.callbacks = { label: ctx => {
         if(ctx.parsed.y==null) return null;
-        return ctx.dataset.yAxisID==="yM" ? "CEBE mNAV: "+(+ctx.parsed.y).toFixed(2)+"x"
+        return ctx.dataset.yAxisID==="yM" ? "EV mNAV: "+(+ctx.parsed.y).toFixed(2)+"x"
                                           : co+": $"+(+ctx.parsed.y).toFixed(2);
       }};
       mkChart("ch-mnav-"+co, { type:"line", data:{ labels: mh.dates, datasets:[
         {label:"Price", data:mh.px, yAxisID:"yP", borderColor:c, backgroundColor:c+"18",
           borderWidth:2, tension:.2, pointRadius:0, fill:false, order:1},
-        {label:"CEBE mNAV", data:cebeSeries, yAxisID:"yM", borderColor:"rgba(255,255,255,0.85)",
+        {label:"EV mNAV", data:mh.mnav, yAxisID:"yM", borderColor:"rgba(255,255,255,0.85)",
           backgroundColor:"transparent", borderWidth:2, tension:.2, pointRadius:0, fill:false, order:2} ]},
         options: mnOpts });
     }
@@ -1313,18 +1368,26 @@ function simulate(s, cfg){
   // dollars, which capture the mNAV premium spread).
   const nav = (hold,b)=> hold*b/1e6;                                   // $mm
   const claims = (pref,buf) => s.debt + pref - s.cash - buf;           // $mm
-  const priceAt = (hold,b,pref,buf,sh,mn)=> Math.max((mn*nav(hold,b) - claims(pref,buf)) / sh, 0.01);
+  // ending-multiple basis: EV prices the whole structure (mcap = mn×NAV − claims);
+  // net prices the common's residual (mcap = mn×(NAV − claims)). Converts are held
+  // at notional throughout — the model doesn't flip ITM tranches into share count.
+  const priceAt = (hold,b,pref,buf,sh,mn)=> Math.max(
+    (cfg.basis==="net" ? mn*(nav(hold,b) - claims(pref,buf))
+                       : mn*nav(hold,b) - claims(pref,buf)) / sh, 0.01);
   const cebeShare = (hold,b,pref,buf,sh)=> (nav(hold,b) - claims(pref,buf)) / sh;
   const nav0 = nav(s.hold, s.btc);
   if(nav0<=0) return null;
   const mnav0 = (s.px*s.sharesM + claims(s.pref,0)) / nav0;            // current EV mNAV
+  const netNav0 = nav0 - claims(s.pref,0);
+  const net0 = netNav0>0 ? (s.px*s.sharesM)/netNav0 : null;            // current net mNAV
+  const mn0 = (cfg.basis==="net" && net0) ? net0 : mnav0;              // interpolation start
   const cebe0 = cebeShare(s.hold, s.btc, s.pref, 0, s.sharesM);
   let hold=s.hold, sharesM=s.sharesM, pref=s.pref, buf=0, p=s.px;
   let raised=0, raisedMnWt=0, parked=0, premCap=0;
   const idxStock=[100], idxBtc=[100], labels=["0"];
   for(let m=1;m<=cfg.months;m++){
     const b  = s.btc + (cfg.btcTarget - s.btc)*m/cfg.months;
-    const mn = mnav0 + (cfg.endMnav - mnav0)*m/cfg.months;
+    const mn = mn0 + (cfg.endMnav - mn0)*m/cfg.months;
     pref += cfg.prefMo;
     const divMo = pref*cfg.rate/100/12;
     let gap = Math.max(0, cfg.runway*divMo - buf);                     // cash still to park
@@ -1355,7 +1418,7 @@ function simulate(s, cfg){
   // stock = BTC move x CEBE accretion x residual mNAV re-rate)
   const satsAcc = cebe0>0 && cebeEnd>0 ? (cebeEnd/cfg.btcTarget)/(cebe0/s.btc) : 1;
   return { implied:p, stockX, btcX,
-           cebe0, cebeEnd, cebeX:satsAcc, mnav0, mnavX:stockX/(btcX*satsAcc),
+           cebe0, cebeEnd, cebeX:satsAcc, mnav0, net0, mn0, mnavX:stockX/(btcX*satsAcc),
            endHold:hold, endSharesM:sharesM, endPref:pref, endCash:buf,
            raised, avgIssMn: raised>0 ? raisedMnWt/raised : null, parked, premCap,
            endClaims:claims(pref,buf)/nav(hold,cfg.btcTarget)*100,
@@ -1367,7 +1430,8 @@ function runCalc(){
   const gv = id => parseFloat(document.getElementById(id).value)||0;
   const cfg = { btcTarget:gv("ci-btc"), months:Math.max(1,Math.round(gv("ci-months"))),
     prefMo:gv("ci-pref"), commonMo:gv("ci-common"), rate:gv("ci-rate"),
-    fundMix:gv("ci-fund")/100, endMnav:gv("ci-mnav"), runway:Math.max(0,gv("ci-runway")) };
+    fundMix:gv("ci-fund")/100, endMnav:gv("ci-mnav"), runway:Math.max(0,gv("ci-runway")),
+    basis:(document.getElementById("ci-basis")||{}).value || "ev" };
   const lbl = document.getElementById("ci-fund-lbl");
   if(lbl){ const m=Math.round(cfg.fundMix*100);
     lbl.textContent = m===0 ? "100% common issuance" : m===100 ? "100% BTC sales" : m+"% BTC sales · "+(100-m)+"% common"; }
@@ -1378,7 +1442,7 @@ function runCalc(){
   const r = simulate(s, cfg);
   const o = DATA.companies[calcCo];
   document.getElementById("calc-snap").textContent =
-    `Starting today: $${fmt(s.px,2)} · ₿${fmt(s.hold)} · BTC $${fmt(s.btc)} · EV mNAV ${r?fmt(r.mnav0,2):"—"}x`;
+    `Starting today: $${fmt(s.px,2)} · ₿${fmt(s.hold)} · BTC $${fmt(s.btc)} · EV mNAV ${r?fmt(r.mnav0,2):"—"}x · Net ${r&&r.net0?fmt(r.net0,2):"—"}x`;
   if(!r){ out.innerHTML = '<div class="calc-decomp">BTC NAV is unavailable — model cannot run.</div>'; return; }
   const cls = r.stockX>=1 ? "pos":"neg";
   out.innerHTML = `
@@ -1391,9 +1455,9 @@ function runCalc(){
     <div class="calc-cell"><div class="k">BTC Return</div>
       <div class="v">${fmt(r.btcX,2)}x</div>
       <div class="s">${sig((r.btcX-1)*100)}${fmt((r.btcX-1)*100,0)}%</div></div>
-    <div class="calc-cell"><div class="k">Amplification</div>
+    <div class="calc-cell"><div class="k">Return vs BTC</div>
       <div class="v ${r.stockX>=r.btcX?"pos":"neg"}">${fmt(r.stockX/r.btcX,2)}x</div>
-      <div class="s">vs holding BTC</div></div>
+      <div class="s">stock ÷ BTC multiple</div></div>
     <div class="calc-decomp">Decomposition: BTC <b>${fmt(r.btcX,2)}x</b> × CEBE/share accretion <b>${fmt(r.cebeX,2)}x</b> × mNAV re-rate <b>${fmt(r.mnavX,2)}x</b> = <b>${fmt(r.stockX,2)}x</b>
       &nbsp;·&nbsp; Ending: ₿${fmt(Math.round(r.endHold))} held · ${fmt(r.endSharesM,1)}M shares · CEBE NAV $${fmt(r.cebeEnd,2)}/sh · claims ${fmt(r.endClaims,1)}% of NAV${
       r.raised>0 ? `<br>Issuance: $${fmt(Math.round(r.raised))}M raised @ avg ${fmt(r.avgIssMn,2)}× mNAV — $${fmt(Math.round(r.raised - r.parked))}M → BTC (premium captured ≈ ${sig(r.premCap/(r.implied*r.endSharesM)*100)}${fmt(r.premCap/(r.implied*r.endSharesM)*100,1)}% of ending equity) · $${fmt(Math.round(r.parked))}M parked as dividend cash (per-share neutral)${r.endCash>0.5 ? ` · $${fmt(Math.round(r.endCash))}M runway cash left` : ``}` : ``}</div>`;
@@ -1413,7 +1477,8 @@ async function shareCard(){
   const gv = id => parseFloat(document.getElementById(id).value)||0;
   const cfg = { btcTarget:gv("ci-btc"), months:Math.max(1,Math.round(gv("ci-months"))),
     prefMo:gv("ci-pref"), commonMo:gv("ci-common"), rate:gv("ci-rate"),
-    fundMix:gv("ci-fund")/100, endMnav:gv("ci-mnav"), runway:Math.max(0,gv("ci-runway")) };
+    fundMix:gv("ci-fund")/100, endMnav:gv("ci-mnav"), runway:Math.max(0,gv("ci-runway")),
+    basis:(document.getElementById("ci-basis")||{}).value || "ev" };
   const snap = calcSnapshot(calcCo), r = simulate(snap, cfg), o = DATA.companies[calcCo];
   if(!r) return;
   const W=1200, H=675, SCALE=2;                 // render 2x for crisp social images
@@ -1441,7 +1506,7 @@ async function shareCard(){
     x.font=F("400 14px"); x.fillStyle="#9aa0a6"; x.fillText(sub, bx+16, 155);
   };
   statBox(660, "STOCK RETURN", fmt(r.stockX,2)+"x", r.stockX>=1?"#34d399":"#ff7a7a", "BTC "+fmt(r.btcX,2)+"x over same period");
-  statBox(895, "AMPLIFICATION", fmt(r.stockX/r.btcX,2)+"x", r.stockX>=r.btcX?"#34d399":"#ff7a7a", "vs holding BTC");
+  statBox(895, "RETURN VS BTC", fmt(r.stockX/r.btcX,2)+"x", r.stockX>=r.btcX?"#34d399":"#ff7a7a", "vs holding BTC");
   // assumptions
   const rows = [
     ["BTC Price Target", "$"+fmt(cfg.btcTarget)],
@@ -1451,7 +1516,8 @@ async function shareCard(){
     ["Dividend Rate", fmt(cfg.rate,1)+"% / yr"],
     ["Dividend Funding Mix", Math.round(cfg.fundMix*100)+"% BTC sales / "+Math.round((1-cfg.fundMix)*100)+"% common"],
     ...(cfg.runway>0 ? [["Div. Cash Runway", fmt(cfg.runway)+" months pre-funded"]] : []),
-    ["Ending mNAV", fmt(cfg.endMnav,2)+"x  (now "+fmt(r.mnav0,2)+"x)"],
+    [cfg.basis==="net" ? "Ending Net mNAV" : "Ending EV mNAV",
+      fmt(cfg.endMnav,2)+"x  (now "+fmt(r.mn0,2)+"x)"],
     ["Starting Today", "$"+fmt(snap.px,2)+"  ·  ₿"+fmt(snap.hold)+"  ·  BTC $"+fmt(snap.btc)],
   ];
   let y=248;
@@ -1537,6 +1603,16 @@ function initCalc(){
   }));
   ["ci-btc","ci-months","ci-pref","ci-common","ci-rate","ci-mnav","ci-runway"].forEach(id =>
     document.getElementById(id).addEventListener("input", runCalc));
+  const basisSel = document.getElementById("ci-basis");
+  if(basisSel) basisSel.addEventListener("change", () => {
+    // prefill the target with today's multiple on the chosen basis (no re-rate)
+    const o = DATA.companies[calcCo];
+    const nav0 = o.holdings*btcPrice/1e6, cl = o.seniorDebt + o.prefNotional - o.cash;
+    const cur = basisSel.value==="net" ? (nav0-cl>0 ? o.stockPrice*o.sharesOutstanding/(nav0-cl) : 1)
+                                       : (o.stockPrice*o.sharesOutstanding + cl)/nav0;
+    document.getElementById("ci-mnav").value = (Math.round(cur*20)/20).toFixed(2);
+    runCalc();
+  });
   document.getElementById("ci-fund").addEventListener("input", runCalc);
   document.getElementById("ci-share").addEventListener("click", shareCard);
   setDefaults();
