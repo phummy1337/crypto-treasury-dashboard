@@ -1211,6 +1211,31 @@ def fetch_short_interest(data):
                 log(f"[skip] short interest {pref}: {e} — keeping existing values")
 
 
+def fetch_strategy_kpi(data):
+    """Authoritative MSTR balance-sheet inputs from strategy.com's own KPI API
+    (open, no auth): market cap -> current basic shares, convertible debt, and
+    USD reserve derived via the EV identity (cash = mcap + debt + pref - EV).
+    Runs after fetch_strategytracker so these override the tracker's stale
+    share count and our filing-flow cash estimate."""
+    try:
+        k = get_json("https://api.strategy.com/btc/mstrKpiData")[0]
+        num = lambda s: float(str(s).replace(",", ""))
+        co = data["companies"]["MSTR"]
+        px, mcap = num(k.get("ufPrice") or k["price"]), num(k["marketCap"])
+        debt, pref, ev = num(k["debt"]), num(k["pref"]), num(k["entVal"])
+        cash = round(mcap + debt + pref - ev)
+        if px > 0 and mcap > 0:
+            co["sharesOutstanding"] = round(mcap / px, 2)
+            co["floatSharesM"] = round(co["sharesOutstanding"] - CLASS_B_SHARES_M["MSTR"], 2)
+        co["seniorDebt"] = round(debt)
+        if cash > 0:
+            co["cash"] = cash
+        log(f"[strategy.com] MSTR: {co['sharesOutstanding']}M sh, debt ${debt:,.0f}M, "
+            f"USD reserve ${cash:,}M")
+    except Exception as e:
+        log(f"[skip] strategy.com KPI: {e} — keeping existing values")
+
+
 CE_UA = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
                        "(KHTML, like Gecko) Chrome/126.0 Safari/537.36",
          "Origin": "https://chartexchange.com"}
@@ -1280,6 +1305,8 @@ def main():
     fetch_btc_market(data)            # CoinGecko: BTC price + supply
     fetch_strategytracker(data)       # PRIMARY: current metrics + real history (both names)
     fetch_holdings(data)             # SEC EDGAR: weekly accumulation (8-K period ranges)
+    fetch_strategy_kpi(data)          # strategy.com API: shares, debt, USD reserve (MSTR)
+                                      # (after holdings: overrides its flow-based cash estimate)
     fetch_short_interest(data)        # Nasdaq: days to cover (semi-monthly)
     fetch_borrow_fees(data)           # ChartExchange/IBKR: annualized cost to short
     # debt schedule + preferred breakdown are parsed from the 10-Q (see notes);

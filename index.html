@@ -952,7 +952,7 @@ function renderValuation(){
 
   // Strategy's Jul-2026 net-framework stats (computed live for both names)
   const netRes = o => netParts(o).netReserve;
-  const amp = o => { const p=netParts(o); return p.netReserve>0 ? p.reserve/p.netReserve : null; };
+  const amp = o => { const p=netParts(o); return p.netReserve>0 ? p.nav/p.netReserve : null; };  // BTC reserve ÷ net reserve (Strategy's definition)
   const durY = o => o.annualObligations>0 ? (nav(o)+o.cash)/o.annualObligations : null;
   const brkE = o => (nav(o)+o.cash)>0 ? o.annualObligations/(nav(o)+o.cash)*100 : null;
 
@@ -962,7 +962,7 @@ function renderValuation(){
   h += row({label:"Net mNAV", sub:"hover for math",
     MSTR:cell(nM,netRows(M),"Net mNAV"), ASST:cell(nA,netRows(A),"Net mNAV")});
   h += row({label:"Net Reserve", sub:"BTC + USD − OTM debt − pref", MSTR:bil(netRes(M)), ASST:bil(netRes(A))});
-  h += row({label:"Amplification", sub:"reserve ÷ net reserve", MSTR:fmt(amp(M),2)+"x", ASST:fmt(amp(A),2)+"x"});
+  h += row({label:"Amplification", sub:"BTC reserve ÷ net reserve", MSTR:fmt(amp(M),2)+"x", ASST:fmt(amp(A),2)+"x"});
   h += row({label:"Duration", sub:"reserve ÷ annual obligations", MSTR:fmt(durY(M),1)+" yrs", ASST:fmt(durY(A),1)+" yrs",
     betterFor: durY(M)>durY(A)?"MSTR":"ASST"});
   h += row({label:"Breakeven BTC Rate", sub:"obligations ÷ reserve", MSTR:fmt(brkE(M),2)+"%/yr", ASST:fmt(brkE(A),2)+"%/yr",
