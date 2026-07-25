@@ -219,6 +219,12 @@
   .calc-inputs .basissel { background:none; border:none; color:var(--muted); font:inherit; font-size:12.5px;
     text-transform:uppercase; letter-spacing:.8px; padding:0; cursor:pointer; }
   .calc-inputs .basissel option { color:#000; text-transform:none; }
+  /* mobile shrink-safety: grid items must be allowed to contract */
+  .chartcard, .chartwrap, .statbox, .calc-inputs label, .calc-cell { min-width: 0; }
+  .chartwrap canvas { max-width: 100%; }
+  .calc-inputs input, .calc-inputs select { width: 100%; box-sizing: border-box; min-width: 0; }
+  .calc-inputs .basissel { width: auto; }
+  .tabs { flex-wrap: wrap; }
   /* short-interest stat chips */
   .si-chips { display:flex; flex-wrap:wrap; gap:8px; margin:2px 0 10px; }
   .si-chip { display:inline-flex; align-items:baseline; gap:5px; border:1px solid var(--border);
@@ -278,6 +284,17 @@
     .grow { grid-template-columns: 1.3fr 1fr 1fr; }
     .grow > div { padding: 9px 10px; }
     .btcprice { min-width: 160px; }
+    .masthead { flex-direction: column-reverse; align-items: flex-start; gap: 16px; }
+    .masthead .poweredby { flex-direction: row; align-items: center; gap: 8px; }
+    .title h1 { font-size: 25px; }
+    .title p { font-size: 14.5px; }
+    .title .legend { flex-direction: column; gap: 6px; }
+    .statbar { gap: 8px; }
+    .statbox .val { font-size: 21px; }
+    .statbox { padding: 10px 12px; }
+    .grow.headrow .co small { display: none; }
+    .tabs { gap: 16px; }
+    .tabbtn { font-size: 13.5px; }
   }
 </style>
 </head>
@@ -1053,6 +1070,7 @@ function mkChart(id, cfg){
   CHARTS[id] = new Chart(el.getContext("2d"), cfg);
 }
 const GRID = "rgba(255,255,255,0.07)", AX = "#9aa0a6";
+const MTL = (typeof innerWidth !== "undefined" && innerWidth < 640) ? 5 : 8;  // x ticks on phones
 if(typeof Chart !== "undefined") Chart.defaults.font.family = "'Google Sans Flex','Google Sans',-apple-system,'Segoe UI',Roboto,sans-serif";
 const baseOpts = (extra={}) => Object.assign({
   responsive:true, maintainAspectRatio:false, interaction:{mode:"index",intersect:false},
@@ -1121,7 +1139,7 @@ function renderCharts(){
     // 2. BTC per share over time — real series from strategytracker
     const bh = DATA.companies[co].bpsHistory || {dates:[],sats:[]};
     const bpsOpts = baseOpts({ scales:{
-      x:{ ticks:{color:AX,font:{size:11},autoSkip:true,maxTicksLimit:8,maxRotation:0}, grid:{color:GRID} },
+      x:{ ticks:{color:AX,font:{size:11},autoSkip:true,maxTicksLimit:MTL,maxRotation:0}, grid:{color:GRID} },
       y:axis("sats / share","left") } });
     bpsOpts.plugins.legend.display = false;
     mkChart("ch-bps-"+co, { type:"line", data:{ labels: bh.dates, datasets:[
@@ -1137,7 +1155,7 @@ function renderCharts(){
       const labels = mhs.dates.slice(_start), px = mhs.px.slice(_start),
             mn = (mhs.net || mhs.mnav).slice(_start);
       const siOpts = baseOpts({ scales:{
-        x:{ ticks:{color:AX,font:{size:11},autoSkip:true,maxTicksLimit:8,maxRotation:0}, grid:{color:GRID} },
+        x:{ ticks:{color:AX,font:{size:11},autoSkip:true,maxTicksLimit:MTL,maxRotation:0}, grid:{color:GRID} },
         yP:axis("","left",{ticks:{color:c,font:{size:11},callback:v=>"$"+(+v).toFixed(0)}}),
         yM:axis("net mNAV","right",{ticks:{color:"#ffffff",font:{size:11},callback:v=>(+v).toFixed(2)+"x"}}) } });
       siOpts.plugins.tooltip.callbacks = { label: ctx => {
@@ -1159,7 +1177,7 @@ function renderCharts(){
       const pt = DATA.companies[co].prefTicker;
       const shOut = ph.notional.map(n => n ? n/100 : null);       // $M notional -> M shares
       const prefOpts = baseOpts({ scales:{
-        x:{ ticks:{color:AX,font:{size:11},autoSkip:true,maxTicksLimit:8,maxRotation:0}, grid:{color:GRID} },
+        x:{ ticks:{color:AX,font:{size:11},autoSkip:true,maxTicksLimit:MTL,maxRotation:0}, grid:{color:GRID} },
         yP:axis("","left",{ticks:{color:c,font:{size:11},callback:v=>"$"+(+v).toFixed(0)}}),
         yS:axis("shares out","right",{ticks:{color:"#ffffff",font:{size:11},callback:v=>(+v).toFixed(0)+"M"}}) } });
       prefOpts.plugins.tooltip.callbacks = { label: ctx => {
@@ -1181,7 +1199,7 @@ function renderCharts(){
     const mh = DATA.companies[co].mnavHistory;
     if(mh){
       const mnOpts = baseOpts({ scales:{
-        x:{ ticks:{color:AX,font:{size:11},autoSkip:true,maxTicksLimit:8,maxRotation:0}, grid:{color:GRID} },
+        x:{ ticks:{color:AX,font:{size:11},autoSkip:true,maxTicksLimit:MTL,maxRotation:0}, grid:{color:GRID} },
         yP:axis("","left",{ticks:{color:c,font:{size:11},callback:v=>"$"+(+v).toFixed(0)}}),
         yM:axis("EV mNAV","right",{ticks:{color:"#ffffff",font:{size:11},callback:v=>(+v).toFixed(2)+"x"}}) } });
       mnOpts.plugins.tooltip.callbacks = { label: ctx => {
@@ -1234,7 +1252,7 @@ function renderCharts(){
     const line   = hasLive ? (si.dtc10 || si.dtc20 || si.dtc).concat([si.dtcLive]) : (si.dtc10 || si.dtc20 || si.dtc);
     const lastIdx = labels.length - 1;
     const shOpts = baseOpts({ scales:{
-      x:{ ticks:{color:AX,font:{size:11},autoSkip:true,maxTicksLimit:10,maxRotation:0}, grid:{color:GRID} },
+      x:{ ticks:{color:AX,font:{size:11},autoSkip:true,maxTicksLimit:MTL+2,maxRotation:0}, grid:{color:GRID} },
       yF:axis("% float","left",{ticks:{color:ac,font:{size:11},callback:v=>(+v).toFixed(1)+"%"}, beginAtZero:true}),
       yD:axis("days to cover","right",{ticks:{color:"#ffffff",font:{size:11},callback:v=>(+v).toFixed(1)}, beginAtZero:true}) } });
     shOpts.plugins.tooltip.callbacks = { label: ctx => {
@@ -1481,7 +1499,7 @@ function runCalc(){
       r.raised>0 ? `<br>Issuance: $${fmt(Math.round(r.raised))}M raised @ avg ${fmt(r.avgIssMn,2)}× mNAV — $${fmt(Math.round(r.raised - r.parked))}M → BTC (premium captured ≈ ${sig(r.premCap/(r.implied*r.endSharesM)*100)}${fmt(r.premCap/(r.implied*r.endSharesM)*100,1)}% of ending equity) · $${fmt(Math.round(r.parked))}M parked as dividend cash (per-share neutral)${r.endCash>0.5 ? ` · $${fmt(Math.round(r.endCash))}M runway cash left` : ``}` : ``}</div>`;
   if(typeof Chart!=="undefined"){
     const mnOpts = baseOpts({ scales:{
-      x:{ title:{display:true,text:"months",color:AX,font:{size:11}}, ticks:{color:AX,font:{size:11},autoSkip:true,maxTicksLimit:10}, grid:{color:GRID} },
+      x:{ title:{display:true,text:"months",color:AX,font:{size:11}}, ticks:{color:AX,font:{size:11},autoSkip:true,maxTicksLimit:MTL+2}, grid:{color:GRID} },
       y:{ ticks:{color:AX,font:{size:11},callback:v=>v+""}, grid:{color:GRID},
           title:{display:true,text:"indexed (start = 100)",color:AX,font:{size:11}} } }});
     mkChart("ch-calc", { type:"line", data:{ labels:r.labels, datasets:[
