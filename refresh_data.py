@@ -388,17 +388,29 @@ def fetch_strategytracker(data):
             # count instead. Uses today's tranche set for the whole window (all six
             # MSTR tranches were outstanding across it). ASST: all debt is a claim.
             sched = co.get("debtSchedule") or []
+            rows = [(i, d, hd["market_cap_basic"][i], hd["btc_balance"][i],
+                     hd["btc_prices"][i], hd["stock_prices"][i])
+                    for i, d in enumerate(hd["dates"])
+                    if d >= start and hd["market_cap_basic"][i] and hd["btc_balance"][i]
+                    and hd["btc_prices"][i] and hd["stock_prices"][i]]
+            # the tracker's share count goes stale between filings while the ATM keeps
+            # issuing: interpolate the trailing flat segment toward the live count
+            # from strategy.com's KPI API so recent mcap (and both mNAV series) is right
+            shs = [mc / sp / 1e6 for (_i, _d, mc, _b, _bp, sp) in rows]
+            true_sh = (_KPI.get(tk) or {}).get("sharesM")
+            if shs and true_sh and true_sh > shs[-1] + 0.5:
+                j0 = len(shs) - 1
+                while j0 > 0 and abs(shs[j0 - 1] - shs[-1]) < 0.3:
+                    j0 -= 1
+                span = max(1, len(shs) - 1 - j0)
+                for k in range(j0, len(shs)):
+                    shs[k] = shs[j0] + (true_sh - shs[j0]) * (k - j0) / span
             dts_m, px_m, mnv, netv = [], [], [], []
-            for i, d in enumerate(hd["dates"]):
-                if d < start:
-                    continue
-                mc, b, bp, sp = (hd["market_cap_basic"][i], hd["btc_balance"][i],
-                                 hd["btc_prices"][i], hd["stock_prices"][i])
-                if not (mc and b and bp and sp):
-                    continue
+            for idx, (i, d, mc, b, bp, sp) in enumerate(rows):
                 nav = b * bp / 1e6
+                mcap = sp * shs[idx]
                 claims = debt_at(d, i) + pref_at(d) - cash_at(d, i)
-                ev = mc / 1e6 + claims
+                ev = mcap + claims
                 dts_m.append(_iso_lbl(d, "%b %-d"))
                 px_m.append(round(sp, 2))
                 mnv.append(round(ev / nav, 3))
@@ -409,7 +421,7 @@ def fetch_strategytracker(data):
                 else:
                     otm, itm_sh = debt_at(d, i), 0.0
                 net_res = nav + cash_at(d, i) - otm - pref_at(d)
-                netv.append(round(sp * (mc / sp / 1e6 + itm_sh) / net_res, 3)
+                netv.append(round(sp * (shs[idx] + itm_sh) / net_res, 3)
                             if net_res > 0 else None)
             if mnv:
                 co["mnavHistory"] = {"dates": dts_m, "px": px_m, "mnav": mnv, "net": netv}
@@ -1211,14 +1223,20 @@ def fetch_short_interest(data):
                 log(f"[skip] short interest {pref}: {e} — keeping existing values")
 
 
+# live KPI snapshot from strategy.com, shared with the history builder
+_KPI = {}
+
+
 def fetch_strategy_kpi(data):
     """Authoritative MSTR balance-sheet inputs from strategy.com's own KPI API
     (open, no auth): market cap -> current basic shares, convertible debt, and
     USD reserve derived via the EV identity (cash = mcap + debt + pref - EV).
-    Runs after fetch_strategytracker so these override the tracker's stale
-    share count and our filing-flow cash estimate."""
+    Called before fetch_strategytracker (so the history builder and step series
+    see fresh values) and again after fetch_holdings (which recomputes its own
+    cash estimate and must be overridden)."""
     try:
-        k = get_json("https://api.strategy.com/btc/mstrKpiData")[0]
+        k = _KPI.get("_raw") or get_json("https://api.strategy.com/btc/mstrKpiData")[0]
+        _KPI["_raw"] = k
         num = lambda s: float(str(s).replace(",", ""))
         co = data["companies"]["MSTR"]
         px, mcap = num(k.get("ufPrice") or k["price"]), num(k["marketCap"])
@@ -1230,6 +1248,7 @@ def fetch_strategy_kpi(data):
         co["seniorDebt"] = round(debt)
         if cash > 0:
             co["cash"] = cash
+        _KPI["MSTR"] = {"sharesM": co["sharesOutstanding"], "debt": round(debt), "cash": cash}
         log(f"[strategy.com] MSTR: {co['sharesOutstanding']}M sh, debt ${debt:,.0f}M, "
             f"USD reserve ${cash:,}M")
     except Exception as e:
@@ -1303,10 +1322,10 @@ def main():
 
     print("Refreshing treasury data…")
     fetch_btc_market(data)            # CoinGecko: BTC price + supply
+    fetch_strategy_kpi(data)          # strategy.com API: shares, debt, USD reserve (MSTR)
     fetch_strategytracker(data)       # PRIMARY: current metrics + real history (both names)
     fetch_holdings(data)             # SEC EDGAR: weekly accumulation (8-K period ranges)
-    fetch_strategy_kpi(data)          # strategy.com API: shares, debt, USD reserve (MSTR)
-                                      # (after holdings: overrides its flow-based cash estimate)
+    fetch_strategy_kpi(data)          # re-apply: holdings clobbers cash with its own estimate
     fetch_short_interest(data)        # Nasdaq: days to cover (semi-monthly)
     fetch_borrow_fees(data)           # ChartExchange/IBKR: annualized cost to short
     # debt schedule + preferred breakdown are parsed from the 10-Q (see notes);
