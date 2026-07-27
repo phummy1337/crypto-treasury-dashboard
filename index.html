@@ -547,6 +547,7 @@
       <li>Weekly accumulation, debt schedule, historical preferred &amp; cash: SEC EDGAR filings (8-K, 10-Q, XBRL)</li>
       <li>Days to cover / short interest: Nasdaq (semi-monthly settlement data)</li>
       <li>Live BTC price: CoinGecko API</li>
+      <li>Live preferred quotes: strategy.com API (STRC, real-time) · Cboe delayed quotes (SATA, ~15 min)</li>
     </ul>
     <div style="margin-top:8px;color:var(--faint)">Not investment advice. Confirm against each issuer's latest filing before relying on the ratios.</div>
   </div>
@@ -1678,7 +1679,38 @@ async function fetchLiveEquity(){
   }catch(e){ /* keep last refresh's values */ }
 }
 
-loadData().then(fetchLiveEquity);
+loadData().then(fetchLiveEquity).then(fetchLivePrefs);
+
+// live preferred quotes — the cron only lands ~hourly (GitHub throttles its
+// schedule), so the prefs tick client-side like the commons do:
+//   STRC: strategy.com's own KPI API (real-time, CORS-open)
+//   SATA: Cboe delayed quote (15 min) via a CORS relay; falls back to cron data
+async function fetchLivePrefs(){
+  let changed = false;
+  try{
+    const k = await (await fetch("https://api.strategy.com/btc/strcKpiData", {cache:"no-store"})).json();
+    const q = Array.isArray(k) ? k[0] : k;
+    const px = parseFloat(q.ufPrice || q.price), chg = parseFloat(q.priceVarPerc);
+    const co = DATA.companies.MSTR;
+    if(px > 0 && Math.abs(px - co.prefPrice) > 0.005){
+      co.prefPrice = Math.round(px*100)/100;
+      if(!isNaN(chg)) co.prefChangePct = Math.round(chg*100)/100;
+      changed = true;
+    }
+  }catch(e){}
+  try{
+    const url = "https://api.allorigins.win/raw?url=" +
+      encodeURIComponent("https://cdn.cboe.com/api/global/delayed_quotes/quotes/SATA.json");
+    const d = (await (await fetch(url, {cache:"no-store"})).json()).data;
+    const co = DATA.companies.ASST;
+    if(d && d.current_price > 0 && Math.abs(d.current_price - co.prefPrice) > 0.005){
+      co.prefPrice = Math.round(d.current_price*100)/100;
+      co.prefChangePct = Math.round(d.price_change_percent*100)/100;
+      changed = true;
+    }
+  }catch(e){}
+  if(changed) renderAll();
+}
 // previous close derived from the cron snapshot (px and day-change at refresh time)
 function derivePrevClose(){
   for(const tk of ["MSTR","ASST"]){
@@ -1714,8 +1746,9 @@ async function repollData(){
 // cadence: every minute during market hours -> live stock px + BTC (all derived
 // metrics re-render with them); every 15 minutes -> full data.json repoll
 setInterval(() => { if(marketOpenET()) fetchLiveEquity(); }, 60000);
+setInterval(() => { if(marketOpenET()) fetchLivePrefs(); }, 60000);
 setInterval(fetchBtcPrice, 60000);          // BTC trades 24/7 — tick every minute always
-setInterval(() => { if(marketOpenET()) repollData(); }, 15*60*1000);
+setInterval(() => { if(marketOpenET()) repollData(); }, 5*60*1000);
 </script>
 </body>
 </html>
