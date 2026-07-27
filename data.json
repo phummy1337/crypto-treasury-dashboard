@@ -1,9 +1,9 @@
 {
   "asOf": "2026-07-27",
   "priceAsOf": "2026-07-27",
-  "btcPriceUsd": 64910,
+  "btcPriceUsd": 65178,
   "btcSupply": 21000000,
-  "btcCirculating": 20061956,
+  "btcCirculating": 20061987,
   "companies": {
     "MSTR": {
       "name": "Strategy",
@@ -12,13 +12,13 @@
       "prefTicker": "STRC",
       "asset": "BTC",
       "accent": "#ed1946",
-      "stockPrice": 91.67,
-      "dayChangePct": 0.0,
-      "sharesOutstanding": 384.6,
+      "stockPrice": 97.12,
+      "dayChangePct": 5.94,
+      "sharesOutstanding": 384.59,
       "betaBtc": 1.3,
       "week52Low": 82.31,
       "week52High": 403.8,
-      "prefPrice": 86.89,
+      "prefPrice": 88.75,
       "holdings": 843775,
       "pctSupply": 4.018,
       "netChangeYtd": 171275,
@@ -36,12 +36,12 @@
       "satsPer100": 119000,
       "mnav": 1.01,
       "cebeMnav": 1.28,
-      "cash": 3750,
+      "cash": 3749,
       "seniorDebt": 6754,
-      "prefNotional": 15459,
+      "prefNotional": 15460,
       "annualObligations": 1762,
       "staking": 0,
-      "prefChangePct": 2.29,
+      "prefChangePct": 2.15,
       "yearEnd": {
         "2020": 70470,
         "2021": 124391,
@@ -74,7 +74,7 @@
         [
           "STRE",
           "STRE \u00b7 10% (EUR)",
-          882
+          883
         ]
       ],
       "debtSchedule": [
@@ -136,7 +136,7 @@
       "capStructAsOf": "2026-03-31 (10-Q)",
       "dilutedShares": 401.29,
       "marketCapBasic": 29540,
-      "navPremiumBasic": 0.621,
+      "navPremiumBasic": 0.655,
       "treasuryDate": "2026-07-06",
       "bpsHistory": {
         "dates": [
@@ -1182,7 +1182,7 @@
         "dtcLive": 2.69
       },
       "daysToCover": 1.97,
-      "prefMarket": 12956,
+      "prefMarket": 13180,
       "prefHistory": {
         "dates": [
           "Jul 25",
@@ -1435,7 +1435,8 @@
           "Jul 21",
           "Jul 22",
           "Jul 23",
-          "Jul 24"
+          "Jul 24",
+          "Jul 27"
         ],
         "iso": [
           "2025-07-25",
@@ -1688,7 +1689,8 @@
           "2026-07-21",
           "2026-07-22",
           "2026-07-23",
-          "2026-07-24"
+          "2026-07-24",
+          "2026-07-27"
         ],
         "px": [
           88.6,
@@ -1941,7 +1943,8 @@
           88.16,
           87.45,
           84.94,
-          86.89
+          86.89,
+          88.87
         ],
         "notional": [
           null,
@@ -2153,6 +2156,7 @@
           8537,
           8537,
           8537,
+          10489,
           10489,
           10489,
           10489,
@@ -2800,7 +2804,7 @@
           91.67,
           91.67,
           91.67,
-          91.67
+          97.12
         ],
         "mnav": [
           1.474,
@@ -3098,11 +3102,11 @@
           1.025,
           1.037,
           1.028,
-          1.001,
+          1.0,
           1.003,
           0.999,
           0.983,
-          0.98
+          1.014
         ],
         "net": [
           1.564,
@@ -3404,7 +3408,7 @@
           0.963,
           0.997,
           0.974,
-          0.969
+          1.02
         ]
       },
       "strcNotionalSteps": [
@@ -3534,7 +3538,7 @@
         "commonMo": 1163
       },
       "strcRate": 12.0,
-      "floatSharesM": 364.96,
+      "floatSharesM": 364.95,
       "prefShortInterest": {
         "dates": [
           "Jul 31",
@@ -3692,12 +3696,12 @@
           0.64,
           2.14
         ],
-        "dtcLive": 3.36
+        "dtcLive": 3.5
       },
       "borrowFee": {
         "pct": 0.29,
-        "avail": 9400000,
-        "asOf": "2026-07-27 09:23:30"
+        "avail": 9300000,
+        "asOf": "2026-07-27 10:10:19"
       },
       "borrowFeeHist": {
         "iso": [
@@ -3714,7 +3718,7 @@
       "prefBorrowFee": {
         "pct": 1.05,
         "avail": 4500000,
-        "asOf": "2026-07-27 09:23:30"
+        "asOf": "2026-07-27 10:10:19"
       },
       "prefBorrowFeeHist": {
         "iso": [
@@ -3736,13 +3740,13 @@
       "prefTicker": "SATA",
       "asset": "BTC",
       "accent": "#4c9fff",
-      "stockPrice": 11.49,
-      "dayChangePct": 0.0,
+      "stockPrice": 12.28,
+      "dayChangePct": 6.88,
       "sharesOutstanding": 84.1,
       "betaBtc": 1.35,
       "week52Low": 7.16,
       "week52High": 178.2,
-      "prefPrice": 96.58,
+      "prefPrice": 97,
       "holdings": 20000,
       "pctSupply": 0.0952,
       "netChangeYtd": 12373,
@@ -3760,12 +3764,12 @@
       "satsPer100": 81000,
       "mnav": 1.18,
       "cebeMnav": 1.88,
-      "cash": 198,
+      "cash": 199,
       "seniorDebt": 0,
       "prefNotional": 783,
       "annualObligations": 102,
       "staking": 0,
-      "prefChangePct": 0.29,
+      "prefChangePct": 0.43,
       "yearEnd": {
         "2025": 7627
       },
@@ -3780,7 +3784,7 @@
       "capStructAsOf": "2026-06-18 (8-K)",
       "dilutedShares": 113.4,
       "marketCapBasic": 925,
-      "navPremiumBasic": 0.743,
+      "navPremiumBasic": 0.791,
       "treasuryDate": "2026-07-24",
       "bpsHistory": {
         "dates": [
@@ -4134,7 +4138,7 @@
         "dtcLive": 8.49
       },
       "daysToCover": 6.9,
-      "prefMarket": 756,
+      "prefMarket": 759,
       "prefHistory": {
         "dates": [
           "Nov 6",
@@ -4314,7 +4318,8 @@
           "Jul 21",
           "Jul 22",
           "Jul 23",
-          "Jul 24"
+          "Jul 24",
+          "Jul 27"
         ],
         "iso": [
           "2025-11-06",
@@ -4494,7 +4499,8 @@
           "2026-07-21",
           "2026-07-22",
           "2026-07-23",
-          "2026-07-24"
+          "2026-07-24",
+          "2026-07-27"
         ],
         "px": [
           88.0,
@@ -4674,7 +4680,8 @@
           98.29,
           98.09,
           96.3,
-          96.58
+          96.58,
+          97.02
         ],
         "notional": [
           null,
@@ -4831,6 +4838,7 @@
           751,
           751,
           751,
+          783,
           783,
           783,
           783,
@@ -5276,7 +5284,7 @@
           11.49,
           11.49,
           11.49,
-          11.49
+          12.28
         ],
         "mnav": [
           1.172,
@@ -5486,7 +5494,7 @@
           1.21,
           1.206,
           1.187,
-          1.194
+          1.239
         ],
         "net": [
           1.214,
@@ -5696,7 +5704,7 @@
           1.387,
           1.379,
           1.339,
-          1.352
+          1.434
         ]
       },
       "cashUsd": 154.0,
@@ -5821,12 +5829,12 @@
           1.35,
           4.71
         ],
-        "dtcLive": 6.25
+        "dtcLive": 6.92
       },
       "borrowFee": {
         "pct": 0.89,
-        "avail": 1800000,
-        "asOf": "2026-07-27 09:23:30"
+        "avail": 1500000,
+        "asOf": "2026-07-27 10:10:19"
       },
       "borrowFeeHist": {
         "iso": [
@@ -5842,8 +5850,8 @@
       },
       "prefBorrowFee": {
         "pct": 37.38,
-        "avail": 10000,
-        "asOf": "2026-07-27 09:23:30"
+        "avail": 15000,
+        "asOf": "2026-07-27 10:10:19"
       },
       "prefBorrowFeeHist": {
         "iso": [
@@ -6961,7 +6969,7 @@
       91.67,
       91.67,
       91.67,
-      91.67
+      97.12
     ],
     "ASST": [
       74.8,
@@ -7328,7 +7336,7 @@
       11.49,
       11.49,
       11.49,
-      11.49
+      12.28
     ]
   },
   "weekly": {
@@ -7719,13 +7727,15 @@
     }
   },
   "dataSource": "strategytracker.com (live) + SEC EDGAR (debt/preferred)",
-  "eurUsd": 1.1377,
+  "eurUsd": 1.1389,
   "actions": [
     {
       "d": "2026-07-26",
       "co": "MSTR",
       "items": [
-        "Raised ~$544M net via ATM (common stock $544M)"
+        "Raised ~$544M net via ATM (common stock $544M)",
+        "Repurchased 288,930 STRC shares (~$25M)",
+        "USD Reserve at $3,750M"
       ]
     },
     {
@@ -7741,7 +7751,8 @@
       "d": "2026-07-19",
       "co": "MSTR",
       "items": [
-        "Raised ~$264M net via ATM (common stock $264M)"
+        "Raised ~$264M net via ATM (common stock $264M)",
+        "USD Reserve at $3,225M"
       ]
     },
     {
@@ -7757,7 +7768,8 @@
       "d": "2026-07-12",
       "co": "MSTR",
       "items": [
-        "Raised ~$467M net via ATM (common stock $467M)"
+        "Raised ~$467M net via ATM (common stock $467M)",
+        "USD Reserve at $3,000M"
       ]
     },
     {
@@ -7787,7 +7799,8 @@
       "d": "2026-06-28",
       "co": "MSTR",
       "items": [
-        "Raised ~$1,152M net via ATM (common stock $1,152M)"
+        "Raised ~$1,152M net via ATM (common stock $1,152M)",
+        "USD Reserve at $2,550M"
       ]
     },
     {
@@ -7803,7 +7816,8 @@
       "co": "MSTR",
       "items": [
         "Bought 520 BTC (~$35M at ~$67,068/BTC)",
-        "Raised ~$336M net via ATM (common stock $336M)"
+        "Raised ~$336M net via ATM (common stock $336M)",
+        "USD Reserve at $1,400M"
       ]
     },
     {
@@ -7864,7 +7878,15 @@
       "d": "2026-05-31",
       "co": "MSTR",
       "items": [
-        "Raised ~$128M net via ATM (common stock $128M)"
+        "Raised ~$128M net via ATM (common stock $128M)",
+        "USD Reserve at $900M"
+      ]
+    },
+    {
+      "d": "2026-05-25",
+      "co": "MSTR",
+      "items": [
+        "USD Reserve at $871M"
       ]
     },
     {
@@ -8131,7 +8153,8 @@
       "d": "2025-12-21",
       "co": "MSTR",
       "items": [
-        "Raised ~$748M net via ATM (common stock $748M)"
+        "Raised ~$748M net via ATM (common stock $748M)",
+        "USD Reserve at $2,190M"
       ]
     },
     {

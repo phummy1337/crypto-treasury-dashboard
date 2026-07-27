@@ -767,6 +767,25 @@ def _mstr_actions(text, rec, fl):
     if rm and "STRC" in text:
         items.append(f"{'Raised' if float(rm.group(2)) > float(rm.group(1)) else 'Cut'} STRC dividend rate "
                      f"{rm.group(1)}% → {rm.group(2)}%")
+    # share repurchase program (Jun-2026 framework): "<SEC> Stock (1) <shares> $<amt>"
+    rp = re.search(r"Repurchase Program Update(.*?)(?:BTC Update|ATM Update|Item\s+7|$)", text, re.S)
+    if rp:
+        for s in ("STRC", "STRF", "STRK", "STRD", "MSTR"):
+            m = re.search(rf"{s} Stock\s*(?:\(\d\))?\s*([\d,]+)\s*\$\s*([\d,.]+)", rp.group(1))
+            if m and int(m.group(1).replace(",", "")) > 0:
+                sh, amt = int(m.group(1).replace(",", "")), float(m.group(2).replace(",", ""))
+                items.append(f"Repurchased {sh:,} {s} shares (~${amt:,.0f}M)")
+    # convertible note retirements (no dedicated table yet — prose disclosure)
+    cm2 = re.search(r"repurchased[^.]{0,80}\$\s?([\d,.]+)\s*(million|billion)[^.]{0,60}principal amount"
+                    r"[^.]{0,80}[Cc]onvertible[^.]{0,40}(20\d\d)", text)
+    if cm2:
+        v = float(cm2.group(1).replace(",", "")) * (1000 if cm2.group(2) == "billion" else 1)
+        items.append(f"Repurchased ~${v:,.0f}M principal of {cm2.group(3)} convertible notes")
+    # weekly USD Reserve balance (disclosed since the Jun-2026 framework)
+    um = re.search(r"balance of the USD Reserve is \$([\d,.]+)\s*(billion|million)", text)
+    if um:
+        v = float(um.group(1).replace(",", "")) * (1000 if um.group(2) == "billion" else 1)
+        items.append(f"USD Reserve at ${v:,.0f}M")
     return items
 
 
