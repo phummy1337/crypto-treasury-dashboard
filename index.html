@@ -219,6 +219,9 @@
   .calc-inputs .basissel { background:none; border:none; color:var(--muted); font:inherit; font-size:12.5px;
     text-transform:uppercase; letter-spacing:.8px; padding:0; cursor:pointer; }
   .calc-inputs .basissel option { color:#000; text-transform:none; }
+  .calc-alert { grid-column: 1/-1; border:1px solid rgba(255,122,122,0.45); background:rgba(255,122,122,0.08);
+    border-radius:4px; padding:10px 14px; font-size:13.5px; color:var(--text); line-height:1.5; }
+  .calc-alert b { color:#ff7a7a; }
   /* mobile shrink-safety: grid items must be allowed to contract */
   .chartcard, .chartwrap, .statbox, .calc-inputs label, .calc-cell { min-width: 0; }
   .chartwrap canvas { max-width: 100%; }
@@ -474,6 +477,7 @@
       <li><b>Starts from today's live balance sheet.</b></li>
       <li><b>Defaults are real</b> — issuance uses each company's rolling 3-month pace from its filings (MSTR preferred sits at $0 while the STRC ATM is paused below par). Override anything.</li>
       <li><b>Dividend cash runway</b> — issuance proceeds first park N months of preferred dividends as cash (MSTR's recent posture); only the rest buys BTC. Parked cash never earns the mNAV multiple, so it's per-share neutral and a longer runway means less accretion. 0 = every dollar buys BTC.</li>
+      <li><b>Issuance is earned, not assumed</b> — the common ATM shuts in any month the modeled net mNAV sits below your floor (default 1.00×, Strategy's stated accretion threshold). Dividends then follow a waterfall: runway cash first, then issuance <i>only while the ATM is open</i>, then forced BTC sales. That's what makes a premium collapse actually hurt — you lose the accretion engine and start selling coin at the same moment.</li>
     </ul>
     <div class="grid calcbox">
       <div class="calc-co">
@@ -487,6 +491,9 @@
         <label>Horizon (months)<input type="number" id="ci-months" value="12" step="6" min="1" max="120"></label>
         <label>Preferred Issued ($M / mo)<input type="number" id="ci-pref" value="0" step="50" min="0"></label>
         <label>Common Issued ($M / mo)<input type="number" id="ci-common" value="0" step="50" min="0"></label>
+        <label><span class="lblrow">ATM Pauses Below<span class="evhint" data-title="Common ATM discipline" data-rows="Rule~no common issuance below this net mNAV|Strategy's stated threshold~1.00×|Set 0~issue regardless (unrealistic)|Effect~below the floor, dividends must come from BTC sales">?</span></span>
+          <input type="number" id="ci-floor" value="1.00" step="0.05" min="0" max="5">
+          <span class="mixlbl" id="ci-floor-lbl">× net mNAV — ATM open above this</span></label>
         <label>Dividend Rate (% / yr)<input type="number" id="ci-rate" value="12" step="0.5" min="0"></label>
         <label>Dividend Funding Mix
           <input type="range" id="ci-fund" min="0" max="100" step="5" value="0">
@@ -501,7 +508,7 @@
       </div>
       <div class="calc-out" id="calc-out"></div>
       <div class="chartwrap" style="height:260px; padding: 0 16px 14px;"><canvas id="ch-calc"></canvas></div>
-      <p class="footnote" style="padding:0 18px 14px; margin:0;">A model, not a forecast: BTC and mNAV move linearly to your targets; issuance is constant per month. EV basis prices the whole structure (mcap = mNAV × BTC NAV − claims); net basis prices the common's residual (mcap = mNAV × net NAV). Converts are held at notional throughout — the model doesn't flip in-the-money tranches into share count. Runway cash offsets claims at face value but never earns the multiple — only BTC-bought dollars capture the issuance premium.</p>
+      <p class="footnote" style="padding:0 18px 14px; margin:0;">A model, not a forecast: BTC and mNAV move linearly to your targets; issuance is constant per month <i>while the ATM is open</i>. Not modeled: in-the-money converts flipping to shares, variable preferred-rate resets, and taxes on unrealized gains. EV basis prices the whole structure (mcap = mNAV × BTC NAV − claims); net basis prices the common's residual (mcap = mNAV × net NAV). Converts are held at notional throughout — the model doesn't flip in-the-money tranches into share count. Runway cash offsets claims at face value but never earns the multiple — only BTC-bought dollars capture the issuance premium.</p>
     </div>
   </section>
 
@@ -1421,10 +1428,23 @@ function simulate(s, cfg){
   const cebe0 = cebeShare(s.hold, s.btc, s.pref, 0, s.sharesM);
   let hold=s.hold, sharesM=s.sharesM, pref=s.pref, buf=0, p=s.px;
   let raised=0, raisedMnWt=0, parked=0, premCap=0;
+  let pausedMo=0, forcedDiv=0, divBtcSold=0, broke=null;
   const idxStock=[100], idxBtc=[100], labels=["0"];
   for(let m=1;m<=cfg.months;m++){
     const b  = s.btc + (cfg.btcTarget - s.btc)*m/cfg.months;
     const mn = mn0 + (cfg.endMnav - mn0)*m/cfg.months;
+    if(broke){                                                         // structure is gone;
+      idxStock.push(0); idxBtc.push(b/s.btc*100); labels.push(String(m)); continue;
+    }
+    // Is the common ATM open this month? Management issues only when the stock
+    // trades above the accretion threshold (Strategy states a hard 1.0x on the
+    // net multiple; Strive behaves the same). Evaluated on the NET multiple
+    // regardless of which basis the user is modelling in, before this month's
+    // issuance — the same information a board would act on.
+    const nav_ = nav(hold,b), cl_ = claims(pref,buf), netNav_ = nav_ - cl_;
+    const netMn = netNav_>0 ? (cfg.basis==="net" ? mn : (mn*nav_ - cl_)/netNav_) : 0;
+    const atmOpen = netNav_>0 && netMn >= cfg.atmFloor;
+    if(!atmOpen && cfg.commonMo>0) pausedMo++;
     pref += cfg.prefMo;
     const divMo = pref*cfg.rate/100/12;
     let gap = Math.max(0, cfg.runway*divMo - buf);                     // cash still to park
@@ -1432,21 +1452,33 @@ function simulate(s, cfg){
     buf += pc; hold += (cfg.prefMo - pc)*1e6/b;                        // runway first, rest -> BTC
     premCap += (cfg.prefMo - pc)*(mn-1);
     p = priceAt(hold,b,pref,buf,sharesM,mn);
-    if(cfg.commonMo>0){                                                // common ATM: same split
-      const cc = Math.min(cfg.commonMo, gap);
-      buf += cc; sharesM += cfg.commonMo/p; hold += (cfg.commonMo - cc)*1e6/b;
-      parked += cc; premCap += (cfg.commonMo - cc)*(mn-1);
+    const commonMo = atmOpen ? cfg.commonMo : 0;                       // ATM shut below the floor
+    if(commonMo>0){                                                    // common ATM: same split
+      const cc = Math.min(commonMo, gap);
+      buf += cc; sharesM += commonMo/p; hold += (commonMo - cc)*1e6/b;
+      parked += cc; premCap += (commonMo - cc)*(mn-1);
     }
     parked += pc;
-    raised += cfg.prefMo + cfg.commonMo; raisedMnWt += (cfg.prefMo + cfg.commonMo)*mn;
-    let div = divMo;                                                   // service dividends:
-    const fb = Math.min(div, buf); buf -= fb; div -= fb;               // runway cash first,
-    if(div>0){                                                         // then the funding mix
-      if(cfg.fundMix>0) hold -= div*cfg.fundMix*1e6/b;                 // BTC-sale share
-      const dc = div*(1-cfg.fundMix);                                  // common-issuance share
-      if(dc>0){ p = priceAt(hold,b,pref,buf,sharesM,mn); sharesM += dc/p; }
+    raised += cfg.prefMo + commonMo; raisedMnWt += (cfg.prefMo + commonMo)*mn;
+    // dividend waterfall: runway cash -> common issuance (only while the ATM is
+    // open) -> forced BTC sales for whatever is left. The mix slider is a
+    // preference, not a guarantee: below the floor, selling coin is the only door.
+    let div = divMo;
+    const fb = Math.min(div, buf); buf -= fb; div -= fb;
+    if(div>0){
+      let viaBtc = div*cfg.fundMix, viaEq = div - viaBtc;
+      if(!atmOpen && viaEq>0){ forcedDiv += viaEq; viaBtc += viaEq; viaEq = 0; }
+      if(viaBtc>0){ hold -= viaBtc*1e6/b; divBtcSold += viaBtc; }
+      if(viaEq>0){ p = priceAt(hold,b,pref,buf,sharesM,mn); sharesM += viaEq/p; }
     }
     p = priceAt(hold,b,pref,buf,sharesM,mn);
+    // structural break: reserves gone, or senior claims have eaten them entirely
+    if(hold<=0 || (nav(hold,b) - claims(pref,buf))<=0){
+      broke = { month:m, btc:Math.round(b),
+                why: hold<=0 ? "BTC reserve exhausted by dividend sales"
+                             : "senior claims exceed total reserves" };
+      hold = Math.max(hold, 0); p = 0.01;
+    }
     idxStock.push(p/s.px*100); idxBtc.push(b/s.btc*100); labels.push(String(m));
   }
   const cebeEnd = cebeShare(hold, cfg.btcTarget, pref, buf, sharesM);
@@ -1458,6 +1490,7 @@ function simulate(s, cfg){
            cebe0, cebeEnd, cebeX:satsAcc, mnav0, net0, mn0, mnavX:stockX/(btcX*satsAcc),
            endHold:hold, endSharesM:sharesM, endPref:pref, endCash:buf,
            raised, avgIssMn: raised>0 ? raisedMnWt/raised : null, parked, premCap,
+           pausedMo, forcedDiv, divBtcSold, broke,
            endClaims:claims(pref,buf)/nav(hold,cfg.btcTarget)*100,
            idxStock, idxBtc, labels };
 }
@@ -1468,7 +1501,8 @@ function runCalc(){
   const cfg = { btcTarget:gv("ci-btc"), months:Math.max(1,Math.round(gv("ci-months"))),
     prefMo:gv("ci-pref"), commonMo:gv("ci-common"), rate:gv("ci-rate"),
     fundMix:gv("ci-fund")/100, endMnav:gv("ci-mnav"), runway:Math.max(0,gv("ci-runway")),
-    basis:(document.getElementById("ci-basis")||{}).value || "ev" };
+    basis:(document.getElementById("ci-basis")||{}).value || "ev",
+    atmFloor:Math.max(0, gv("ci-floor")) };
   const lbl = document.getElementById("ci-fund-lbl");
   if(lbl){ const m=Math.round(cfg.fundMix*100);
     lbl.textContent = m===0 ? "100% common issuance" : m===100 ? "100% BTC sales" : m+"% BTC sales · "+(100-m)+"% common"; }
@@ -1482,10 +1516,13 @@ function runCalc(){
     `Starting today: $${fmt(s.px,2)} · ₿${fmt(s.hold)} · BTC $${fmt(s.btc)} · EV mNAV ${r?fmt(r.mnav0,2):"—"}x · Net ${r&&r.net0?fmt(r.net0,2):"—"}x`;
   if(!r){ out.innerHTML = '<div class="calc-decomp">BTC NAV is unavailable — model cannot run.</div>'; return; }
   const cls = r.stockX>=1 ? "pos":"neg";
-  out.innerHTML = `
+  const yr = m => m>=12 ? `year ${fmt(m/12,1)}` : `month ${m}`;
+  out.innerHTML = `${ r.broke ? `
+    <div class="calc-alert"><b>Structure breaks in month ${r.broke.month}</b> (${yr(r.broke.month)}, BTC ≈ $${fmt(r.broke.btc)}) — ${r.broke.why}.
+      Common equity is wiped out before the horizon ends; the implied price below is a floor, not a forecast.</div>` : `` }
     <div class="calc-cell"><div class="k">Implied ${calcCo} Price</div>
-      <div class="v" style="color:${o.accent}">$${fmt(r.implied,2)}</div>
-      <div class="s">in ${cfg.months} months</div></div>
+      <div class="v" style="color:${r.broke ? "#ff7a7a" : o.accent}">${r.broke ? "$0" : "$"+fmt(r.implied,2)}</div>
+      <div class="s">${r.broke ? "equity wiped out" : "in "+cfg.months+" months"}</div></div>
     <div class="calc-cell"><div class="k">Stock Return</div>
       <div class="v ${cls}">${fmt(r.stockX,2)}x</div>
       <div class="s">${sig((r.stockX-1)*100)}${fmt((r.stockX-1)*100,0)}%</div></div>
@@ -1497,7 +1534,11 @@ function runCalc(){
       <div class="s">stock ÷ BTC multiple</div></div>
     <div class="calc-decomp">Decomposition: BTC <b>${fmt(r.btcX,2)}x</b> × CEBE/share accretion <b>${fmt(r.cebeX,2)}x</b> × mNAV re-rate <b>${fmt(r.mnavX,2)}x</b> = <b>${fmt(r.stockX,2)}x</b>
       &nbsp;·&nbsp; Ending: ₿${fmt(Math.round(r.endHold))} held · ${fmt(r.endSharesM,1)}M shares · CEBE NAV $${fmt(r.cebeEnd,2)}/sh · claims ${fmt(r.endClaims,1)}% of NAV${
-      r.raised>0 ? `<br>Issuance: $${fmt(Math.round(r.raised))}M raised @ avg ${fmt(r.avgIssMn,2)}× mNAV — $${fmt(Math.round(r.raised - r.parked))}M → BTC (premium captured ≈ ${sig(r.premCap/(r.implied*r.endSharesM)*100)}${fmt(r.premCap/(r.implied*r.endSharesM)*100,1)}% of ending equity) · $${fmt(Math.round(r.parked))}M parked as dividend cash (per-share neutral)${r.endCash>0.5 ? ` · $${fmt(Math.round(r.endCash))}M runway cash left` : ``}` : ``}</div>`;
+      r.raised>0 ? `<br>Issuance: $${fmt(Math.round(r.raised))}M raised @ avg ${fmt(r.avgIssMn,2)}× mNAV — $${fmt(Math.round(r.raised - r.parked))}M → BTC (premium captured ≈ ${sig(r.premCap/(r.implied*r.endSharesM)*100)}${fmt(r.premCap/(r.implied*r.endSharesM)*100,1)}% of ending equity) · $${fmt(Math.round(r.parked))}M parked as dividend cash (per-share neutral)${r.endCash>0.5 ? ` · $${fmt(Math.round(r.endCash))}M runway cash left` : ``}` : ``}${
+      (r.pausedMo>0 || r.divBtcSold>0.5) ? `<br>Stress: ${
+        r.pausedMo>0 ? `common ATM shut <b>${r.pausedMo} of ${cfg.months} months</b> (net mNAV below ${fmt(cfg.atmFloor,2)}×)` : `ATM open all ${cfg.months} months`}${
+        r.divBtcSold>0.5 ? ` · <b>$${fmt(Math.round(r.divBtcSold))}M</b> of BTC sold to pay dividends${
+          r.forcedDiv>0.5 ? ` (<b>$${fmt(Math.round(r.forcedDiv))}M</b> forced — no ATM to issue into)` : ``}` : ``}` : ``}</div>`;
   if(typeof Chart!=="undefined"){
     const mnOpts = baseOpts({ scales:{
       x:{ title:{display:true,text:"months",color:AX,font:{size:11}}, ticks:{color:AX,font:{size:11},autoSkip:true,maxTicksLimit:MTL+2}, grid:{color:GRID} },
@@ -1515,7 +1556,8 @@ async function shareCard(){
   const cfg = { btcTarget:gv("ci-btc"), months:Math.max(1,Math.round(gv("ci-months"))),
     prefMo:gv("ci-pref"), commonMo:gv("ci-common"), rate:gv("ci-rate"),
     fundMix:gv("ci-fund")/100, endMnav:gv("ci-mnav"), runway:Math.max(0,gv("ci-runway")),
-    basis:(document.getElementById("ci-basis")||{}).value || "ev" };
+    basis:(document.getElementById("ci-basis")||{}).value || "ev",
+    atmFloor:Math.max(0, gv("ci-floor")) };
   const snap = calcSnapshot(calcCo), r = simulate(snap, cfg), o = DATA.companies[calcCo];
   if(!r) return;
   const W=1200, H=675, SCALE=2;                 // render 2x for crisp social images
@@ -1552,6 +1594,7 @@ async function shareCard(){
     ["Common Issued", "$"+fmt(cfg.commonMo)+"M / mo"],
     ["Dividend Rate", fmt(cfg.rate,1)+"% / yr"],
     ["Dividend Funding Mix", Math.round(cfg.fundMix*100)+"% BTC sales / "+Math.round((1-cfg.fundMix)*100)+"% common"],
+    ["ATM Pauses Below", fmt(cfg.atmFloor,2)+"x net mNAV"],
     ...(cfg.runway>0 ? [["Div. Cash Runway", fmt(cfg.runway)+" months pre-funded"]] : []),
     [cfg.basis==="net" ? "Ending Net mNAV" : "Ending EV mNAV",
       fmt(cfg.endMnav,2)+"x  (now "+fmt(r.mn0,2)+"x)"],
@@ -1638,7 +1681,7 @@ function initCalc(){
     setDefaults();
     runCalc();
   }));
-  ["ci-btc","ci-months","ci-pref","ci-common","ci-rate","ci-mnav","ci-runway"].forEach(id =>
+  ["ci-btc","ci-months","ci-pref","ci-common","ci-rate","ci-mnav","ci-runway","ci-floor"].forEach(id =>
     document.getElementById(id).addEventListener("input", runCalc));
   const basisSel = document.getElementById("ci-basis");
   if(basisSel) basisSel.addEventListener("change", () => {
