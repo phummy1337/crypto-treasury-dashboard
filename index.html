@@ -90,7 +90,17 @@
   .dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:6px; vertical-align: middle; }
 
   /* header stat bar */
-  .statbar { display:grid; grid-template-columns: repeat(7, 1fr); gap: 10px; }
+  .statbar { display:grid; grid-template-columns: 0.85fr 1.5fr 1.5fr; gap: 12px; align-items: stretch; }
+  .statgroup { position:relative; overflow:hidden; border:1px solid var(--border); border-radius:6px;
+    background:rgba(255,255,255,0.02); padding:10px 16px 12px; }
+  .statgroup::before { content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--bx); }
+  .sg-head { font-size:11.5px; text-transform:uppercase; letter-spacing:1.4px; font-weight:700; margin-bottom:6px; }
+  .sg-items { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
+  .sg-item .lbl { font-size:11.5px; text-transform:uppercase; letter-spacing:1px; color:var(--muted); white-space:nowrap; }
+  .sg-item .val { font-size:23px; font-weight:700; font-style:italic; margin-top:2px;
+    color:var(--bx); font-variant-numeric:tabular-nums; }
+  .sg-item .sub { font-size:12px; color:var(--faint); margin-top:2px; }
+  .sg-item .defhint { margin-left:4px; }
   .statbox {
     background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
     padding: 13px 15px; position: relative; overflow: hidden;
@@ -105,7 +115,7 @@
   .statbox .sub { font-size: 12.5px; color: var(--faint); margin-top: 3px; }
   .statbox .sub.live { color: var(--pos); }
   .statbox .refresh { margin-top: 8px; display:inline-block; }
-  @media (max-width: 900px) { .statbar { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 1100px) { .statbar { grid-template-columns: 1fr; } .btchero { max-width: none; } }
 
   /* ---------- Sections ---------- */
   section { margin-bottom: 40px; }
@@ -222,12 +232,42 @@
   .calc-alert { grid-column: 1/-1; border:1px solid rgba(255,122,122,0.45); background:rgba(255,122,122,0.08);
     border-radius:4px; padding:10px 14px; font-size:13.5px; color:var(--text); line-height:1.5; }
   .calc-alert b { color:#ff7a7a; }
+  .howto { margin: -4px 0 14px; }
+  .howto summary { cursor: pointer; color: var(--muted); font-size: 13.5px; font-weight: 600;
+    list-style: none; display: inline-flex; align-items: center; gap: 6px; }
+  .howto summary::-webkit-details-marker { display: none; }
+  .howto summary::before { content: "▸"; color: var(--faint); transition: transform .15s; }
+  .howto[open] summary::before { transform: rotate(90deg); }
+  .howto summary:hover { color: var(--text); }
+  .howto .calc-how { margin-top: 10px; }
   /* mobile shrink-safety: grid items must be allowed to contract */
   .chartcard, .chartwrap, .statbox, .calc-inputs label, .calc-cell { min-width: 0; }
   .chartwrap canvas { max-width: 100%; }
   .calc-inputs input, .calc-inputs select { width: 100%; box-sizing: border-box; min-width: 0; }
   .calc-inputs .basissel { width: auto; }
   .tabs { flex-wrap: wrap; }
+  /* sticky section nav + chart range chips */
+  .secnav { position: sticky; top: 0; z-index: 40; display: flex; align-items: center;
+    justify-content: space-between; gap: 16px; flex-wrap: wrap;
+    margin: -22px 0 24px; padding: 9px 0; background: rgba(10,10,11,0.92);
+    backdrop-filter: blur(10px); border-bottom: 1px solid var(--border); }
+  body.tab-calc .secnav { display: none; }
+  .secnav-links { display: flex; gap: 18px; flex-wrap: wrap; overflow-x: auto; }
+  .secnav-links a { color: var(--faint); font-size: 13px; font-weight: 600; text-decoration: none;
+    letter-spacing: .3px; white-space: nowrap; padding: 2px 0; border-bottom: 2px solid transparent; }
+  .secnav-links a:hover { color: var(--text); }
+  .secnav-links a.here { color: #fff; border-bottom-color: var(--red); }
+  .freshness { display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--faint);
+    margin-left:auto; white-space:nowrap; }
+  .livedot { width:7px; height:7px; border-radius:50%; background:var(--pos);
+    box-shadow:0 0 0 3px rgba(52,211,153,0.16); }
+  .fresh-ago::before { content:"·"; margin:0 5px; }
+  .rangechips { display: flex; gap: 4px; flex: 0 0 auto; }
+  .rangechips button { background: none; border: 1px solid var(--border); border-radius: 4px;
+    color: var(--faint); font: inherit; font-size: 12px; font-weight: 600; padding: 3px 9px; cursor: pointer; }
+  .rangechips button:hover { color: var(--text); }
+  .rangechips button.active { color: #fff; border-color: rgba(255,255,255,0.45); background: rgba(255,255,255,0.06); }
+  section { scroll-margin-top: 54px; }
   /* short-interest stat chips */
   .si-chips { display:flex; flex-wrap:wrap; gap:8px; margin:2px 0 10px; }
   .si-chip { display:inline-flex; align-items:baseline; gap:5px; border:1px solid var(--border);
@@ -295,6 +335,18 @@
     .statbar { gap: 8px; }
     .statbox .val { font-size: 21px; }
     .statbox { padding: 10px 12px; }
+    .statgroup { padding: 9px 12px 11px; }
+    .sg-items { gap: 8px; }
+    .sg-item .val { font-size: 17px; }
+    .sg-item .lbl, .sg-item .sub { font-size: 10.5px; letter-spacing: .6px; }
+    /* one sticky row on phones: links scroll sideways, chips stay put */
+    .secnav { margin: -14px 0 18px; gap: 10px; flex-wrap: nowrap; padding: 7px 0; }
+    .secnav-links { gap: 15px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
+      -webkit-overflow-scrolling: touch; }
+    .secnav-links::-webkit-scrollbar { display: none; }
+    .secnav-links a { font-size: 12.5px; }
+    .freshness { display: none; }
+    .rangechips button { padding: 3px 7px; font-size: 11.5px; }
     .grow.headrow .co small { display: none; }
     .tabs { gap: 16px; }
     .tabbtn { font-size: 13.5px; }
@@ -320,40 +372,32 @@
       </a>
     </div>
     <div class="statbar">
-      <div class="statbox" style="--bx:var(--btc)">
+      <div class="statbox btchero" style="--bx:var(--btc)">
         <div class="lbl">Bitcoin</div>
         <div class="val" id="btcVal">—</div>
         <div class="sub" id="btcSub">loading…</div>
       </div>
-      <div class="statbox" style="--bx:var(--mstr)">
-        <div class="lbl">MSTR price</div>
-        <div class="val" id="hdr-px-MSTR">—</div>
-        <div class="sub" id="hdr-px-MSTR-sub">Strategy common</div>
+      <div class="statgroup" style="--bx:var(--mstr)">
+        <div class="sg-head" style="color:var(--mstr)">Strategy</div>
+        <div class="sg-items">
+          <div class="sg-item"><div class="lbl">MSTR</div><div class="val" id="hdr-px-MSTR">—</div>
+            <div class="sub" id="hdr-px-MSTR-sub">common</div></div>
+          <div class="sg-item"><div class="lbl">Net mNAV<span class="defhint" data-def="Net mNAV" aria-label="About this metric">&#9432;</span></div>
+            <div class="val" id="hdr-mnav-MSTR">—</div><div class="sub">mcap ÷ net reserve</div></div>
+          <div class="sg-item"><div class="lbl">STRC</div><div class="val" id="hdr-strc">—</div>
+            <div class="sub" id="hdr-strc-sub">preferred</div></div>
+        </div>
       </div>
-      <div class="statbox" style="--bx:var(--mstr)">
-        <div class="lbl">MSTR Net mNAV</div>
-        <div class="val" id="hdr-mnav-MSTR">—</div>
-        <div class="sub">mcap ÷ net reserve</div>
-      </div>
-      <div class="statbox" style="--bx:var(--mstr)">
-        <div class="lbl">STRC price</div>
-        <div class="val" id="hdr-strc">—</div>
-        <div class="sub" id="hdr-strc-sub">Strategy pref</div>
-      </div>
-      <div class="statbox" style="--bx:var(--asst)">
-        <div class="lbl">ASST price</div>
-        <div class="val" id="hdr-px-ASST">—</div>
-        <div class="sub" id="hdr-px-ASST-sub">Strive common</div>
-      </div>
-      <div class="statbox" style="--bx:var(--asst)">
-        <div class="lbl">ASST Net mNAV</div>
-        <div class="val" id="hdr-mnav-ASST">—</div>
-        <div class="sub">mcap ÷ net reserve</div>
-      </div>
-      <div class="statbox" style="--bx:var(--asst)">
-        <div class="lbl">SATA price</div>
-        <div class="val" id="hdr-sata">—</div>
-        <div class="sub" id="hdr-sata-sub">Strive pref</div>
+      <div class="statgroup" style="--bx:var(--asst)">
+        <div class="sg-head" style="color:var(--asst)">Strive</div>
+        <div class="sg-items">
+          <div class="sg-item"><div class="lbl">ASST</div><div class="val" id="hdr-px-ASST">—</div>
+            <div class="sub" id="hdr-px-ASST-sub">common</div></div>
+          <div class="sg-item"><div class="lbl">Net mNAV<span class="defhint" data-def="Net mNAV" aria-label="About this metric">&#9432;</span></div>
+            <div class="val" id="hdr-mnav-ASST">—</div><div class="sub">mcap ÷ net reserve</div></div>
+          <div class="sg-item"><div class="lbl">SATA</div><div class="val" id="hdr-sata">—</div>
+            <div class="sub" id="hdr-sata-sub">preferred</div></div>
+        </div>
       </div>
     </div>
   </header>
@@ -361,6 +405,19 @@
   <nav class="tabs">
     <button class="tabbtn active" data-tab="dash">Dashboard</button>
     <button class="tabbtn" data-tab="calc">MSTR/ASST Implied Price Calculator</button>
+  </nav>
+
+  <nav class="secnav" id="secnav">
+    <div class="secnav-links">
+      <a href="#company">Company</a><a href="#holdings">Holdings</a><a href="#cost">Cost</a>
+      <a href="#pershare">Per-Share</a><a href="#valuation">Valuation</a><a href="#capital">Capital</a>
+      <a href="#actions">Actions</a><a href="#shorts">Shorts</a>
+    </div>
+    <span class="freshness" id="freshness"><span class="livedot"></span>live<span class="fresh-ago" id="fresh-ago"></span></span>
+    <div class="rangechips" id="rangechips" title="Applies to every time-series chart, so both companies show the same window">
+      <button data-range="3m">3M</button><button data-range="6m">6M</button>
+      <button data-range="1y">1Y</button><button data-range="all" class="active">All</button>
+    </div>
   </nav>
 
   <!-- 0. Company Stats -->
@@ -415,7 +472,7 @@
 
   <!-- 2. Cost & Efficiency -->
   <section id="cost">
-    <div class="sec-head"><h2>Cost &amp; Efficiency</h2><span class="tag" style="color:var(--pos);border-color:rgba(52,211,153,0.45)">live</span></div>
+    <div class="sec-head"><h2>Cost &amp; Efficiency</h2></div>
     <p class="sec-note">How well the bitcoin was bought — each company's entry price versus today's market.</p>
     <div class="grid" id="grid-cost"></div>
   </section>
@@ -462,7 +519,7 @@
 
   <!-- 6. Capital Structure (FULLY WORKING, from Excel) -->
   <section id="capital">
-    <div class="sec-head"><h2>Capital Structure</h2><span class="tag" style="color:var(--pos);border-color:rgba(52,211,153,0.45)">live</span></div>
+    <div class="sec-head"><h2>Capital Structure</h2></div>
     <p class="sec-note">How much cushion sits between each treasury and its obligations — leverage, coverage, and staying power.</p>
     <div class="grid" id="grid-capital"></div>
     <p class="footnote">Leverage and coverage use face/notional values. Lower leverage and higher coverage = a safer structure for common holders; higher leverage can enable faster accumulation.</p>
@@ -472,13 +529,14 @@
   <section id="calc">
     <div class="sec-head"><h2>Implied Price Calculator</h2><span class="tag" style="color:var(--btc);border-color:rgba(247,147,26,0.4)">model</span></div>
     <p class="sec-note">Set your assumptions, get an implied share price.</p>
+    <details class="howto"><summary>How the model works</summary>
     <ul class="calc-how">
       <li><b>Month-by-month engine</b> — issuance buys BTC, dividends get serviced, and each month's price backs out of your EV&nbsp;mNAV.</li>
       <li><b>Starts from today's live balance sheet.</b></li>
       <li><b>Defaults are real</b> — issuance uses each company's rolling 3-month pace from its filings (MSTR preferred sits at $0 while the STRC ATM is paused below par). Override anything.</li>
       <li><b>Dividend cash runway</b> — issuance proceeds first park N months of preferred dividends as cash (MSTR's recent posture); only the rest buys BTC. Parked cash never earns the mNAV multiple, so it's per-share neutral and a longer runway means less accretion. 0 = every dollar buys BTC.</li>
       <li><b>Issuance is earned, not assumed</b> — the common ATM shuts in any month the modeled net mNAV sits below your floor (default 1.00×, Strategy's stated accretion threshold). Dividends then follow a waterfall: runway cash first, then issuance <i>only while the ATM is open</i>, then forced BTC sales. That's what makes a premium collapse actually hurt — you lose the accretion engine and start selling coin at the same moment.</li>
-    </ul>
+    </ul></details>
     <div class="grid calcbox">
       <div class="calc-co">
         <button class="cobtn active" data-co="MSTR">MSTR · Strategy</button>
@@ -514,7 +572,7 @@
 
   <!-- 7. Company Actions -->
   <section id="actions">
-    <div class="sec-head"><h2>Company Actions</h2><span class="tag" style="color:var(--pos);border-color:rgba(52,211,153,0.45)">live</span></div>
+    <div class="sec-head"><h2>Company Actions</h2></div>
     <p class="sec-note">A running log of what each company actually did, week by week, straight from their SEC filings — raises, buys, sales, and dividend changes. Newest first; scroll for history.</p>
     <div class="grid actionsbox" id="grid-actions"></div>
   </section>
@@ -522,7 +580,8 @@
   <!-- 8. Short Interest -->
   <section id="shorts">
     <div class="sec-head"><h2>Short Interest</h2><span class="tag stub" id="tag-shorts">seed data</span></div>
-    <p class="sec-note">How crowded the short side is, instrument by instrument — semi-monthly FINRA settlement data via Nasdaq. Bars: shares short as a % of float (common float = shares outstanding on that settlement date minus insider Class B; preferred float = notional ÷ $100 par). Line: days to cover on the trailing 10-trading-day average volume (≈ FINRA’s own reporting window). Cost to short is Interactive Brokers' indicative annualized borrow rate, refreshed with the data.</p>
+    <p class="sec-note">How crowded the short side is, instrument by instrument — and what it costs to stay short.
+      <span class="evhint" data-title="Short interest methodology" data-rows="Source~FINRA semi-monthly settlements, via Nasdaq|Bars~shares short ÷ float, at that settlement date|Common float~shares outstanding then − insider Class B|Preferred float~notional ÷ $100 par|Line~days to cover on trailing 10-day avg volume|Why 10 days~≈ FINRA's own reporting window|Cost to short~IBKR indicative annualized borrow rate">methodology&#9432;</span></p>
     <div class="charts">
       <div class="chartcard">
         <h3><span class="dot" style="background:var(--mstr)"></span>MSTR — Short Interest</h3>
@@ -690,6 +749,18 @@ function unit(v, u){ return `${v}<span class="unit">${u}</span>`; }
 
 // ---------- per-metric definitions (label hover: how it's calculated / what it means) ----------
 const METRIC_DEFS = {
+  "Duration": {c:"(BTC reserve + USD reserve) ÷ annual obligations, where obligations are preferred dividends plus cash interest on debt. Answers: if no new money ever came in, how many years could the existing reserves keep paying?",
+    m:"Staying power. A high number means the company could service its dividends and interest for decades out of what it already holds, so a long bear market is survivable without touching the equity story. A low number means it depends on continued issuance or rising bitcoin to keep the obligations funded — the same treasury is far more fragile. Strategy splits this into BTC duration and USD duration; this is the combined figure."},
+  "EV mNAV": {c:"(Market cap + senior debt + preferred notional − USD reserve) ÷ BTC reserve.",
+    m:"What the market pays for the whole structure — common, debt and preferred together — per dollar of bitcoin behind it. This is the solvency and coverage lens, and it's the one a STRC or SATA holder should care about, since their claim sits on the entire enterprise rather than the residual."},
+  "Net mNAV": {c:"Fully-diluted market cap ÷ net reserve, where net reserve is BTC + USD reserve − out-of-the-money convertible debt − preferred notional. In-the-money converts are counted as shares instead of debt.",
+    m:"What common shareholders pay per dollar of bitcoin that's actually left for them after the senior claims are satisfied. Strategy adopted this as its headline mNAV in July 2026, and it fixes the accretion threshold at exactly 1.0× — above it, issuing stock to buy bitcoin raises bitcoin-per-share; below it, issuing destroys it."},
+  "Net Reserve": {c:"BTC reserve + USD reserve − out-of-the-money convertible debt − preferred notional.",
+    m:"The bitcoin value genuinely attributable to common equity once everyone senior has been paid. This is the denominator common shareholders are actually buying, and it's what makes leverage cut both ways: it grows faster than bitcoin on the way up and shrinks faster on the way down."},
+  "Amplification": {c:"BTC reserve ÷ net reserve.",
+    m:"How much the residual moves for a given move in bitcoin. At 1.5×, a 20% rise in bitcoin lifts net bitcoin-per-share roughly 30% — that's the leverage common holders are paying a premium to access. It rises as bitcoin falls (the fixed claims eat a bigger share) and decays as bitcoin rises unless the company keeps issuing preferred."},
+  "Breakeven BTC Rate": {c:"Annual obligations ÷ total reserves, expressed as a percentage per year.",
+    m:"The rate bitcoin has to appreciate for capital gains alone to cover every dividend and interest payment. Above this rate the structure funds itself indefinitely without selling coin or issuing stock; below it, the obligations have to come from somewhere else."},
   "Stock Price": {c:"Latest common-share price from the strategy.com / treasury.strive.com data feed, refreshed throughout market hours.",
     m:"What the market charges for one share of common stock — the starting point for market cap and every valuation ratio below."},
   "Day Change": {c:"Today's price versus the prior close, in percent.",
@@ -1048,10 +1119,10 @@ function renderPriceHeader(){
   set("hdr-strc", usd(M.prefPrice,2));
   set("hdr-sata", usd(A.prefPrice,2));
   const chg = v => (v==null||isNaN(v)) ? "" : `<span class="${v>=0?'pos':'neg'}">${sig(v)}${fmt(v,2)}%</span> · `;
-  set("hdr-px-MSTR-sub", chg(M.dayChangePct)+"Strategy common");
-  set("hdr-px-ASST-sub", chg(A.dayChangePct)+"Strive common");
-  set("hdr-strc-sub", chg(M.prefChangePct)+"Strategy pref");
-  set("hdr-sata-sub", chg(A.prefChangePct)+"Strive pref");
+  set("hdr-px-MSTR-sub", chg(M.dayChangePct)+"common");
+  set("hdr-px-ASST-sub", chg(A.dayChangePct)+"common");
+  set("hdr-strc-sub", chg(M.prefChangePct)+"preferred");
+  set("hdr-sata-sub", chg(A.prefChangePct)+"preferred");
 }
 function renderActions(){
   const el = document.getElementById("grid-actions"); if(!el) return;
@@ -1066,7 +1137,11 @@ function renderActions(){
   }).join("");
 }
 
-function renderAll(){ renderPriceHeader(); renderCompany(); renderHoldings(); renderCost(); renderPerShare(); renderValuation(); renderCapital(); renderActions(); if(typeof runCalc==="function") runCalc(); }
+function renderAll(){ renderPriceHeader(); renderCompany(); renderHoldings(); renderCost(); renderPerShare(); renderValuation(); renderCapital(); renderActions(); if(typeof runCalc==="function") runCalc();
+  // keep every hint reachable by keyboard (re-rendered markup loses the attribute)
+  document.querySelectorAll(".evhint, .defhint").forEach(el => {
+    if(!el.hasAttribute("tabindex")){ el.setAttribute("tabindex","0"); el.setAttribute("role","button"); } });
+}
 
 // ---------- charts (Chart.js) ----------
 const CHARTS = {};
@@ -1079,6 +1154,19 @@ function mkChart(id, cfg){
 }
 const GRID = "rgba(255,255,255,0.07)", AX = "#9aa0a6";
 const MTL = (typeof innerWidth !== "undefined" && innerWidth < 640) ? 5 : 8;  // x ticks on phones
+
+// ---------- global chart time range ----------
+// One window for every time-series chart, so MSTR and ASST panels stay comparable.
+let chartRange = "all";
+const RANGE_MO = {"3m":3, "6m":6, "1y":12, "all":null};
+// clip parallel arrays to the trailing window; ppm = points per month for this cadence
+function clip(ppm, ...arrs){
+  const mo = RANGE_MO[chartRange];
+  if(!mo) return arrs;
+  const n = Math.max(3, Math.round(mo*ppm));
+  return arrs.map(a => Array.isArray(a) && a.length > n ? a.slice(-n) : a);
+}
+const PPM_DAY = 21, PPM_WEEK = 4.33, PPM_SEMI = 2;   // trading days / weeks / settlements per month
 if(typeof Chart !== "undefined") Chart.defaults.font.family = "'Google Sans Flex','Google Sans',-apple-system,'Segoe UI',Roboto,sans-serif";
 const baseOpts = (extra={}) => Object.assign({
   responsive:true, maintainAspectRatio:false, interaction:{mode:"index",intersect:false},
@@ -1106,11 +1194,12 @@ function renderCharts(){
 
   // per-section status: flip chip + caption (all sections are now real/derived, no modeled history)
   const setStatus = (sec, illus) => {
+    // the chip is exception-reporting: silent when live (the header says so once),
+    // visible only when a section is still on seed data
     const tag = document.getElementById("tag-"+sec);
-    if(tag){ tag.textContent = illus ? "seed data" : "live";
-      tag.classList.toggle("stub", illus);
-      tag.style.color = illus ? "" : "var(--pos)";
-      tag.style.borderColor = illus ? "" : "rgba(52,211,153,0.45)"; }
+    if(tag){ tag.textContent = "seed data";
+      tag.classList.toggle("stub", true);
+      tag.style.display = illus ? "" : "none"; }
     const cap = document.getElementById("illus-"+sec);
     if(cap) cap.textContent = "";
   };
@@ -1136,11 +1225,12 @@ function renderCharts(){
       if(wc.ranges && wc.ranges[i]) return "Week of "+wc.ranges[i];   // real 8-K period
       return weekRange(items[0].label, W.year || 2026);
     }};
-    mkChart("ch-acc-"+co, { data:{ labels: wdates, datasets:[
-      {type:"bar", label:"BTC / week", data:wc.acquired, yAxisID:"y1",
+    const [wdates_, wacq_, whold_] = clip(PPM_WEEK, wdates, wc.acquired, wc.holdings);
+    mkChart("ch-acc-"+co, { data:{ labels: wdates_, datasets:[
+      {type:"bar", label:"BTC / week", data:wacq_, yAxisID:"y1",
         backgroundColor:c+"55", borderColor:c, borderWidth:1, borderRadius:2, order:2,
         hoverBackgroundColor:"rgba(255,255,255,0.9)", hoverBorderColor:"#ffffff", hoverBorderWidth:2},
-      {type:"line", label:"Total BTC", data:wc.holdings, yAxisID:"y2",
+      {type:"line", label:"Total BTC", data:whold_, yAxisID:"y2",
         borderColor:"#fff3ff", backgroundColor:"transparent", borderWidth:2, tension:.25, pointRadius:0, order:1}
     ]}, options: accOpts });
 
@@ -1150,8 +1240,9 @@ function renderCharts(){
       x:{ ticks:{color:AX,font:{size:11},autoSkip:true,maxTicksLimit:MTL,maxRotation:0}, grid:{color:GRID} },
       y:axis("sats / share","left") } });
     bpsOpts.plugins.legend.display = false;
-    mkChart("ch-bps-"+co, { type:"line", data:{ labels: bh.dates, datasets:[
-      {label:"sats / share", data:bh.sats, borderColor:c, backgroundColor:c+"22",
+    const [bhd_, bhs_] = clip(PPM_DAY, bh.dates, bh.sats);
+    mkChart("ch-bps-"+co, { type:"line", data:{ labels: bhd_, datasets:[
+      {label:"sats / share", data:bhs_, borderColor:c, backgroundColor:c+"22",
         borderWidth:2, tension:.25, pointRadius:0, fill:true} ]},
       options: bpsOpts });
 
@@ -1160,8 +1251,8 @@ function renderCharts(){
     if(mhs){
       // MSTR from Oct 2025; ASST from Jan 1, 2026
       const _start = co==="ASST" ? Math.max(0, mhs.dates.findIndex(d=>d.startsWith("Jan"))) : 0;
-      const labels = mhs.dates.slice(_start), px = mhs.px.slice(_start),
-            mn = (mhs.net || mhs.mnav).slice(_start);
+      const [labels, px, mn] = clip(PPM_DAY, mhs.dates.slice(_start), mhs.px.slice(_start),
+            (mhs.net || mhs.mnav).slice(_start));
       const siOpts = baseOpts({ scales:{
         x:{ ticks:{color:AX,font:{size:11},autoSkip:true,maxTicksLimit:MTL,maxRotation:0}, grid:{color:GRID} },
         yP:axis("","left",{ticks:{color:c,font:{size:11},callback:v=>"$"+(+v).toFixed(0)}}),
@@ -1183,7 +1274,8 @@ function renderCharts(){
     const ph = DATA.companies[co].prefHistory;
     if(ph){
       const pt = DATA.companies[co].prefTicker;
-      const shOut = ph.notional.map(n => n ? n/100 : null);       // $M notional -> M shares
+      const [phd_, phpx_, phn_] = clip(PPM_DAY, ph.dates, ph.px, ph.notional);
+      const shOut = phn_.map(n => n ? n/100 : null);              // $M notional -> M shares
       const prefOpts = baseOpts({ scales:{
         x:{ ticks:{color:AX,font:{size:11},autoSkip:true,maxTicksLimit:MTL,maxRotation:0}, grid:{color:GRID} },
         yP:axis("","left",{ticks:{color:c,font:{size:11},callback:v=>"$"+(+v).toFixed(0)}}),
@@ -1193,8 +1285,8 @@ function renderCharts(){
         return ctx.dataset.yAxisID==="yS" ? "Shares outstanding: "+(+ctx.parsed.y).toFixed(1)+"M"
                                           : pt+": $"+(+ctx.parsed.y).toFixed(2);
       }};
-      mkChart("ch-pref-"+co, { type:"line", data:{ labels: ph.dates, datasets:[
-        {label:pt+" Price", data:ph.px, yAxisID:"yP", borderColor:c, backgroundColor:c+"18",
+      mkChart("ch-pref-"+co, { type:"line", data:{ labels: phd_, datasets:[
+        {label:pt+" Price", data:phpx_, yAxisID:"yP", borderColor:c, backgroundColor:c+"18",
           borderWidth:2, tension:.2, pointRadius:0, fill:false, order:1},
         {label:"Shares Outstanding", data:shOut, yAxisID:"yS", borderColor:"rgba(255,255,255,0.75)",
           backgroundColor:"rgba(255,255,255,0.08)", borderWidth:2, stepped:true, pointRadius:0,
@@ -1215,10 +1307,11 @@ function renderCharts(){
         return ctx.dataset.yAxisID==="yM" ? "EV mNAV: "+(+ctx.parsed.y).toFixed(2)+"x"
                                           : co+": $"+(+ctx.parsed.y).toFixed(2);
       }};
-      mkChart("ch-mnav-"+co, { type:"line", data:{ labels: mh.dates, datasets:[
-        {label:"Price", data:mh.px, yAxisID:"yP", borderColor:c, backgroundColor:c+"18",
+      const [mhd_, mhpx_, mhev_] = clip(PPM_DAY, mh.dates, mh.px, mh.mnav);
+      mkChart("ch-mnav-"+co, { type:"line", data:{ labels: mhd_, datasets:[
+        {label:"Price", data:mhpx_, yAxisID:"yP", borderColor:c, backgroundColor:c+"18",
           borderWidth:2, tension:.2, pointRadius:0, fill:false, order:1},
-        {label:"EV mNAV", data:mh.mnav, yAxisID:"yM", borderColor:"rgba(255,255,255,0.85)",
+        {label:"EV mNAV", data:mhev_, yAxisID:"yM", borderColor:"rgba(255,255,255,0.85)",
           backgroundColor:"transparent", borderWidth:2, tension:.2, pointRadius:0, fill:false, order:2} ]},
         options: mnOpts });
     }
@@ -1255,9 +1348,11 @@ function renderCharts(){
     }
     // extend the DTC line with a live "Today" point: latest shorts / 10d volume through today
     const hasLive = si.dtcLive != null;
-    const labels = hasLive ? si.dates.concat(["Today"]) : si.dates;
-    const bars   = hasLive ? si.pctFloat.concat([null]) : si.pctFloat;
-    const line   = hasLive ? (si.dtc10 || si.dtc20 || si.dtc).concat([si.dtcLive]) : (si.dtc10 || si.dtc20 || si.dtc);
+    const [sd_, sp_, sdtc_, ssi_] = clip(PPM_SEMI, si.dates, si.pctFloat,
+                                         si.dtc10 || si.dtc20 || si.dtc, si.si);
+    const labels = hasLive ? sd_.concat(["Today"]) : sd_;
+    const bars   = hasLive ? sp_.concat([null]) : sp_;
+    const line   = hasLive ? sdtc_.concat([si.dtcLive]) : sdtc_;
     const lastIdx = labels.length - 1;
     const shOpts = baseOpts({ scales:{
       x:{ ticks:{color:AX,font:{size:11},autoSkip:true,maxTicksLimit:MTL+2,maxRotation:0}, grid:{color:GRID} },
@@ -1267,7 +1362,7 @@ function renderCharts(){
       if(ctx.parsed.y==null) return null;
       const i = ctx.dataIndex;
       if(ctx.dataset.yAxisID==="yF")
-        return "Shorts: "+(+ctx.parsed.y).toFixed(1)+"% of float  ·  "+(si.si[i]/1e6).toFixed(2)+"M sh";
+        return "Shorts: "+(+ctx.parsed.y).toFixed(1)+"% of float  ·  "+(ssi_[i]/1e6).toFixed(2)+"M sh";
       if(hasLive && i===lastIdx)
         return "Days to cover starting today: "+(+ctx.parsed.y).toFixed(2)+"  (latest shorts ÷ trailing 10d volume)";
       return "Days to cover: "+(+ctx.parsed.y).toFixed(2)+((si.dtc10||si.dtc20)?"  (10d avg volume)":"");
@@ -1288,37 +1383,60 @@ function renderCharts(){
 
 // ---------- generic hover breakdown tooltip (position:fixed, not clipped by the grid) ----------
 const evtip = document.createElement("div"); evtip.id = "evtip"; document.body.appendChild(evtip);
-document.addEventListener("mouseover", e => {
-  const el = e.target.closest && e.target.closest(".evhint"); if(!el) return;
-  const rows = (el.dataset.rows||"").split("|").map(r=>r.split("~"));
-  evtip.innerHTML = `<div class="et-title">${el.dataset.title||""}</div><table>` +
-    rows.map(([k,v])=>`<tr><td>${k}</td><td>${v}</td></tr>`).join("") + '</table>';
-  evtip.style.display = "block";
-  const r = el.getBoundingClientRect();
-  let left = r.right - evtip.offsetWidth; if(left < 8) left = 8;
-  let top = r.bottom + 8; if(top + evtip.offsetHeight > window.innerHeight - 8) top = r.top - evtip.offsetHeight - 8;
-  evtip.style.left = left + "px"; evtip.style.top = top + "px";
-});
-document.addEventListener("mouseout", e => {
-  if(e.target.closest && e.target.closest(".evhint")) evtip.style.display = "none";
-});
+const HINT_SEL = ".evhint, .defhint";
+let tipPinned = null;                       // element whose tip is held open by tap/click
 
-// label-definition tooltips (how it's calculated / what it means)
+function tipHTML(el){
+  if(el.classList.contains("defhint")){
+    const d = METRIC_DEFS[el.dataset.def]; if(!d) return null;
+    return `<div class="et-title">${el.dataset.def}</div>
+      <div class="et-sec">How It's Calculated</div><p class="et-p">${d.c}</p>
+      <div class="et-sec">What It Means</div><p class="et-p">${d.m}</p>`;
+  }
+  const rows = (el.dataset.rows||"").split("|").map(r=>r.split("~"));
+  return `<div class="et-title">${el.dataset.title||""}</div><table>` +
+    rows.map(([k,v])=>`<tr><td>${k}</td><td>${v}</td></tr>`).join("") + '</table>';
+}
+function showTip(el){
+  const html = tipHTML(el); if(html==null) return;
+  evtip.innerHTML = html; evtip.style.display = "block";
+  const r = el.getBoundingClientRect(), W = window.innerWidth;
+  // definitions read left-aligned; breakdown tables hang right off the number
+  let left = el.classList.contains("defhint") ? r.left : r.right - evtip.offsetWidth;
+  if(left + evtip.offsetWidth > W - 8) left = W - evtip.offsetWidth - 8;
+  if(left < 8) left = 8;
+  let top = r.bottom + 8;
+  if(top + evtip.offsetHeight > window.innerHeight - 8) top = r.top - evtip.offsetHeight - 8;
+  evtip.style.left = left + "px"; evtip.style.top = Math.max(8, top) + "px";
+}
+function hideTip(){ evtip.style.display = "none"; tipPinned = null; }
+
 document.addEventListener("mouseover", e => {
-  const el = e.target.closest && e.target.closest(".defhint"); if(!el) return;
-  const d = METRIC_DEFS[el.dataset.def]; if(!d) return;
-  evtip.innerHTML = `<div class="et-title">${el.dataset.def}</div>
-    <div class="et-sec">How It's Calculated</div><p class="et-p">${d.c}</p>
-    <div class="et-sec">What It Means</div><p class="et-p">${d.m}</p>`;
-  evtip.style.display = "block";
-  const r = el.getBoundingClientRect();
-  let left = r.left; if(left + evtip.offsetWidth > window.innerWidth - 8) left = window.innerWidth - evtip.offsetWidth - 8;
-  let top = r.bottom + 8; if(top + evtip.offsetHeight > window.innerHeight - 8) top = r.top - evtip.offsetHeight - 8;
-  evtip.style.left = left + "px"; evtip.style.top = top + "px";
+  if(tipPinned) return;                     // a pinned tip outranks hover
+  const el = e.target.closest && e.target.closest(HINT_SEL); if(el) showTip(el);
 });
 document.addEventListener("mouseout", e => {
-  if(e.target.closest && e.target.closest(".defhint")) evtip.style.display = "none";
+  if(tipPinned) return;
+  if(e.target.closest && e.target.closest(HINT_SEL)) evtip.style.display = "none";
 });
+// tap/click pins the tip open — the only way these definitions are reachable on touch
+document.addEventListener("click", e => {
+  const el = e.target.closest && e.target.closest(HINT_SEL);
+  if(!el){ if(tipPinned && !e.target.closest("#evtip")) hideTip(); return; }
+  e.preventDefault(); e.stopPropagation();
+  if(tipPinned === el) hideTip(); else { tipPinned = el; showTip(el); }
+});
+document.addEventListener("keydown", e => {
+  if(e.key === "Escape"){ hideTip(); return; }
+  const el = document.activeElement;
+  if((e.key === "Enter" || e.key === " ") && el && el.matches && el.matches(HINT_SEL)){
+    e.preventDefault();
+    if(tipPinned === el) hideTip(); else { tipPinned = el; showTip(el); }
+  }
+});
+window.addEventListener("scroll", () => { if(tipPinned) hideTip(); }, {passive:true});
+
+// (label-definition tooltips share the unified handler above)
 
 // ---------- debt schedule tooltip (convertible notes) ----------
 function debtTipHTML(co){
@@ -1355,6 +1473,16 @@ document.addEventListener("mouseout", e => {
   if(e.target.closest && e.target.closest(".debthint")) debttip.style.display="none";
 });
 
+// ---------- one global freshness indicator (replaces per-section "live" chips) ----------
+let lastTick = Date.now();
+function markFresh(){ lastTick = Date.now(); paintFresh(); }
+function paintFresh(){
+  const el = document.getElementById("fresh-ago"); if(!el) return;
+  const s = Math.round((Date.now() - lastTick)/1000);
+  el.textContent = s < 45 ? "just now" : s < 5400 ? Math.round(s/60)+"m ago" : Math.round(s/3600)+"h ago";
+}
+setInterval(paintFresh, 30000);
+
 async function fetchBtcPrice(){
   const sub = document.getElementById("btcSub");
   try{
@@ -1366,7 +1494,7 @@ async function fetchBtcPrice(){
     const ch = j.bitcoin.usd_24h_change;
     sub.innerHTML = `live · CoinGecko · 24h <span class="${ch>=0?'pos':'neg'}">${sig(ch)}${fmt(ch,2)}%</span>`;
     sub.classList.add("live");
-    renderAll();
+    renderAll(); markFresh();
   }catch(e){
     sub.textContent = `latest · ${usd(DATA.btcPriceUsd)} · as of ${DATA.priceAsOf}`;
   }
@@ -1718,7 +1846,7 @@ async function fetchLiveEquity(){
         co.holdings = Math.round(src.holdings); changed = true;
       }
     }
-    if(changed) renderAll();
+    if(changed){ renderAll(); markFresh(); }
   }catch(e){ /* keep last refresh's values */ }
 }
 
@@ -1752,7 +1880,7 @@ async function fetchLivePrefs(){
       changed = true;
     }
   }catch(e){}
-  if(changed) renderAll();
+  if(changed){ renderAll(); markFresh(); }
 }
 // previous close derived from the cron snapshot (px and day-change at refresh time)
 function derivePrevClose(){
@@ -1788,6 +1916,33 @@ async function repollData(){
 
 // cadence: every minute during market hours -> live stock px + BTC (all derived
 // metrics re-render with them); every 15 minutes -> full data.json repoll
+// ---------- section nav: active highlighting + chart range chips ----------
+(function initSecNav(){
+  const nav = document.getElementById("secnav"); if(!nav) return;
+  const links = [...nav.querySelectorAll(".secnav-links a")];
+  const targets = links.map(a => document.querySelector(a.getAttribute("href"))).filter(Boolean);
+  // Which section owns the viewport? Take the last one whose top has passed just
+  // under the sticky bar. (Intersection ratios don't work here — sections differ
+  // in height by 5x, so a tall section never out-scores a short one.)
+  let queued = false;
+  const setHere = () => {
+    queued = false;
+    const y = scrollY + 72;
+    let cur = targets[0];
+    for(const t of targets) if(t.getBoundingClientRect().top + scrollY <= y) cur = t;
+    links.forEach(a => a.classList.toggle("here", a.getAttribute("href") === "#"+cur.id));
+  };
+  addEventListener("scroll", () => { if(!queued){ queued = true; requestAnimationFrame(setHere); } },
+                   {passive:true});
+  setHere();
+  document.getElementById("rangechips").addEventListener("click", e => {
+    const b = e.target.closest("button[data-range]"); if(!b) return;
+    chartRange = b.dataset.range;
+    [...b.parentElement.children].forEach(x => x.classList.toggle("active", x===b));
+    renderCharts();
+  });
+})();
+
 setInterval(() => { if(marketOpenET()) fetchLiveEquity(); }, 60000);
 setInterval(() => { if(marketOpenET()) fetchLivePrefs(); }, 60000);
 setInterval(fetchBtcPrice, 60000);          // BTC trades 24/7 — tick every minute always
