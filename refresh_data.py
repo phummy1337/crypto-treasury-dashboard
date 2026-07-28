@@ -240,7 +240,11 @@ def fetch_strategytracker(data):
         # share counts only move on filings, so keep the dilution overlay (which is
         # structural and slow-moving) and rebase it onto the live basic count.
         tr_basic = pm["latestTotalShares"] / 1e6
-        tr_dil = pm["latestDilutedShares"] / 1e6
+        # EFFECTIVE diluted, not assumed: it drops instruments the issuer flags as
+        # out of the money (ASST's 26.6M warrants struck at $27 against a ~$12
+        # stock). This is the basis both strategy.com and treasury.strive.com
+        # publish — for MSTR the two coincide, for ASST they differ by 30%.
+        tr_dil = (pm.get("latestEffectiveDilutedShares") or pm["latestDilutedShares"]) / 1e6
         co["_dilOverlayM"] = round(max(0.0, tr_dil - tr_basic), 4)
         _apply_per_share(co, tk)
         co["btcYieldYtd"]   = round(pm["btcYieldYtd"], 1)
@@ -309,14 +313,14 @@ def fetch_strategytracker(data):
         sp = [x for x in hd["stock_prices"][-365:] if x is not None]
         if sp:
             co["week52Low"], co["week52High"] = round(min(sp), 2), round(max(sp), 2)
-        # BTC-per-share history (weekly downsample) on the assumed-diluted basis,
-        # matching the headline figure. The tracker's trailing share count is stale
-        # between filings, so rebase the flat tail onto the live count the same way
-        # the mNAV history does.
-        dts, bps = hd["dates"], hd["btc_per_diluted_share"]
+        # BTC-per-share history (weekly downsample), basic basis — the cleanest read
+        # on whether buying outpaced issuance. The tracker's trailing share count is
+        # stale between filings, so rebase the flat tail onto the live count the same
+        # way the mNAV history does.
+        dts, bps = hd["dates"], hd["btc_per_share"]
         bal = hd["btc_balance"]
         shs = [(bal[i]/bps[i]/1e6 if bps[i] and bal[i] else None) for i in range(len(dts))]
-        true_dil = co.get("assumedDilutedShares")
+        true_dil = (_KPI.get(tk) or {}).get("sharesM") or co.get("sharesOutstanding")
         known = [i for i, v in enumerate(shs) if v]
         if true_dil and known:
             last = known[-1]
@@ -334,7 +338,7 @@ def fetch_strategytracker(data):
         for i in range(0, len(dts), 5):
             _pt(i)
         _pt(len(dts) - 1)
-        co["bpsHistory"] = {"dates": od, "sats": ov, "basis": "assumed diluted"}
+        co["bpsHistory"] = {"dates": od, "sats": ov, "basis": "basic"}
 
         # beta to BTC: regression of trailing-1y daily stock returns on BTC returns
         try:
