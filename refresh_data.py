@@ -234,8 +234,15 @@ def fetch_strategytracker(data):
             for dt, mc, px in zip(hd["dates"], hd["market_cap_basic"], hd["stock_prices"])
             if mc and px)
         co["dilutedShares"] = round(pm["latestDilutedShares"] / 1e6, 2)
-        co["satsPerShareBasic"]   = round(pm["btcPerShare"] * 1e8)
-        co["satsPerShareDiluted"] = round(pm["btcPerDilutedShare"] * 1e8)
+        # Per-share metrics. "Assumed diluted" = basic + dilution from ALL converts
+        # and convertible preferred regardless of moneyness — the denominator
+        # strategy.com publishes as its headline BTC-per-share. The tracker's own
+        # share counts only move on filings, so keep the dilution overlay (which is
+        # structural and slow-moving) and rebase it onto the live basic count.
+        tr_basic = pm["latestTotalShares"] / 1e6
+        tr_dil = pm["latestDilutedShares"] / 1e6
+        co["_dilOverlayM"] = round(max(0.0, tr_dil - tr_basic), 4)
+        _apply_per_share(co, tk)
         co["btcYieldYtd"]   = round(pm["btcYieldYtd"], 1)
         co["btcYieldQtd"]   = round(pm["btcYieldQuarterly"], 1)
         co["pctSupply"]     = round(co["holdings"] / data["btcSupply"] * 100, 4)
@@ -302,15 +309,32 @@ def fetch_strategytracker(data):
         sp = [x for x in hd["stock_prices"][-365:] if x is not None]
         if sp:
             co["week52Low"], co["week52High"] = round(min(sp), 2), round(max(sp), 2)
-        # BTC-per-share history (weekly downsample) for the per-share chart
-        dts, bps = hd["dates"], hd["btc_per_share"]
+        # BTC-per-share history (weekly downsample) on the assumed-diluted basis,
+        # matching the headline figure. The tracker's trailing share count is stale
+        # between filings, so rebase the flat tail onto the live count the same way
+        # the mNAV history does.
+        dts, bps = hd["dates"], hd["btc_per_diluted_share"]
+        bal = hd["btc_balance"]
+        shs = [(bal[i]/bps[i]/1e6 if bps[i] and bal[i] else None) for i in range(len(dts))]
+        true_dil = co.get("assumedDilutedShares")
+        known = [i for i, v in enumerate(shs) if v]
+        if true_dil and known:
+            last = known[-1]
+            if true_dil > shs[last] + 0.5:
+                j0 = last
+                while j0 > 0 and shs[j0-1] and abs(shs[j0-1] - shs[last]) < 0.3:
+                    j0 -= 1
+                span = max(1, last - j0)
+                for k in range(j0, last + 1):
+                    shs[k] = shs[j0] + (true_dil - shs[j0]) * (k - j0) / span
         od, ov = [], []
+        def _pt(i):
+            if shs[i] and bal[i]:
+                od.append(_iso_lbl(dts[i], "%b '%y")); ov.append(round(bal[i]*1e8/(shs[i]*1e6)))
         for i in range(0, len(dts), 5):
-            if bps[i] is not None:
-                od.append(_iso_lbl(dts[i], "%b '%y")); ov.append(round(bps[i] * 1e8))
-        if bps and bps[-1] is not None:
-            od.append(_iso_lbl(dts[-1], "%b '%y")); ov.append(round(bps[-1] * 1e8))
-        co["bpsHistory"] = {"dates": od, "sats": ov}
+            _pt(i)
+        _pt(len(dts) - 1)
+        co["bpsHistory"] = {"dates": od, "sats": ov, "basis": "assumed diluted"}
 
         # beta to BTC: regression of trailing-1y daily stock returns on BTC returns
         try:
@@ -1246,6 +1270,21 @@ def fetch_short_interest(data):
 _KPI = {}
 
 
+def _apply_per_share(co, tk):
+    """Recompute sats-per-share on the freshest basic count we have.
+    Basic = shares outstanding; assumed diluted = basic + the structural dilution
+    overlay (all converts + convertible preferred, moneyness-agnostic), which is
+    the denominator strategy.com publishes."""
+    live = (_KPI.get(tk) or {}).get("sharesM") or co.get("sharesOutstanding")
+    overlay = co.get("_dilOverlayM") or 0.0
+    if not (live and co.get("holdings")):
+        return
+    sats = co["holdings"] * 1e8
+    co["satsPerShareBasic"] = round(sats / (live * 1e6))
+    co["assumedDilutedShares"] = round(live + overlay, 2)
+    co["satsPerShareDiluted"] = round(sats / ((live + overlay) * 1e6))
+
+
 def fetch_strategy_kpi(data):
     """Authoritative MSTR balance-sheet inputs from strategy.com's own KPI API
     (open, no auth): market cap -> current basic shares, convertible debt, and
@@ -1268,8 +1307,9 @@ def fetch_strategy_kpi(data):
         if cash > 0:
             co["cash"] = cash
         _KPI["MSTR"] = {"sharesM": co["sharesOutstanding"], "debt": round(debt), "cash": cash}
+        _apply_per_share(co, "MSTR")      # rebase per-share onto the live count
         log(f"[strategy.com] MSTR: {co['sharesOutstanding']}M sh, debt ${debt:,.0f}M, "
-            f"USD reserve ${cash:,}M")
+            f"USD reserve ${cash:,}M, {co.get('satsPerShareDiluted','?'):,} sats/sh diluted")
     except Exception as e:
         log(f"[skip] strategy.com KPI: {e} — keeping existing values")
 

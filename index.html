@@ -485,12 +485,12 @@
     <div class="charts">
       <div class="chartcard">
         <h3><span class="dot" style="background:var(--mstr)"></span>MSTR — BTC per Share</h3>
-        <div class="ch-sub">sats / share over time · strategytracker</div>
+        <div class="ch-sub">sats / share over time · assumed diluted basis</div>
         <div class="chartwrap"><canvas id="ch-bps-MSTR"></canvas></div>
       </div>
       <div class="chartcard">
         <h3><span class="dot" style="background:var(--asst)"></span>ASST — BTC per Share</h3>
-        <div class="ch-sub">sats / share over time · strategytracker</div>
+        <div class="ch-sub">sats / share over time · assumed diluted basis</div>
         <div class="chartwrap"><canvas id="ch-bps-ASST"></canvas></div>
       </div>
     </div>
@@ -803,8 +803,10 @@ const METRIC_DEFS = {
     m:"The paper return on the treasury: whether the stack is in profit at today's price."},
   "Unrealized P/L": {c:"(Live BTC price − average cost) × holdings.",
     m:"The dollar gain or loss embedded in the treasury right now."},
-  "BTC per Share (Basic)": {c:"Holdings ÷ basic shares outstanding, in satoshis. Hover the value for the diluted view.",
-    m:"How much bitcoin one share actually represents — the core 'what do I own' number for a treasury stock."},
+  "BTC per Share (Assumed Diluted)": {c:"Bitcoin held ÷ assumed diluted shares, in satoshis. Assumed diluted = basic shares plus dilution from every convertible note and convertible preferred outstanding, counted whether or not it is currently in the money. This is the denominator strategy.com publishes, and it is rebased here onto the live share count rather than the last filing.",
+    m:"The headline 'what does one share own' number, and the one to quote alongside Strategy's own site. Because it assumes every convertible eventually becomes stock, it is the conservative read — it never flatters the company by ignoring dilution that is already contracted for."},
+  "BTC per Share (Basic)": {c:"Bitcoin held ÷ basic shares outstanding, in satoshis — no convertible dilution assumed.",
+    m:"The pure accumulation view: did buying outpace common-share issuance? Always higher than the diluted figure, so read it as the optimistic bookend rather than the number to compare against strategy.com."},
   "BTC Yield — 1 Week": {c:"Percent change in BTC-per-share over the latest 8-K week.",
     m:"Whether last week's buying grew each share's bitcoin backing after any new share issuance."},
   "BTC Yield — YTD": {c:"Percent change in BTC-per-share since January 1.",
@@ -984,13 +986,18 @@ function renderPerShare(){
   const cls = v => v>=0?"pos":"neg";
   let h = headRow();
   // hover reconciles to strategy.com, whose headline figure is per assumed-diluted share
-  const bpsCell = o => {
-    if(!o.satsPerShareDiluted) return fmt(o.satsPerShareBasic);
-    const rows=[["Basic ("+fmt(o.sharesOutstanding,2)+"M sh)", fmt(o.satsPerShareBasic)],
-                ["Assumed Diluted ("+fmt(o.dilutedShares,2)+"M sh)", fmt(o.satsPerShareDiluted)]].map(r=>r.join("~")).join("|");
-    return `<span class="evhint" data-title="Sats per Share" data-rows="${rows}">${fmt(o.satsPerShareBasic)}</span>`;
-  };
-  h += row({label:"BTC per Share (Basic)", sub:"hover for diluted", MSTR:bpsCell(M), ASST:bpsCell(A)});
+  const bpsRows = o => [["Bitcoin held", fmt(o.holdings)+" BTC"],
+      ["Basic shares", fmt(o.sharesOutstanding,2)+"M"],
+      ["+ converts & convertible pref", fmt((o.assumedDilutedShares||0)-o.sharesOutstanding,2)+"M"],
+      ["= Assumed diluted", fmt(o.assumedDilutedShares,2)+"M"],
+      ["Sats / assumed diluted share", fmt(o.satsPerShareDiluted)],
+      ["Sats / basic share", fmt(o.satsPerShareBasic)]].map(r=>r.join("~")).join("|");
+  const bpsCell = o => !o.satsPerShareDiluted ? fmt(o.satsPerShareBasic)
+    : `<span class="evhint" data-title="Sats per Share" data-rows="${bpsRows(o)}">${fmt(o.satsPerShareDiluted)}</span>`;
+  h += row({label:"BTC per Share (Assumed Diluted)", sub:"as published by strategy.com",
+    MSTR:bpsCell(M), ASST:bpsCell(A)});
+  h += row({label:"BTC per Share (Basic)", sub:"pure accumulation view",
+    MSTR:fmt(M.satsPerShareBasic), ASST:fmt(A.satsPerShareBasic)});
   h += row({label:"BTC Yield — 1 Week", sub:"latest 8-K week", MSTR:pct(wyM), ASST:pct(wyA),
     cls:{MSTR:cls(wyM),ASST:cls(wyA)}, betterFor: (wyA!=null&&wyM!=null&&wyA>wyM)?"ASST":"MSTR"});
   h += row({label:"BTC Yield — YTD", sub:"since Jan 1", MSTR:pct(M.btcYieldYtd), ASST:pct(A.btcYieldYtd),
