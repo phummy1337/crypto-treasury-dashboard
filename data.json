@@ -1,9 +1,9 @@
 {
   "asOf": "2026-07-29",
   "priceAsOf": "2026-07-29",
-  "btcPriceUsd": 63492,
+  "btcPriceUsd": 63554,
   "btcSupply": 21000000,
-  "btcCirculating": 20062900,
+  "btcCirculating": 20062921,
   "companies": {
     "MSTR": {
       "name": "Strategy",
@@ -136,7 +136,7 @@
       "capStructAsOf": "2026-03-31 (10-Q)",
       "dilutedShares": 401.29,
       "marketCapBasic": 29540,
-      "navPremiumBasic": 0.648,
+      "navPremiumBasic": 0.647,
       "treasuryDate": "2026-07-06",
       "bpsHistory": {
         "dates": [
@@ -1183,7 +1183,7 @@
         "dtcLive": 2.69
       },
       "daysToCover": 1.97,
-      "prefMarket": 13046,
+      "prefMarket": 13058,
       "prefHistory": {
         "dates": [
           "Jul 25",
@@ -3121,7 +3121,7 @@
           0.982,
           1.048,
           1.029,
-          1.016
+          1.015
         ],
         "net": [
           1.564,
@@ -3425,7 +3425,7 @@
           0.971,
           1.072,
           1.043,
-          1.023
+          1.022
         ]
       },
       "strcNotionalSteps": [
@@ -3713,12 +3713,12 @@
           0.64,
           2.14
         ],
-        "dtcLive": 3.32
+        "dtcLive": 3.31
       },
       "borrowFee": {
         "pct": 0.29,
         "avail": 8700000,
-        "asOf": "2026-07-29 16:24:13"
+        "asOf": "2026-07-29 17:26:48"
       },
       "borrowFeeHist": {
         "iso": [
@@ -3739,7 +3739,7 @@
       "prefBorrowFee": {
         "pct": 0.82,
         "avail": 3600000,
-        "asOf": "2026-07-29 16:24:13"
+        "asOf": "2026-07-29 17:26:48"
       },
       "prefBorrowFeeHist": {
         "iso": [
@@ -3811,7 +3811,7 @@
       "capStructAsOf": "2026-06-18 (8-K)",
       "dilutedShares": 113.4,
       "marketCapBasic": 925,
-      "navPremiumBasic": 0.733,
+      "navPremiumBasic": 0.732,
       "treasuryDate": "2026-07-24",
       "bpsHistory": {
         "dates": [
@@ -5536,7 +5536,7 @@
           1.187,
           1.264,
           1.247,
-          1.194
+          1.193
         ],
         "net": [
           1.214,
@@ -5748,7 +5748,7 @@
           1.339,
           1.488,
           1.456,
-          1.361
+          1.358
         ]
       },
       "cashUsd": 154.0,
@@ -5878,7 +5878,7 @@
       "borrowFee": {
         "pct": 0.89,
         "avail": 1100000,
-        "asOf": "2026-07-29 16:24:13"
+        "asOf": "2026-07-29 17:26:48"
       },
       "borrowFeeHist": {
         "iso": [
@@ -5899,7 +5899,7 @@
       "prefBorrowFee": {
         "pct": 46.27,
         "avail": 20000,
-        "asOf": "2026-07-29 16:24:13"
+        "asOf": "2026-07-29 17:26:48"
       },
       "prefBorrowFeeHist": {
         "iso": [
