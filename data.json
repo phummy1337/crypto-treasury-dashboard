@@ -1,7 +1,7 @@
 {
   "asOf": "2026-07-29",
   "priceAsOf": "2026-07-29",
-  "btcPriceUsd": 63866,
+  "btcPriceUsd": 63492,
   "btcSupply": 21000000,
   "btcCirculating": 20062900,
   "companies": {
@@ -12,21 +12,21 @@
       "prefTicker": "STRC",
       "asset": "BTC",
       "accent": "#ed1946",
-      "stockPrice": 98.39,
-      "dayChangePct": 2.32,
-      "sharesOutstanding": 384.6,
+      "stockPrice": 93.33,
+      "dayChangePct": -2.94,
+      "sharesOutstanding": 384.59,
       "betaBtc": 1.27,
       "week52Low": 82.31,
       "week52High": 402.01,
-      "prefPrice": 88.37,
+      "prefPrice": 87.51,
       "holdings": 843775,
       "pctSupply": 4.018,
       "netChangeYtd": 171275,
       "btcPerDay": 1042,
       "btcPerWeek": 7300,
       "avgCost": 75476,
-      "satsPerShareBasic": 219390,
-      "satsPerShareDiluted": 203673,
+      "satsPerShareBasic": 219396,
+      "satsPerShareDiluted": 203678,
       "btcYieldYtd": 7.8,
       "btcYieldQtd": -0.3,
       "btcGain": null,
@@ -36,12 +36,12 @@
       "satsPer100": 119000,
       "mnav": 1.01,
       "cebeMnav": 1.28,
-      "cash": 3750,
+      "cash": 3749,
       "seniorDebt": 6754,
       "prefNotional": 15459,
       "annualObligations": 1762,
       "staking": 0,
-      "prefChangePct": 0.17,
+      "prefChangePct": -0.8,
       "yearEnd": {
         "2020": 70470,
         "2021": 124391,
@@ -136,7 +136,7 @@
       "capStructAsOf": "2026-03-31 (10-Q)",
       "dilutedShares": 401.29,
       "marketCapBasic": 29540,
-      "navPremiumBasic": 0.677,
+      "navPremiumBasic": 0.648,
       "treasuryDate": "2026-07-06",
       "bpsHistory": {
         "dates": [
@@ -1008,12 +1008,12 @@
           237663,
           236105,
           227656,
-          226292,
-          224353,
-          223026,
-          221714,
-          220417,
-          219390
+          226293,
+          224355,
+          223029,
+          221718,
+          220422,
+          219396
         ],
         "basis": "basic"
       },
@@ -1183,7 +1183,7 @@
         "dtcLive": 2.69
       },
       "daysToCover": 1.97,
-      "prefMarket": 13125,
+      "prefMarket": 13046,
       "prefHistory": {
         "dates": [
           "Jul 25",
@@ -1951,7 +1951,7 @@
           86.89,
           88.32,
           88.22,
-          88.24
+          87.51
         ],
         "notional": [
           null,
@@ -2817,7 +2817,7 @@
           91.67,
           98.65,
           96.16,
-          98.39
+          93.33
         ],
         "mnav": [
           1.474,
@@ -3121,7 +3121,7 @@
           0.982,
           1.048,
           1.029,
-          1.043
+          1.016
         ],
         "net": [
           1.564,
@@ -3425,7 +3425,7 @@
           0.971,
           1.072,
           1.043,
-          1.065
+          1.023
         ]
       },
       "strcNotionalSteps": [
@@ -3555,7 +3555,7 @@
         "commonMo": 1163
       },
       "strcRate": 12.0,
-      "floatSharesM": 364.96,
+      "floatSharesM": 364.95,
       "prefShortInterest": {
         "dates": [
           "Jul 31",
@@ -3713,12 +3713,12 @@
           0.64,
           2.14
         ],
-        "dtcLive": 3.38
+        "dtcLive": 3.32
       },
       "borrowFee": {
         "pct": 0.29,
         "avail": 8700000,
-        "asOf": "2026-07-29 15:37:21"
+        "asOf": "2026-07-29 16:24:13"
       },
       "borrowFeeHist": {
         "iso": [
@@ -3739,7 +3739,7 @@
       "prefBorrowFee": {
         "pct": 0.82,
         "avail": 3600000,
-        "asOf": "2026-07-29 15:37:21"
+        "asOf": "2026-07-29 16:24:13"
       },
       "prefBorrowFeeHist": {
         "iso": [
@@ -3757,7 +3757,7 @@
           0.82
         ]
       },
-      "assumedDilutedShares": 414.28,
+      "assumedDilutedShares": 414.27,
       "_dilOverlayM": 29.68
     },
     "ASST": {
@@ -3767,13 +3767,13 @@
       "prefTicker": "SATA",
       "asset": "BTC",
       "accent": "#4c9fff",
-      "stockPrice": 11.55,
-      "dayChangePct": -3.55,
+      "stockPrice": 11.06,
+      "dayChangePct": -7.68,
       "sharesOutstanding": 84.1,
       "betaBtc": 1.33,
       "week52Low": 7.16,
       "week52High": 178.2,
-      "prefPrice": 96.48,
+      "prefPrice": 95.5,
       "holdings": 20000,
       "pctSupply": 0.0952,
       "netChangeYtd": 12373,
@@ -3791,12 +3791,12 @@
       "satsPer100": 81000,
       "mnav": 1.18,
       "cebeMnav": 1.88,
-      "cash": 199,
+      "cash": 198,
       "seniorDebt": 0,
       "prefNotional": 783,
       "annualObligations": 102,
       "staking": 0,
-      "prefChangePct": 1.13,
+      "prefChangePct": 0.1,
       "yearEnd": {
         "2025": 7627
       },
@@ -3811,7 +3811,7 @@
       "capStructAsOf": "2026-06-18 (8-K)",
       "dilutedShares": 113.4,
       "marketCapBasic": 925,
-      "navPremiumBasic": 0.76,
+      "navPremiumBasic": 0.733,
       "treasuryDate": "2026-07-24",
       "bpsHistory": {
         "dates": [
@@ -4166,7 +4166,7 @@
         "dtcLive": 8.19
       },
       "daysToCover": 6.9,
-      "prefMarket": 755,
+      "prefMarket": 748,
       "prefHistory": {
         "dates": [
           "Nov 6",
@@ -4715,7 +4715,7 @@
           96.58,
           96.76,
           95.4,
-          96.31
+          95.5
         ],
         "notional": [
           null,
@@ -5324,7 +5324,7 @@
           11.49,
           12.19,
           11.98,
-          11.55
+          11.06
         ],
         "mnav": [
           1.172,
@@ -5536,7 +5536,7 @@
           1.187,
           1.264,
           1.247,
-          1.217
+          1.194
         ],
         "net": [
           1.214,
@@ -5748,7 +5748,7 @@
           1.339,
           1.488,
           1.456,
-          1.4
+          1.361
         ]
       },
       "cashUsd": 154.0,
@@ -5873,12 +5873,12 @@
           1.35,
           4.71
         ],
-        "dtcLive": 6.5
+        "dtcLive": 6.38
       },
       "borrowFee": {
         "pct": 0.89,
         "avail": 1100000,
-        "asOf": "2026-07-29 15:37:21"
+        "asOf": "2026-07-29 16:24:13"
       },
       "borrowFeeHist": {
         "iso": [
@@ -5899,7 +5899,7 @@
       "prefBorrowFee": {
         "pct": 46.27,
         "avail": 20000,
-        "asOf": "2026-07-29 15:37:21"
+        "asOf": "2026-07-29 16:24:13"
       },
       "prefBorrowFeeHist": {
         "iso": [
@@ -7023,7 +7023,7 @@
       91.67,
       98.65,
       96.16,
-      98.39
+      93.33
     ],
     "ASST": [
       67.6,
@@ -7390,7 +7390,7 @@
       11.49,
       12.19,
       11.98,
-      11.55
+      11.06
     ]
   },
   "weekly": {
