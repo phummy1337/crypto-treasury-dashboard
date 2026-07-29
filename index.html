@@ -1789,19 +1789,32 @@ async function shareCard(){
 
 function initCalc(){
   if(!document.getElementById("calc-out")) return;
-  const setTab = tab => {
+  // Tab routing owns ONLY the #calc hash. Section anchors (#valuation etc.) must
+  // pass straight through to the browser — routing them as "not calc" used to
+  // scroll to top and strip the hash, which broke every section-nav link.
+  const isCalcHash = () => /^#calc(ulator)?$/i.test(location.hash);
+  const setTab = (tab, opts={}) => {
+    const changing = document.body.classList.contains("tab-calc") !== (tab==="calc");
     document.querySelectorAll(".tabbtn").forEach(x=>x.classList.toggle("active", x.dataset.tab===tab));
     document.body.classList.toggle("tab-calc", tab==="calc");
-    window.scrollTo(0,0);
-    if(tab==="calc") runCalc();   // re-render the chart once visible
-    const want = tab==="calc" ? "#calc" : "";
-    if(location.hash !== want)
-      try{ history.replaceState(null, "", location.pathname + want); }catch(e){}
+    if(changing){
+      window.scrollTo(0,0);
+      if(tab==="calc") runCalc();   // re-render the chart once visible
+    }
+    if(opts.writeHash){             // only tab clicks rewrite the hash
+      const want = tab==="calc" ? "#calc" : "";
+      if(location.hash !== want && (want || isCalcHash()))
+        try{ history.replaceState(null, "", location.pathname + want); }catch(e){}
+    }
   };
-  document.querySelectorAll(".tabbtn").forEach(b => b.addEventListener("click", () => setTab(b.dataset.tab)));
+  document.querySelectorAll(".tabbtn").forEach(b =>
+    b.addEventListener("click", () => setTab(b.dataset.tab, {writeHash:true})));
   // deep link: /#calc or /#calculator (the /calculator path redirects here)
-  const hashTab = () => /^#calc(ulator)?$/i.test(location.hash) ? "calc" : "dash";
-  window.addEventListener("hashchange", () => setTab(hashTab()));
+  window.addEventListener("hashchange", () => {
+    if(isCalcHash()) setTab("calc");
+    else if(!location.hash && document.body.classList.contains("tab-calc")) setTab("dash");
+    // any other hash is a section anchor — leave it to the browser
+  });
   const setDefaults = () => {
     const o = DATA.companies[calcCo];
     document.getElementById("ci-rate").value = calcCo==="MSTR" ? 12 : 13;
@@ -1832,7 +1845,7 @@ function initCalc(){
   document.getElementById("ci-share").addEventListener("click", shareCard);
   setDefaults();
   runCalc();
-  if(hashTab()==="calc") setTab("calc");   // arrived via /calculator or /#calc
+  if(isCalcHash()) setTab("calc");   // arrived via /calculator or /#calc
 }
 
 // real-time equity layer: the tracker's light feed (CORS-open, ~140KB) carries live
