@@ -1,9 +1,9 @@
 {
   "asOf": "2026-07-31",
   "priceAsOf": "2026-07-31",
-  "btcPriceUsd": 62956,
+  "btcPriceUsd": 62882,
   "btcSupply": 21000000,
-  "btcCirculating": 20063884,
+  "btcCirculating": 20063906,
   "companies": {
     "MSTR": {
       "name": "Strategy",
@@ -26,7 +26,7 @@
       "btcPerWeek": 7300,
       "avgCost": 75476,
       "satsPerShareBasic": 219396,
-      "satsPerShareDiluted": 203678,
+      "satsPerShareDiluted": 203683,
       "btcYieldYtd": 7.8,
       "btcYieldQtd": -0.3,
       "btcGain": null,
@@ -3736,7 +3736,7 @@
       "borrowFee": {
         "pct": 0.29,
         "avail": 8900000,
-        "asOf": "2026-07-31 16:23:45"
+        "asOf": "2026-07-31 16:55:06"
       },
       "borrowFeeHist": {
         "iso": [
@@ -3761,7 +3761,7 @@
       "prefBorrowFee": {
         "pct": 0.83,
         "avail": 3400000,
-        "asOf": "2026-07-31 16:23:45"
+        "asOf": "2026-07-31 16:55:06"
       },
       "prefBorrowFeeHist": {
         "iso": [
@@ -3784,7 +3784,15 @@
         ]
       },
       "assumedDilutedShares": 414.27,
-      "_dilOverlayM": 29.68
+      "_dilOverlayM": 29.68,
+      "netSatsPerShare": 141656,
+      "netMnavPub": 1.0465,
+      "amplificationPub": 1.5326,
+      "breakevenArrPub": 3.3157,
+      "hurdleArrPub": 10.7933,
+      "floorArrPub": -11.2282,
+      "creditDurationPub": 5.8827,
+      "netDilutedShares": 388.65
     },
     "ASST": {
       "name": "Strive",
@@ -5792,7 +5800,7 @@
           1.456,
           1.342,
           1.416,
-          1.388
+          1.389
         ]
       },
       "cashUsd": 154.0,
@@ -5922,7 +5930,7 @@
       "borrowFee": {
         "pct": 0.89,
         "avail": 1000000,
-        "asOf": "2026-07-31 16:23:45"
+        "asOf": "2026-07-31 16:55:06"
       },
       "borrowFeeHist": {
         "iso": [
@@ -5947,7 +5955,7 @@
       "prefBorrowFee": {
         "pct": 38.2,
         "avail": 10000,
-        "asOf": "2026-07-31 16:23:45"
+        "asOf": "2026-07-31 16:55:06"
       },
       "prefBorrowFeeHist": {
         "iso": [
@@ -5970,7 +5978,9 @@
         ]
       },
       "_dilOverlayM": 2.7083,
-      "assumedDilutedShares": 86.81
+      "assumedDilutedShares": 86.81,
+      "netSatsPerShare": 12340,
+      "netDilutedShares": 86.81
     }
   },
   "stockHistory": {

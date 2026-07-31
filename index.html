@@ -803,10 +803,10 @@ const METRIC_DEFS = {
     m:"The paper return on the treasury: whether the stack is in profit at today's price."},
   "Unrealized P/L": {c:"(Live BTC price − average cost) × holdings.",
     m:"The dollar gain or loss embedded in the treasury right now."},
-  "BTC per Share (Diluted)": {c:"Bitcoin held ÷ effective diluted shares, in satoshis. Effective diluted = basic shares plus dilution the issuer counts as live, excluding instruments struck well out of the money — Strive leaves out 26.6M warrants struck at $27 against a ~$12 stock, while Strategy has no such exclusion so its assumed and effective counts coincide. Rebased here onto the live share count rather than the last filing.",
-    m:"The headline 'what does one share own' number, and the one that reconciles with each company's own site. It counts dilution that would actually convert at today's prices, so it is stricter than basic without pretending far out-of-the-money paper is real stock."},
-  "BTC per Share (Basic)": {c:"Bitcoin held ÷ basic shares outstanding, in satoshis — no convertible dilution assumed.",
-    m:"The pure accumulation view: did buying outpace common-share issuance? Always higher than the diluted figure, so read it as the optimistic bookend rather than the number to compare against strategy.com."},
+  "BTC per Share": {c:"Bitcoin held ÷ diluted shares, in satoshis. For MSTR this is taken verbatim from strategy.com's own feed, so it always equals the figure on strategy.com/btc; for ASST it is computed on the effective diluted count Strive publishes, which excludes 26.6M warrants struck at $27 against a ~$12 stock. Hover the value for the basic figure and the full derivation.",
+    m:"What one share owns before anyone senior is paid. This is the long-horizon accumulation metric — it answers whether buying is outpacing share issuance, and it is the number each company headlines on its own site."},
+  "Net BTC per Share": {c:"Bitcoin left for common shareholders after senior claims — net reserve ÷ BTC price, spread over the same diluted share count. Net reserve is BTC plus USD reserve minus out-of-the-money convertible debt and preferred. For MSTR this comes straight from strategy.com's feed.",
+    m:"What one share owns after debt and preferred are satisfied — the shorter-horizon, more conservative read Strategy introduced in July 2026. The gap between this and BTC per Share is the drag from the credit stack: for MSTR that is roughly 30% of the gross figure, which is exactly the leverage common holders are paying a premium to access."},
   "BTC Yield — 1 Week": {c:"Percent change in BTC-per-share over the latest 8-K week.",
     m:"Whether last week's buying grew each share's bitcoin backing after any new share issuance."},
   "BTC Yield — YTD": {c:"Percent change in BTC-per-share since January 1.",
@@ -991,13 +991,17 @@ function renderPerShare(){
       ["+ in-the-money dilution", fmt((o.assumedDilutedShares||0)-o.sharesOutstanding,2)+"M"],
       ["= Effective diluted", fmt(o.assumedDilutedShares,2)+"M"],
       ["Sats / diluted share", fmt(o.satsPerShareDiluted)],
-      ["Sats / basic share", fmt(o.satsPerShareBasic)]].map(r=>r.join("~")).join("|");
+      ["Sats / basic share", fmt(o.satsPerShareBasic)],
+      ["Net sats / diluted share", fmt(o.netSatsPerShare)+" ("+fmt(o.netDilutedShares,2)+"M sh)"]].map(r=>r.join("~")).join("|");
   const bpsCell = o => !o.satsPerShareDiluted ? fmt(o.satsPerShareBasic)
     : `<span class="evhint" data-title="Sats per Share" data-rows="${bpsRows(o)}">${fmt(o.satsPerShareDiluted)}</span>`;
-  h += row({label:"BTC per Share (Diluted)", sub:"effective basis, as each issuer publishes",
+  h += row({label:"BTC per Share", sub:"sats · diluted, as each issuer publishes",
     MSTR:bpsCell(M), ASST:bpsCell(A)});
-  h += row({label:"BTC per Share (Basic)", sub:"pure accumulation view",
-    MSTR:fmt(M.satsPerShareBasic), ASST:fmt(A.satsPerShareBasic)});
+  // live: net reserve moves with BTC, so recompute rather than showing a frozen snapshot
+  const netSats = o => { const p=netParts(o), n=o.netDilutedShares||p.shares;
+    return (p.netReserve>0 && btcPrice && n) ? Math.round(p.netReserve*1e8/(btcPrice*n)) : o.netSatsPerShare; };
+  h += row({label:"Net BTC per Share", sub:"sats · after senior claims",
+    MSTR:fmt(netSats(M)), ASST:fmt(netSats(A))});
   h += row({label:"BTC Yield — 1 Week", sub:"latest 8-K week", MSTR:pct(wyM), ASST:pct(wyA),
     cls:{MSTR:cls(wyM),ASST:cls(wyA)}, betterFor: (wyA!=null&&wyM!=null&&wyA>wyM)?"ASST":"MSTR"});
   h += row({label:"BTC Yield — YTD", sub:"since Jan 1", MSTR:pct(M.btcYieldYtd), ASST:pct(A.btcYieldYtd),

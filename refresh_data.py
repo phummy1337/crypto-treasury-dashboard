@@ -98,6 +98,7 @@ def fetch_btc_market(data):
         price = j["market_data"]["current_price"]["usd"]
         circ = j["market_data"]["circulating_supply"]
         data["btcPriceUsd"] = round(price, 2)
+        _BTC_PX["usd"] = price
         data["priceAsOf"] = datetime.date.today().isoformat()
         if circ:
             data["btcCirculating"] = int(circ)
@@ -1272,13 +1273,22 @@ def fetch_short_interest(data):
 
 # live KPI snapshot from strategy.com, shared with the history builder
 _KPI = {}
+# live BTC price, shared with the per-share helper
+_BTC_PX = {}
 
 
 def _apply_per_share(co, tk):
     """Recompute sats-per-share on the freshest basic count we have.
-    Basic = shares outstanding; assumed diluted = basic + the structural dilution
-    overlay (all converts + convertible preferred, moneyness-agnostic), which is
-    the denominator strategy.com publishes."""
+
+    Three denominators, matching what the issuers publish:
+      basic     — shares outstanding
+      diluted   — basic + effective dilution overlay; this is "BTC Per Share" on
+                  strategy.com and "Sats Per Diluted Share" on treasury.strive.com
+      net       — bitcoin left for common AFTER senior claims, per diluted share;
+                  strategy.com's "Net BTC Per Share". Uses the same diluted count.
+    For MSTR the first two are overwritten with strategy.com's own published
+    figures in fetch_strategy_kpi, so we never drift from the source.
+    """
     live = (_KPI.get(tk) or {}).get("sharesM") or co.get("sharesOutstanding")
     overlay = co.get("_dilOverlayM") or 0.0
     if not (live and co.get("holdings")):
@@ -1287,6 +1297,16 @@ def _apply_per_share(co, tk):
     co["satsPerShareBasic"] = round(sats / (live * 1e6))
     co["assumedDilutedShares"] = round(live + overlay, 2)
     co["satsPerShareDiluted"] = round(sats / ((live + overlay) * 1e6))
+    # Net BTC per share uses a NARROWER denominator than the gross figure:
+    # fully diluted (out-of-the-money converts excluded) rather than assumed
+    # diluted. For MSTR that is 388.65M vs 414.26M; for ASST the effective count
+    # already excludes its out-of-the-money warrants, so the two coincide.
+    co["netDilutedShares"] = round(live + overlay, 2)
+    btc = _BTC_PX.get("usd") or 0
+    net_res = (co["holdings"] * btc / 1e6) + (co.get("cash") or 0) \
+        - (co.get("seniorDebt") or 0) - (co.get("prefNotional") or 0)
+    if btc and net_res > 0:
+        co["netSatsPerShare"] = round((net_res * 1e6 / btc) * 1e8 / (co["netDilutedShares"] * 1e6))
 
 
 def fetch_strategy_kpi(data):
@@ -1312,6 +1332,28 @@ def fetch_strategy_kpi(data):
             co["cash"] = cash
         _KPI["MSTR"] = {"sharesM": co["sharesOutstanding"], "debt": round(debt), "cash": cash}
         _apply_per_share(co, "MSTR")      # rebase per-share onto the live count
+        # Strategy publishes BTC-per-share and Net-BTC-per-share itself; take those
+        # verbatim so our headline can never drift from strategy.com/btc.
+        try:
+            r = (get_json("https://api.strategy.com/btc/bitcoinKpis") or {}).get("results") or {}
+            if r.get("satsPerShare"):
+                co["satsPerShareDiluted"] = round(float(r["satsPerShare"]))
+            if r.get("netSatsPerShare") and r.get("netBtcReserve") and r.get("ufPrice"):
+                co["netSatsPerShare"] = round(float(r["netSatsPerShare"]))
+                # back out the fully-diluted count they divide by, so the frontend
+                # can keep the figure live as BTC moves instead of freezing it
+                net_btc = float(r["netBtcReserve"]) / float(r["ufPrice"])
+                co["netDilutedShares"] = round(net_btc * 1e8 / float(r["netSatsPerShare"]) / 1e6, 2)
+            for src, dst in (("mNav", "netMnavPub"), ("amplification", "amplificationPub"),
+                             ("btcBreakevenArr", "breakevenArrPub"),
+                             ("bitcoinHurdleArr", "hurdleArrPub"),
+                             ("btcFailureArr", "floorArrPub"), ("totalDuration", "creditDurationPub")):
+                if r.get(src) is not None:
+                    co[dst] = round(float(r[src]), 4)
+            log(f"[strategy.com] MSTR published: {co['satsPerShareDiluted']:,} sats/sh, "
+                f"net {co.get('netSatsPerShare',0):,} sats/sh, mNAV {co.get('netMnavPub')}")
+        except Exception as e:
+            log(f"[skip] strategy.com bitcoinKpis: {e} — using our own per-share math")
         log(f"[strategy.com] MSTR: {co['sharesOutstanding']}M sh, debt ${debt:,.0f}M, "
             f"USD reserve ${cash:,}M, {co.get('satsPerShareDiluted','?'):,} sats/sh diluted")
     except Exception as e:
