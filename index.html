@@ -787,8 +787,8 @@ const METRIC_DEFS = {
     m:"The full preferred claim sitting senior to common — the 'digital credit' layer both companies fund themselves with."},
   "BTC Duration": {c:"BTC reserve (holdings × live BTC price) ÷ annual obligations, in years — how long the bitcoin stack alone could fund every dividend and coupon at today's marks.",
     m:"The bitcoin leg of staying power. It moves with the BTC price: a drawdown shortens it exactly when the obligations feel heaviest. Add USD Duration for the total figure shown in the Valuation section."},
-  "USD Duration": {c:"USD reserve ÷ annual obligations, in years — how long the cash alone covers the dividends and interest without touching a single coin.",
-    m:"The cushion that decides whether a bear market forces bitcoin sales. Strategy's stated policy is to pre-fund obligations here precisely so the BTC side never has to be tapped at the bottom; ~2 years is their current posture."},
+  "USD Duration": {c:"True dollar reserve ÷ annual obligations, in years. For ASST this deliberately EXCLUDES the ~$45M of STRC preferred Strive holds — that position is counted in total-reserve metrics (matching Strive's own math) but it is BTC-linked paper, not dollars; hover the ASST value for the blended figure.",
+    m:"The cushion that decides whether a bear market forces bitcoin sales — so it should only count assets that hold value in that exact scenario. A reserve parked in another BTC treasury company's preferred is weakest at precisely the moment it's needed, which is why the headline here is stricter than the issuer's blended number."},
   "Annual Obligations": {c:"Each preferred series' notional × its dividend rate, plus convertible-note coupons.",
     m:"The fixed yearly cash cost of the capital structure — what must be paid out before common shareholders see anything."},
   "Total BTC Holdings": {c:"Total bitcoin per the latest weekly 8-K; hover the value for the year-by-year path.",
@@ -935,11 +935,23 @@ function renderCompany(){
   h += row({label:"Annual Obligations", MSTR:capFmt(M.annualObligations), ASST:capFmt(A.annualObligations)});
   // duration split, per strategy.com: how many years each reserve alone covers the obligations
   const btcDur = o => o.annualObligations>0 ? o.holdings*btcPrice/1e6/o.annualObligations : null;
-  const usdDur = o => o.annualObligations>0 ? o.cash/o.annualObligations : null;
   h += row({label:"BTC Duration", sub:"BTC reserve ÷ obligations", MSTR:fmt(btcDur(M),1)+" yrs", ASST:fmt(btcDur(A),1)+" yrs",
     betterFor: btcDur(M)>btcDur(A)?"MSTR":"ASST"});
-  h += row({label:"USD Duration", sub:"USD reserve ÷ obligations", MSTR:fmt(usdDur(M),1)+" yrs", ASST:fmt(usdDur(A),1)+" yrs",
-    betterFor: usdDur(M)>usdDur(A)?"MSTR":"ASST"});
+  // "USD" means dollars. ASST parks part of its reserve in STRC (BTC-linked paper,
+  // marked live at STRC's price) — headline only true dollars, blend in the hover.
+  const usdOnlyA = A.cashUsd != null ? A.cashUsd : A.cash;
+  const strcValA = (A.strcShares && M.prefPrice) ? A.strcShares*M.prefPrice/1e6 : 0;
+  const usdDurM = M.cash/M.annualObligations, usdDurA = usdOnlyA/A.annualObligations;
+  const asstUsdCell = strcValA > 0.5
+    ? `<span class="evhint" data-title="ASST reserve composition" data-rows="${[
+        ["True USD", "$"+fmt(usdOnlyA)+"M → "+fmt(usdDurA,1)+" yrs"],
+        ["+ STRC held ("+fmt(A.strcShares/1e3)+"k sh @ $"+fmt(M.prefPrice,2)+")", "$"+fmt(strcValA)+"M"],
+        ["= Blended reserve", "$"+fmt(usdOnlyA+strcValA)+"M → "+fmt((usdOnlyA+strcValA)/A.annualObligations,1)+" yrs"],
+        ["Caveat", "STRC is BTC-linked paper — weakest exactly when the reserve is needed"]
+      ].map(r=>r.join("~")).join("|")}">${fmt(usdDurA,1)} yrs</span>`
+    : fmt(usdDurA,1)+" yrs";
+  h += row({label:"USD Duration", sub:"true dollars ÷ obligations", MSTR:fmt(usdDurM,1)+" yrs", ASST:asstUsdCell,
+    betterFor: usdDurM>usdDurA?"MSTR":"ASST"});
   document.getElementById("grid-company").innerHTML = h;
 }
 
