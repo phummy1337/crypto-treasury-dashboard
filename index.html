@@ -484,12 +484,12 @@
     <div class="grid" id="grid-pershare"></div>
     <div class="charts">
       <div class="chartcard">
-        <h3><span class="dot" style="background:var(--mstr)"></span>MSTR — BTC per Share</h3>
+        <h3><span class="dot" style="background:var(--mstr)"></span>MSTR — Sats per Share</h3>
         <div class="ch-sub">sats / share over time · basic shares</div>
         <div class="chartwrap"><canvas id="ch-bps-MSTR"></canvas></div>
       </div>
       <div class="chartcard">
-        <h3><span class="dot" style="background:var(--asst)"></span>ASST — BTC per Share</h3>
+        <h3><span class="dot" style="background:var(--asst)"></span>ASST — Sats per Share</h3>
         <div class="ch-sub">sats / share over time · basic shares</div>
         <div class="chartwrap"><canvas id="ch-bps-ASST"></canvas></div>
       </div>
@@ -759,6 +759,8 @@ const METRIC_DEFS = {
     m:"The bitcoin value genuinely attributable to common equity once everyone senior has been paid. This is the denominator common shareholders are actually buying, and it's what makes leverage cut both ways: it grows faster than bitcoin on the way up and shrinks faster on the way down."},
   "Amplification": {c:"BTC reserve ÷ net reserve.",
     m:"How much the residual moves for a given move in bitcoin. At 1.5×, a 20% rise in bitcoin lifts net bitcoin-per-share roughly 30% — that's the leverage common holders are paying a premium to access. It rises as bitcoin falls (the fixed claims eat a bigger share) and decays as bitcoin rises unless the company keeps issuing preferred."},
+  "BTC Hurdle Rate": {c:"The effective annual cost of the credit stack. MSTR: taken from strategy.com's published figure, which uses the option-adjusted financing cost of the converts, not just cash coupons. ASST: annual SATA dividends ÷ preferred notional — no converts, so no option adjustment is needed.",
+    m:"The referee between the gross and net per-share figures. If bitcoin compounds above this rate, the leverage pays for itself, the senior claims shrink relative to NAV, and your outcome converges on the gross Sats per Share. Below it, the claims eat the equity from underneath and Net Sats per Share was the number telling the truth. Compare it to your own BTC return expectation before paying any mNAV premium."},
   "Breakeven BTC Rate": {c:"Annual obligations ÷ total reserves, expressed as a percentage per year.",
     m:"The rate bitcoin has to appreciate for capital gains alone to cover every dividend and interest payment. Above this rate the structure funds itself indefinitely without selling coin or issuing stock; below it, the obligations have to come from somewhere else."},
   "Stock Price": {c:"Latest common-share price from the strategy.com / treasury.strive.com data feed, refreshed throughout market hours.",
@@ -803,9 +805,9 @@ const METRIC_DEFS = {
     m:"The paper return on the treasury: whether the stack is in profit at today's price."},
   "Unrealized P/L": {c:"(Live BTC price − average cost) × holdings.",
     m:"The dollar gain or loss embedded in the treasury right now."},
-  "BTC per Share": {c:"Bitcoin held ÷ diluted shares, in satoshis. For MSTR this is taken verbatim from strategy.com's own feed, so it always equals the figure on strategy.com/btc; for ASST it is computed on the effective diluted count Strive publishes, which excludes 26.6M warrants struck at $27 against a ~$12 stock. Hover the value for the basic figure and the full derivation.",
+  "Sats per Share": {c:"Bitcoin held ÷ diluted shares, in satoshis. For MSTR this is taken verbatim from strategy.com's own feed, so it always equals the figure on strategy.com/btc; for ASST it is computed on the effective diluted count Strive publishes, which excludes 26.6M warrants struck at $27 against a ~$12 stock. Hover the value for the basic figure and the full derivation.",
     m:"What one share owns before anyone senior is paid. This is the long-horizon accumulation metric — it answers whether buying is outpacing share issuance, and it is the number each company headlines on its own site."},
-  "Net BTC per Share": {c:"Bitcoin left for common shareholders after senior claims — net reserve ÷ BTC price, spread over the same diluted share count. Net reserve is BTC plus USD reserve minus out-of-the-money convertible debt and preferred. For MSTR this comes straight from strategy.com's feed.",
+  "Net Sats per Share": {c:"Bitcoin left for common shareholders after senior claims — net reserve ÷ BTC price, spread over the same diluted share count. Net reserve is BTC plus USD reserve minus out-of-the-money convertible debt and preferred. For MSTR this comes straight from strategy.com's feed.",
     m:"What one share owns after debt and preferred are satisfied — the shorter-horizon, more conservative read Strategy introduced in July 2026. The gap between this and BTC per Share is the drag from the credit stack: for MSTR that is roughly 30% of the gross figure, which is exactly the leverage common holders are paying a premium to access."},
   "BTC Yield — 1 Week": {c:"Percent change in BTC-per-share over the latest 8-K week.",
     m:"Whether last week's buying grew each share's bitcoin backing after any new share issuance."},
@@ -995,12 +997,12 @@ function renderPerShare(){
       ["Net sats / diluted share", fmt(o.netSatsPerShare)+" ("+fmt(o.netDilutedShares,2)+"M sh)"]].map(r=>r.join("~")).join("|");
   const bpsCell = o => !o.satsPerShareDiluted ? fmt(o.satsPerShareBasic)
     : `<span class="evhint" data-title="Sats per Share" data-rows="${bpsRows(o)}">${fmt(o.satsPerShareDiluted)}</span>`;
-  h += row({label:"BTC per Share", sub:"sats · diluted, as each issuer publishes",
+  h += row({label:"Sats per Share", sub:"diluted, as each issuer publishes",
     MSTR:bpsCell(M), ASST:bpsCell(A)});
   // live: net reserve moves with BTC, so recompute rather than showing a frozen snapshot
   const netSats = o => { const p=netParts(o), n=o.netDilutedShares||p.shares;
     return (p.netReserve>0 && btcPrice && n) ? Math.round(p.netReserve*1e8/(btcPrice*n)) : o.netSatsPerShare; };
-  h += row({label:"Net BTC per Share", sub:"sats · after senior claims",
+  h += row({label:"Net Sats per Share", sub:"after senior claims",
     MSTR:fmt(netSats(M)), ASST:fmt(netSats(A))});
   h += row({label:"BTC Yield — 1 Week", sub:"latest 8-K week", MSTR:pct(wyM), ASST:pct(wyA),
     cls:{MSTR:cls(wyM),ASST:cls(wyA)}, betterFor: (wyA!=null&&wyM!=null&&wyA>wyM)?"ASST":"MSTR"});
@@ -1057,6 +1059,10 @@ function renderValuation(){
     betterFor: durY(M)>durY(A)?"MSTR":"ASST"});
   h += row({label:"Breakeven BTC Rate", sub:"obligations ÷ reserve", MSTR:fmt(brkE(M),2)+"%/yr", ASST:fmt(brkE(A),2)+"%/yr",
     betterFor: brkE(M)<brkE(A)?"MSTR":"ASST"});
+  const hurdle = o => o.hurdleArrPub != null ? o.hurdleArrPub
+    : ((o.seniorDebt+o.prefNotional)>0 ? o.annualObligations/(o.seniorDebt+o.prefNotional)*100 : null);
+  h += row({label:"BTC Hurdle Rate", sub:"effective cost of credit", MSTR:fmt(hurdle(M),2)+"%/yr", ASST:fmt(hurdle(A),2)+"%/yr",
+    betterFor: hurdle(M)<hurdle(A)?"MSTR":"ASST"});
   h += row({label:"CEBE", sub:"live", MSTR:fmt(cebeSats(M)), ASST:fmt(cebeSats(A)),
     betterFor: cebeSats(M)>cebeSats(A)?"MSTR":"ASST"});
   h += row({label:"Claims % (Drag)", sub:"live", MSTR:pct(claimsP(M)), ASST:pct(claimsP(A)),
