@@ -785,6 +785,10 @@ const METRIC_DEFS = {
     m:"The claims that rank ahead of both preferred and common if things go wrong."},
   "Preferred Equity Notional": {c:"Face (stated) value of every preferred series — $100 per share, with the EUR-denominated STRE converted at the live rate.",
     m:"The full preferred claim sitting senior to common — the 'digital credit' layer both companies fund themselves with."},
+  "BTC Duration": {c:"BTC reserve (holdings × live BTC price) ÷ annual obligations, in years — how long the bitcoin stack alone could fund every dividend and coupon at today's marks.",
+    m:"The bitcoin leg of staying power. It moves with the BTC price: a drawdown shortens it exactly when the obligations feel heaviest. Add USD Duration for the total figure shown in the Valuation section."},
+  "USD Duration": {c:"USD reserve ÷ annual obligations, in years — how long the cash alone covers the dividends and interest without touching a single coin.",
+    m:"The cushion that decides whether a bear market forces bitcoin sales. Strategy's stated policy is to pre-fund obligations here precisely so the BTC side never has to be tapped at the bottom; ~2 years is their current posture."},
   "Annual Obligations": {c:"Each preferred series' notional × its dividend rate, plus convertible-note coupons.",
     m:"The fixed yearly cash cost of the capital structure — what must be paid out before common shareholders see anything."},
   "Total BTC Holdings": {c:"Total bitcoin per the latest weekly 8-K; hover the value for the year-by-year path.",
@@ -929,6 +933,13 @@ function renderCompany(){
   h += row({label:"Senior Debt", sub:"convertible notes · hover for schedule", MSTR:debtCell(M), ASST:debtCell(A)});
   h += row({label:"Preferred Equity Notional", sub:"by series · hover for breakdown", MSTR:prefCell(M), ASST:prefCell(A)});
   h += row({label:"Annual Obligations", MSTR:capFmt(M.annualObligations), ASST:capFmt(A.annualObligations)});
+  // duration split, per strategy.com: how many years each reserve alone covers the obligations
+  const btcDur = o => o.annualObligations>0 ? o.holdings*btcPrice/1e6/o.annualObligations : null;
+  const usdDur = o => o.annualObligations>0 ? o.cash/o.annualObligations : null;
+  h += row({label:"BTC Duration", sub:"BTC reserve ÷ obligations", MSTR:fmt(btcDur(M),1)+" yrs", ASST:fmt(btcDur(A),1)+" yrs",
+    betterFor: btcDur(M)>btcDur(A)?"MSTR":"ASST"});
+  h += row({label:"USD Duration", sub:"USD reserve ÷ obligations", MSTR:fmt(usdDur(M),1)+" yrs", ASST:fmt(usdDur(A),1)+" yrs",
+    betterFor: usdDur(M)>usdDur(A)?"MSTR":"ASST"});
   document.getElementById("grid-company").innerHTML = h;
 }
 
