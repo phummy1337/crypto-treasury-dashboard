@@ -800,9 +800,9 @@ const METRIC_DEFS = {
     m:"How much bitcoin the treasury has actually added this year, net of any sales."},
   "YTD Growth (Relative)": {c:"Net YTD change ÷ holdings at the start of the year.",
     m:"Growth relative to size — a small treasury adding quickly can out-compound a giant one."},
-  "BTC Acquired / Week": {c:"Average bitcoin added per week across recent 8-K filings.",
+  "Avg. BTC Acquired / Week": {c:"Average bitcoin added per week across recent 8-K filings.",
     m:"The current pace of accumulation."},
-  "BTC Acquired / Day": {c:"The weekly pace ÷ 7.",
+  "Avg. BTC Acquired / Day": {c:"The weekly pace ÷ 7.",
     m:"The same accumulation pace, expressed per day."},
   "Avg Acquisition Cost / BTC": {c:"Aggregate purchase cost ÷ total bitcoin held, per the latest 8-K.",
     m:"The blended entry price — the bitcoin level at which the whole stack breaks even."},
@@ -980,9 +980,9 @@ function renderHoldings(){
     return (a && a.length) ? Math.round(a.reduce((x,y)=>x+y,0)/a.length) : DATA.companies[co].btcPerWeek; };
   const pwM=perWk("MSTR"), pwA=perWk("ASST");
   const wkSub = (!W.illustrative && W.MSTR) ? "avg across reported 8-K weeks" : "";
-  h += row({label:"BTC Acquired / Week", sub:wkSub, MSTR:fmt(pwM), ASST:fmt(pwA),
+  h += row({label:"Avg. BTC Acquired / Week", sub:wkSub, MSTR:fmt(pwM), ASST:fmt(pwA),
     betterFor: (pwA/A.holdings)>(pwM/M.holdings)?"ASST":"MSTR"});
-  h += row({label:"BTC Acquired / Day", MSTR:fmt(Math.round(pwM/7)), ASST:fmt(Math.round(pwA/7))});
+  h += row({label:"Avg. BTC Acquired / Day", MSTR:fmt(Math.round(pwM/7)), ASST:fmt(Math.round(pwA/7))});
   document.getElementById("grid-holdings").innerHTML = h;
 }
 function relGrowth(o){ const start=o.holdings-o.netChangeYtd; return start>0 ? o.netChangeYtd/start*100 : null; }
