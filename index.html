@@ -1936,6 +1936,7 @@ loadData().then(fetchLiveEquity).then(fetchLivePrefs);
 // schedule), so the prefs tick client-side like the commons do:
 //   STRC: strategy.com's own KPI API (real-time, CORS-open)
 //   SATA: Cboe delayed quote (15 min) via a CORS relay; falls back to cron data
+let sataRelayStrikes = 0;         // circuit breaker for the flaky SATA quote relay
 async function fetchLivePrefs(){
   let changed = false;
   try{
@@ -1949,17 +1950,26 @@ async function fetchLivePrefs(){
       changed = true;
     }
   }catch(e){}
-  try{
-    const url = "https://api.allorigins.win/raw?url=" +
-      encodeURIComponent("https://cdn.cboe.com/api/global/delayed_quotes/quotes/SATA.json");
-    const d = (await (await fetch(url, {cache:"no-store"})).json()).data;
-    const co = DATA.companies.ASST;
-    if(d && d.current_price > 0 && Math.abs(d.current_price - co.prefPrice) > 0.005){
-      co.prefPrice = Math.round(d.current_price*100)/100;
-      co.prefChangePct = Math.round(d.price_change_percent*100)/100;
-      changed = true;
-    }
-  }catch(e){}
+  // SATA has no CORS-open quote source, so it goes through a public relay that is
+  // only intermittently up. Give up for the session after a few misses rather than
+  // retrying every 60s forever — the cron refresh and the 5-min data.json repoll
+  // still keep the price current, just less often.
+  if(sataRelayStrikes < 3){
+    try{
+      const url = "https://api.allorigins.win/raw?url=" +
+        encodeURIComponent("https://cdn.cboe.com/api/global/delayed_quotes/quotes/SATA.json");
+      const d = (await (await fetch(url, {cache:"no-store"})).json()).data;
+      const co = DATA.companies.ASST;
+      if(d && d.current_price > 0){
+        sataRelayStrikes = 0;
+        if(Math.abs(d.current_price - co.prefPrice) > 0.005){
+          co.prefPrice = Math.round(d.current_price*100)/100;
+          co.prefChangePct = Math.round(d.price_change_percent*100)/100;
+          changed = true;
+        }
+      }
+    }catch(e){ sataRelayStrikes++; }
+  }
   if(changed){ renderAll(); markFresh(); }
 }
 // previous close derived from the cron snapshot (px and day-change at refresh time)
