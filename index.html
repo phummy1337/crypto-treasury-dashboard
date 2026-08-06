@@ -276,6 +276,9 @@
   .si-chip b { font-size:14.5px; font-weight:700; font-style:italic; color:#fff; }
   .si-chip b.warn { color:var(--btc); }
   .si-chip b.hot { color:#ff7a7a; }
+  .mnav-ctx { margin: 0 0 8px; }
+  .mnav-ctx .si-chip { padding: 3px 9px; font-size: 12px; }
+  .mnav-ctx .si-chip b { font-size: 13.5px; }
   .calc-out { display:grid; grid-template-columns: repeat(4, 1fr); gap: 12px; padding: 14px 18px 6px; }
   .calc-cell { border: 1px solid var(--border); border-radius: 4px; padding: 11px 13px; background: rgba(255,255,255,0.02); }
   .calc-cell .k { font-size: 11.5px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted); }
@@ -427,22 +430,20 @@
     <div class="charts">
       <div class="chartcard">
         <h3><span class="dot" style="background:var(--mstr)"></span>MSTR — Daily Close</h3>
-        <div class="ch-sub">Line: daily close (left) · Line: net mNAV (right)</div>
+        <div class="si-chips mnav-ctx" id="mnav-ctx-MSTR"></div>
         <div class="chartwrap"><canvas id="ch-si-MSTR"></canvas></div>
       </div>
       <div class="chartcard">
         <h3><span class="dot" style="background:var(--asst)"></span>ASST — Daily Close</h3>
-        <div class="ch-sub">Line: daily close since Jan 1, 2026 (left) · Line: net mNAV (right)</div>
+        <div class="si-chips mnav-ctx" id="mnav-ctx-ASST"></div>
         <div class="chartwrap"><canvas id="ch-si-ASST"></canvas></div>
       </div>
       <div class="chartcard">
         <h3><span class="dot" style="background:var(--mstr)"></span>STRC — Preferred Daily Close</h3>
-        <div class="ch-sub">Line: daily close (left) · Steps: shares outstanding (right)</div>
         <div class="chartwrap"><canvas id="ch-pref-MSTR"></canvas></div>
       </div>
       <div class="chartcard">
         <h3><span class="dot" style="background:var(--asst)"></span>SATA — Preferred Daily Close</h3>
-        <div class="ch-sub">Line: daily close (left) · Steps: shares outstanding (right)</div>
         <div class="chartwrap"><canvas id="ch-pref-ASST"></canvas></div>
       </div>
     </div>
@@ -1308,6 +1309,24 @@ function renderCharts(){
         {label:"Net mNAV", data:mn, yAxisID:"yM", borderColor:"rgba(255,255,255,0.85)",
           backgroundColor:"transparent", borderWidth:2, tension:.2, pointRadius:0, fill:false, order:2} ]},
         options: siOpts });
+
+      // trailing net-mNAV averages, so today's multiple has historical context.
+      // Always computed on the FULL series, not the visible range.
+      const ctx = document.getElementById("mnav-ctx-"+co);
+      if(ctx){
+        const full = (mhs.net || mhs.mnav).filter(v=>v!=null);
+        const live = netMnav(DATA.companies[co]);
+        const avg = n => { const w = full.slice(-Math.round(n*PPM_DAY));
+          return w.length >= Math.min(5, n*PPM_DAY*0.5) ? w.reduce((a,b)=>a+b,0)/w.length : null; };
+        const cell = (lbl, v) => v==null ? "" :
+          `<span class="si-chip" title="Average net mNAV over the trailing ${lbl}${
+            live!=null ? ` — today is ${((live/v-1)*100).toFixed(0)}% ${live>=v?"above":"below"} it` : ""}">`+
+          `${lbl} <b class="${live!=null && live<v ? "" : "warn"}">${fmt(v,2)}x</b></span>`;
+        ctx.innerHTML = (live!=null
+            ? `<span class="si-chip" title="Net mNAV right now, live with the BTC price">now <b>${fmt(live,2)}x</b></span>`
+            : "")
+          + cell("1M",avg(1)) + cell("3M",avg(3)) + cell("6M",avg(6)) + cell("1Y",avg(12));
+      }
     }
 
     // 4. Preferred price + shares outstanding (STRC / SATA); shares = notional / $100 par
