@@ -1316,12 +1316,16 @@ function renderCharts(){
       if(ctx){
         const full = (mhs.net || mhs.mnav).filter(v=>v!=null);
         const live = netMnav(DATA.companies[co]);
-        const avg = n => { const w = full.slice(-Math.round(n*PPM_DAY));
-          return w.length >= Math.min(5, n*PPM_DAY*0.5) ? w.reduce((a,b)=>a+b,0)/w.length : null; };
-        const cell = (lbl, v) => v==null ? "" :
-          `<span class="si-chip" title="Average net mNAV over the trailing ${lbl}${
-            live!=null ? ` — today is ${((live/v-1)*100).toFixed(0)}% ${live>=v?"above":"below"} it` : ""}">`+
-          `${lbl} <b class="${live!=null && live<v ? "" : "warn"}">${fmt(v,2)}x</b></span>`;
+        // only report a window the history actually covers — ASST's treasury began
+        // Sep 2025, so a "1Y" average would be a 10-month average wearing the wrong label
+        const avg = n => { const need = Math.round(n*PPM_DAY);
+          if(full.length < need) return null;
+          const w = full.slice(-need); return w.reduce((a,b)=>a+b,0)/w.length; };
+        const cell = (lbl, v) => v==null
+          ? `<span class="si-chip" title="Not enough history — the ${lbl} window predates this treasury strategy">${lbl} <b style="color:var(--faint)">—</b></span>`
+          : `<span class="si-chip" title="Average net mNAV over the trailing ${lbl}${
+              live!=null ? ` — today is ${Math.abs((live/v-1)*100).toFixed(0)}% ${live>=v?"above":"below"} it` : ""}">`+
+            `${lbl} <b class="${live!=null && live<v ? "" : "warn"}">${fmt(v,2)}x</b></span>`;
         ctx.innerHTML = (live!=null
             ? `<span class="si-chip" title="Net mNAV right now, live with the BTC price">now <b>${fmt(live,2)}x</b></span>`
             : "")
