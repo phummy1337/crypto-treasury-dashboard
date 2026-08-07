@@ -1,9 +1,9 @@
 {
   "asOf": "2026-08-07",
   "priceAsOf": "2026-08-07",
-  "btcPriceUsd": 64933,
+  "btcPriceUsd": 64861,
   "btcSupply": 21000000,
-  "btcCirculating": 20067118,
+  "btcCirculating": 20067156,
   "companies": {
     "MSTR": {
       "name": "Strategy",
@@ -136,7 +136,7 @@
       "capStructAsOf": "2026-03-31 (10-Q)",
       "dilutedShares": 417.27,
       "marketCapBasic": 29540,
-      "navPremiumBasic": 0.709,
+      "navPremiumBasic": 0.71,
       "treasuryDate": "2026-08-03",
       "bpsHistory": {
         "dates": [
@@ -3168,7 +3168,7 @@
           1.04,
           1.036,
           1.03,
-          1.042
+          1.043
         ],
         "net": [
           1.564,
@@ -3481,7 +3481,7 @@
           1.059,
           1.053,
           1.045,
-          1.062
+          1.064
         ]
       },
       "strcNotionalSteps": [
@@ -3772,7 +3772,7 @@
       "borrowFee": {
         "pct": 0.27,
         "avail": 10000000,
-        "asOf": "2026-08-07 16:55:42"
+        "asOf": "2026-08-07 18:45:30"
       },
       "borrowFeeHist": {
         "iso": [
@@ -3807,7 +3807,7 @@
       "prefBorrowFee": {
         "pct": 0.39,
         "avail": 4800000,
-        "asOf": "2026-08-07 16:55:42"
+        "asOf": "2026-08-07 18:45:30"
       },
       "prefBorrowFeeHist": {
         "iso": [
@@ -3841,12 +3841,12 @@
       },
       "assumedDilutedShares": 417.26,
       "_dilOverlayM": 29.654,
-      "netSatsPerShare": 143838,
+      "netSatsPerShare": 143771,
       "netMnavPub": 1.0713,
-      "amplificationPub": 1.4949,
-      "breakevenArrPub": 3.1981,
-      "hurdleArrPub": 10.779,
-      "floorArrPub": -11.1513,
+      "amplificationPub": 1.4956,
+      "breakevenArrPub": 3.2011,
+      "hurdleArrPub": 10.7781,
+      "floorArrPub": -11.1363,
       "creditDurationPub": 6.2052,
       "netDilutedShares": 391.66
     },
@@ -3901,7 +3901,7 @@
       "capStructAsOf": "2026-06-18 (8-K)",
       "dilutedShares": 113.4,
       "marketCapBasic": 925,
-      "navPremiumBasic": 0.808,
+      "navPremiumBasic": 0.809,
       "treasuryDate": "2026-07-31",
       "bpsHistory": {
         "dates": [
@@ -5673,7 +5673,7 @@
           1.273,
           1.264,
           1.262,
-          1.26
+          1.261
         ],
         "net": [
           1.214,
@@ -5894,7 +5894,7 @@
           1.503,
           1.483,
           1.481,
-          1.473
+          1.475
         ]
       },
       "cashUsd": 151.3,
@@ -6024,7 +6024,7 @@
       "borrowFee": {
         "pct": 0.89,
         "avail": 2100000,
-        "asOf": "2026-08-07 16:55:42"
+        "asOf": "2026-08-07 18:45:30"
       },
       "borrowFeeHist": {
         "iso": [
@@ -6057,9 +6057,9 @@
         ]
       },
       "prefBorrowFee": {
-        "pct": 33.09,
+        "pct": 33.84,
         "avail": 75000,
-        "asOf": "2026-08-07 16:55:42"
+        "asOf": "2026-08-07 18:45:30"
       },
       "prefBorrowFeeHist": {
         "iso": [
@@ -6088,12 +6088,12 @@
           32.2,
           45.03,
           32.97,
-          33.09
+          33.84
         ]
       },
       "_dilOverlayM": 2.5942,
       "assumedDilutedShares": 86.8,
-      "netSatsPerShare": 12703,
+      "netSatsPerShare": 12691,
       "netDilutedShares": 86.8
     }
   },
