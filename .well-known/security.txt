@@ -1,0 +1,5 @@
+Contact: mailto:pete@defidevcorp.com
+Expires: 2027-08-31T00:00:00.000Z
+Preferred-Languages: en
+Canonical: https://treasurytracker.xyz/.well-known/security.txt
+Policy: https://treasurytracker.xyz/
