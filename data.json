@@ -1,7 +1,7 @@
 {
   "asOf": "2026-08-18",
   "priceAsOf": "2026-08-18",
-  "btcPriceUsd": 64590,
+  "btcPriceUsd": 64561,
   "btcSupply": 21000000,
   "btcCirculating": 20071518,
   "companies": {
@@ -3884,7 +3884,7 @@
       "borrowFee": {
         "pct": 0.29,
         "avail": 10000000,
-        "asOf": "2026-08-18 16:25:28"
+        "asOf": "2026-08-18 16:41:08"
       },
       "borrowFeeHist": {
         "iso": [
@@ -3933,7 +3933,7 @@
       "prefBorrowFee": {
         "pct": 1.09,
         "avail": 4400000,
-        "asOf": "2026-08-18 16:25:28"
+        "asOf": "2026-08-18 16:41:08"
       },
       "prefBorrowFeeHist": {
         "iso": [
@@ -3981,12 +3981,12 @@
       },
       "assumedDilutedShares": 427.32,
       "_dilOverlayM": 29.647,
-      "netSatsPerShare": 143489,
+      "netSatsPerShare": 143472,
       "netMnavPub": 0.9978,
-      "amplificationPub": 1.4581,
-      "breakevenArrPub": 3.1666,
+      "amplificationPub": 1.4583,
+      "breakevenArrPub": 3.1675,
       "hurdleArrPub": 10.7557,
-      "floorArrPub": -11.9383,
+      "floorArrPub": -11.9341,
       "creditDurationPub": 6.143,
       "netDilutedShares": 401.7
     },
@@ -6116,7 +6116,7 @@
           1.524,
           1.532,
           1.566,
-          1.513
+          1.514
         ]
       },
       "cashUsd": 154.8,
@@ -6252,7 +6252,7 @@
       "borrowFee": {
         "pct": 0.87,
         "avail": 1600000,
-        "asOf": "2026-08-18 16:25:28"
+        "asOf": "2026-08-18 16:41:08"
       },
       "borrowFeeHist": {
         "iso": [
@@ -6301,7 +6301,7 @@
       "prefBorrowFee": {
         "pct": 27.95,
         "avail": 5000,
-        "asOf": "2026-08-18 16:25:28"
+        "asOf": "2026-08-18 16:41:08"
       },
       "prefBorrowFeeHist": {
         "iso": [
@@ -6349,7 +6349,7 @@
       },
       "_dilOverlayM": 3.2658,
       "assumedDilutedShares": 89.31,
-      "netSatsPerShare": 12615,
+      "netSatsPerShare": 12593,
       "netDilutedShares": 89.31
     }
   },
