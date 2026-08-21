@@ -7,7 +7,14 @@ on:
     # off-peak minutes — GitHub delays/drops crons scheduled on :00/:30
     - cron: "40 10 * * 1-5"         # ~6:40 am ET pre-market (UTC-4)
     - cron: "7,17,27,37,47,57 13-20 * * 1-5"   # ~every 10 min during US market hours
-    - cron: "7 22 * * 5"            # Fri ~5pm EST / 6pm EDT — recapture the settled close so a late after-hours print isn't frozen all weekend
+    # Friday close capture. Requested at 4:01pm ET, but the closing auction needs a
+    # few minutes to settle (a 16:03 run caught MSTR at 118.94 vs the official
+    # 119.25), so these fire at ~4:09pm ET. GitHub is UTC-only and delays crons off
+    # :00/:30, hence two entries — 20:09 UTC is EDT, 21:09 UTC is EST. The off-season
+    # one lands ~3:09pm ET, which is harmless (market-hours cron already runs then).
+    - cron: "9 20 * * 5"            # Fri 4:09pm EDT (summer)
+    - cron: "9 21 * * 5"            # Fri 4:09pm EST (winter)
+    - cron: "7 22 * * 5"            # Fri ~5-6pm ET — safety net if the close run is delayed or drops
   workflow_dispatch:               # manual "Run workflow" button
 
 permissions:

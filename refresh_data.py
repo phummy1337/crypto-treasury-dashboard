@@ -1327,6 +1327,13 @@ def fetch_strategy_kpi(data):
         if px > 0 and mcap > 0:
             co["sharesOutstanding"] = round(mcap / px, 2)
             co["floatSharesM"] = round(co["sharesOutstanding"] - CLASS_B_SHARES_M["MSTR"], 2)
+            # strategy.com carries the official 4:00pm consolidated close; the tracker
+            # feed lags it by a few minutes after the closing auction settles
+            co["stockPrice"] = round(px, 2)
+            try:
+                co["dayChangePct"] = round(float(str(k["priceVarPerc"]).replace(",", "")), 2)
+            except Exception:
+                pass
         co["seniorDebt"] = round(debt)
         if cash > 0:
             co["cash"] = cash

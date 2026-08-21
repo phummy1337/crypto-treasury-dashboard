@@ -1930,7 +1930,11 @@ async function fetchLiveEquity(){
   }catch(e){ /* keep last refresh's values */ }
 }
 
-loadData().then(fetchLiveEquity).then(fetchLivePrefs);
+// Only overlay live quotes while the market is open. After the close, data.json
+// holds the settled 4:00pm consolidated prices (MSTR straight from strategy.com);
+// the tracker's light feed lags the closing auction by minutes and would otherwise
+// overwrite the official close with a staler intraday print.
+loadData().then(() => { if(marketOpenET()){ return fetchLiveEquity().then(fetchLivePrefs); } });
 
 // live preferred quotes — the cron only lands ~hourly (GitHub throttles its
 // schedule), so the prefs tick client-side like the commons do:
