@@ -192,6 +192,8 @@ _SHARES_HIST = {}
 # daily share volume per ticker: preferreds from the tracker's price log,
 # commons from Yahoo — used for trailing-20-day days-to-cover
 _VOL_HIST = {}
+# intraday 15-min candles per preferred ticker, for the ATM tracker
+_ATM_CANDLES = {}
 
 PREF_LABEL = {"STRC": "Stretch · {r}% var", "STRK": "Strike · {r}%", "STRF": "Strife · {r}%",
               "STRD": "Stride · {r}%", "STRE": "STRE · {r}% (EUR)", "SATA": "Strive pref · {r}%"}
@@ -289,6 +291,7 @@ def fetch_strategytracker(data):
                                for d, n in STRC_BACKFILL if d < first] + chg
                         co["strcNotionalSteps"] = [[e["effective_date"], e["notional_millions"]] for e in chg]
                     _VOL_HIST[t] = [(q["date"], q.get("volume") or 0) for q in hp]
+                    _ATM_CANDLES[t] = p.get("intradayCandles") or []
                     dts, isod, px, no = [], [], [], []
                     for q in hp:
                         dts.append(_iso_lbl(q["date"], "%b %-d"))
@@ -1395,6 +1398,133 @@ def _ce_borrow(sym):
             "asOf": r["date"]["value"]}
 
 
+# --------------------------------------------------------------------------- #
+# preferred-equity ATM tracker
+# --------------------------------------------------------------------------- #
+# These preferreds are engineered to trade at a $100 stated amount, and the ATM
+# can only issue while the stock is at/above that level. So dollar volume printed
+# at-or-above par is a proxy for how much the company could have sold, and a
+# "capture rate" maps that proxy onto what it actually sold.
+#
+# Public trackers threshold at exactly $100. That works for a preferred trading
+# clearly above par, but SATA hugs par to the cent, and a strict cutoff misses
+# most of the real issuance: for the week of Aug 14-21 2026 Strive issued 441,313
+# SATA shares (~$44.1M) while volume strictly >= $100.00 was only $10.4M (a 426%
+# implied capture, i.e. the proxy was undercounting ~4x). Volume at >= $99.95 was
+# $44.3M against that $44.1M actual — a ~100% capture. So we threshold a nickel
+# below par and calibrate the capture rate per security against the filings.
+ATM_PAR = 100.0
+ATM_THRESHOLD = 99.95          # a nickel below par — see note above
+ATM_DEFAULT_CAPTURE = 0.75     # prior when we have no confirmed week yet
+                               # (bitcointreasuries.net publishes 74.4%)
+
+
+def _atm_daily(candles):
+    """[(iso, total $vol, ATM-eligible $vol)] per session from 15-min candles."""
+    by = {}
+    for c in candles or []:
+        v = c.get("volume") or 0
+        lo, hi = c.get("low"), c.get("high")
+        if not (v and lo and hi):
+            continue
+        mid = (hi + lo) / 2
+        row = by.setdefault(c["date"], [0.0, 0.0])
+        row[0] += v * mid
+        if lo >= ATM_THRESHOLD:                       # whole bar printed at/above
+            row[1] += v * mid
+        elif hi > ATM_THRESHOLD:                      # straddles — prorate by range
+            row[1] += v * ((hi - ATM_THRESHOLD) / (hi - lo)) * ((hi + ATM_THRESHOLD) / 2)
+    return sorted((d, r[0], r[1]) for d, r in by.items())
+
+
+def _mstr_strc_atm(text):
+    """STRC row of the MSTR 8-K ATM table: shares, net proceeds ($M), capacity ($M)."""
+    per = re.search(r"During Period ([A-Z][a-z]+ \d+, \d{4}) to ([A-Z][a-z]+ \d+, \d{4})", text)
+    m = re.search(r"STRC Stock\s+([\d,]+|-|\u2014)\s+\$\s*([\d,.]+|-|\u2014)\s+"
+                  r"\$\s*([\d,.]+|-|\u2014)\s+\$\s*([\d,.]+)", text)
+    if not m:
+        return None
+    num = lambda x: 0.0 if x in ("-", "\u2014") else float(x.replace(",", ""))
+    return {"from": _pdate(per.group(1)).isoformat() if per else None,
+            "to": _pdate(per.group(2)).isoformat() if per else None,
+            "shares": int(num(m.group(1))), "proceedsM": num(m.group(3)),
+            "capacityM": num(m.group(4))}
+
+
+def _asst_sata_atm(text):
+    """SATA share count delta from the Strive 8-K weekly holdings table."""
+    per = re.search(r"As of ([A-Z][a-z]+ \d+, \d{4}) As of ([A-Z][a-z]+ \d+, \d{4})", text)
+    m = re.search(r"SATA Stock ([\d,]+) ([\d,]+)", text)
+    if not (per and m):
+        return None
+    a, b = (int(x.replace(",", "")) for x in m.groups())
+    return {"from": _pdate(per.group(1)).isoformat(), "to": _pdate(per.group(2)).isoformat(),
+            "shares": b - a, "proceedsM": round((b - a) * ATM_PAR / 1e6, 1), "capacityM": None}
+
+
+def fetch_atm(data):
+    """Live ATM issuance estimate per preferred, calibrated against the filings."""
+    btc = _BTC_PX.get("usd") or data.get("btcPriceUsd") or 0
+    for tk, doc_cik, parser in (("MSTR", "0001050446", _mstr_strc_atm),
+                                ("ASST", "0001920406", _asst_sata_atm)):
+        co = data["companies"].get(tk)
+        if not co:
+            continue
+        pref = co.get("prefTicker")
+        daily = _atm_daily(_ATM_CANDLES.get(pref))
+        if not daily:
+            log(f"[skip] ATM {pref}: no intraday candles")
+            continue
+        # newest 8-K row for this security -> confirmed issuance to calibrate against
+        confirmed = None
+        try:
+            sub = get_json(f"https://data.sec.gov/submissions/CIK{doc_cik}.json")
+            rec = sub["filings"]["recent"]
+            for i in range(len(rec["form"])):
+                if rec["form"][i] != "8-K":
+                    continue
+                url = (f"https://www.sec.gov/Archives/edgar/data/{int(doc_cik)}/"
+                       f"{rec['accessionNumber'][i].replace('-', '')}/{rec['primaryDocument'][i]}")
+                got = parser(_edgar_text(url))
+                if got and got.get("to"):
+                    confirmed = got
+                    break
+        except Exception as e:
+            log(f"[skip] ATM {pref} filing: {e}")
+        # calibrate: actual proceeds over eligible volume across the confirmed window
+        cap, basis = ATM_DEFAULT_CAPTURE, "default (no confirmed week yet)"
+        if confirmed and confirmed["from"]:
+            elig = sum(e for d, _t, e in daily if confirmed["from"] < d <= confirmed["to"])
+            if elig > 1e5 and confirmed["proceedsM"] > 0:
+                raw = confirmed["proceedsM"] * 1e6 / elig
+                cap = max(0.2, min(1.5, raw))
+                basis = (f"calibrated: ${confirmed['proceedsM']:,.1f}M issued "
+                         f"{confirmed['from']} to {confirmed['to']}")
+            elif confirmed["proceedsM"] == 0:
+                basis = f"no issuance in the week to {confirmed['to']}"
+        today = daily[-1]
+        wk = [r for r in daily if r[0] > (confirmed or {}).get("to", "")] or [today]
+        est = lambda e: (e * cap, (e * cap / btc) if btc else None)   # 0 is a real value, not "unknown"
+        t_usd, t_btc = est(today[2])
+        w_usd, w_btc = est(sum(r[2] for r in wk))
+        px = co.get("prefPrice") or 0
+        co["atm"] = {
+            "ticker": pref, "par": ATM_PAR, "threshold": ATM_THRESHOLD,
+            "status": "active" if px >= ATM_THRESHOLD else "standby",
+            "vsPar": round(px - ATM_PAR, 2) if px else None,
+            "captureRate": round(cap, 3), "captureBasis": basis,
+            "asOf": today[0],
+            "todayTotalUsd": round(today[1]), "todayEligUsd": round(today[2]),
+            "todayEstUsd": round(t_usd), "todayEstBtc": round(t_btc, 2) if t_btc is not None else None,
+            "weekEligUsd": round(sum(r[2] for r in wk)),
+            "weekEstUsd": round(w_usd), "weekEstBtc": round(w_btc, 2) if w_btc is not None else None,
+            "confirmed": confirmed,
+            "daily": [{"d": d, "tot": round(t), "elig": round(e)} for d, t, e in daily[-30:]],
+        }
+        log(f"[ATM] {pref}: {co['atm']['status']} | capture {cap:.0%} ({basis}) | "
+            f"today ${today[2]/1e6:,.1f}M eligible -> {co['atm']['todayEstBtc']} BTC est")
+
+
 def fetch_borrow_fees(data):
     """Annualized cost to short (IBKR indicative rate) for commons + preferreds.
     Also accumulates a daily history in data.json (one point per calendar day)."""
@@ -1440,6 +1570,7 @@ def main():
     fetch_strategy_kpi(data)          # re-apply: holdings clobbers cash with its own estimate
     fetch_short_interest(data)        # Nasdaq: days to cover (semi-monthly)
     fetch_borrow_fees(data)           # ChartExchange/IBKR: annualized cost to short
+    fetch_atm(data)                   # preferred ATM issuance estimate + filing calibration
     # debt schedule + preferred breakdown are parsed from the 10-Q (see notes);
     # cebe / per-share / valuation are computed live in the dashboard.
 

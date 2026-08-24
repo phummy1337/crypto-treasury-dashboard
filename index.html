@@ -271,6 +271,19 @@
   .rangechips button:hover { color: var(--text); }
   .rangechips button.active { color: #fff; border-color: rgba(255,255,255,0.45); background: rgba(255,255,255,0.06); }
   section { scroll-margin-top: 54px; }
+  /* ATM tracker */
+  .atm-pill { font-size:10.5px; font-weight:700; letter-spacing:.8px; padding:2px 7px; border-radius:3px;
+    margin-left:8px; vertical-align:middle; border:1px solid; }
+  .atm-pill.on  { color:var(--pos); border-color:rgba(52,211,153,.45); background:rgba(52,211,153,.10); }
+  .atm-pill.off { color:var(--faint); border-color:var(--border); }
+  .atm-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; padding:2px 0 10px; }
+  .atm-grid .k { font-size:11.5px; text-transform:uppercase; letter-spacing:.9px; color:var(--muted); }
+  .atm-grid .v { font-size:21px; font-weight:700; font-style:italic; margin-top:3px;
+    font-variant-numeric:tabular-nums; color:var(--text); }
+  .atm-grid .s { font-size:12px; color:var(--faint); margin-top:2px; }
+  .atm-foot { margin-top:2px; padding-bottom:4px; }
+  .atm-foot b { color:var(--text); }
+  @media (max-width:640px){ .atm-grid { grid-template-columns:repeat(2,1fr); } .atm-grid .v { font-size:18px; } }
   /* short-interest stat chips */
   .si-chips { display:flex; flex-wrap:wrap; gap:8px; margin:2px 0 10px; }
   .si-chip { display:inline-flex; align-items:baseline; gap:5px; border:1px solid var(--border);
@@ -417,7 +430,7 @@
     <div class="secnav-links">
       <a href="#company">Company</a><a href="#holdings">Holdings</a><a href="#cost">Cost</a>
       <a href="#pershare">Per-Share</a><a href="#valuation">Valuation</a><a href="#capital">Capital</a>
-      <a href="#shorts">Shorts</a><a href="#actions">Actions</a>
+      <a href="#atm">ATM</a><a href="#shorts">Shorts</a><a href="#actions">Actions</a>
     </div>
     <span class="freshness" id="freshness"><span class="livedot"></span>live<span class="fresh-ago" id="fresh-ago"></span></span>
     <div class="rangechips" id="rangechips" title="Applies to every time-series chart, so both companies show the same window">
@@ -574,7 +587,15 @@
     </div>
   </section>
 
-  <!-- 7. Short Interest -->
+  <!-- 7. ATM Tracker -->
+  <section id="atm">
+    <div class="sec-head"><h2>Preferred ATM Tracker</h2><span class="tag stub" id="tag-atm">seed data</span></div>
+    <p class="sec-note">These preferreds are engineered to trade at their $100 stated amount, and each company can only issue new shares — and buy bitcoin with the proceeds — while the stock holds at or above that level. Dollar volume printed at par is therefore a live proxy for issuance.
+      <span class="evhint" data-title="How this estimate is built" data-rows="1. Eligible volume~15-min bars with price at/above $99.95, prorated when a bar straddles it|2. Capture rate~what share of that volume was really ATM issuance|3. Calibration~capture solved from the last 8-K that disclosed actual shares issued|4. To bitcoin~estimated proceeds ÷ live BTC price|Why $99.95 not $100~SATA hugs par to the cent; a strict cutoff undercounted a confirmed \$44.1M week by ~4x|Confirmed vs estimate~the 8-K figure is fact, the intraday number is an estimate between filings">methodology&#9432;</span></p>
+    <div class="charts" id="atm-cards"></div>
+  </section>
+
+  <!-- 8. Short Interest -->
   <section id="shorts">
     <div class="sec-head"><h2>Short Interest</h2><span class="tag stub" id="tag-shorts">seed data</span></div>
     <p class="sec-note">How crowded the short side is, instrument by instrument — and what it costs to stay short.
@@ -603,7 +624,7 @@
     </div>
   </section>
 
-  <!-- 8. Company Actions -->
+  <!-- 9. Company Actions -->
   <section id="actions">
     <div class="sec-head"><h2>Company Actions</h2></div>
     <p class="sec-note">A running log of what each company actually did, week by week, straight from their SEC filings — raises, buys, sales, and dividend changes. Newest first; scroll for history.</p>
@@ -1168,6 +1189,57 @@ function renderPriceHeader(){
   set("hdr-strc-sub", chg(M.prefChangePct)+"preferred");
   set("hdr-sata-sub", chg(A.prefChangePct)+"preferred");
 }
+function renderATM(){
+  const el = document.getElementById("atm-cards"); if(!el) return;
+  const specs = [["MSTR", DATA.companies.MSTR, "#ed1946"], ["ASST", DATA.companies.ASST, "#4c9fff"]];
+  let any = false, h = "";
+  specs.forEach(([tk, o, ac]) => {
+    const a = o.atm; if(!a) return;
+    any = true;
+    const live = a.status === "active";
+    const dollars = v => v >= 1e6 ? "$"+fmt(v/1e6,1)+"M" : "$"+fmt(Math.round(v/1e3))+"k";
+    const c = a.confirmed || {};
+    // accuracy check: our estimate over the confirmed window vs what the filing said
+    const wkElig = (a.daily||[]).filter(d => c.from && d.d > c.from && d.d <= c.to)
+                                .reduce((s,d) => s + d.elig, 0);
+    const ourEst = wkElig * a.captureRate;
+    h += `<div class="chartcard">
+      <h3><span class="dot" style="background:${ac}"></span>${a.ticker} — ATM
+        <span class="atm-pill ${live?"on":"off"}">${live ? "ACTIVE" : "STANDBY"}</span></h3>
+      <div class="si-chips">
+        <span class="si-chip" title="Latest price against the $100 stated amount. The ATM can only issue at or above par.">
+          vs par <b class="${a.vsPar>=0?"":"warn"}">${a.vsPar>=0?"+":""}${fmt(a.vsPar,2)}</b></span>
+        <span class="si-chip" title="Share of the capture rate applied to eligible volume — ${a.captureBasis}">
+          capture <b>${fmt(a.captureRate*100,0)}%</b></span>
+        ${c.capacityM!=null ? `<span class="si-chip" title="Remaining ATM capacity disclosed in the latest 8-K">
+          capacity <b>$${fmt(c.capacityM/1000,1)}B</b></span>` : ""}
+      </div>
+      <div class="atm-grid">
+        <div><div class="k">Est. BTC today</div><div class="v" style="color:${ac}">${
+          a.todayEstBtc!=null ? "₿"+fmt(a.todayEstBtc,2) : "—"}</div>
+          <div class="s">${dollars(a.todayEstUsd)} est. proceeds</div></div>
+        <div><div class="k">Eligible volume today</div><div class="v">${dollars(a.todayEligUsd)}</div>
+          <div class="s">of ${dollars(a.todayTotalUsd)} traded${
+            a.todayTotalUsd>0 ? " · "+fmt(a.todayEligUsd/a.todayTotalUsd*100,0)+"%" : ""}</div></div>
+        <div><div class="k">Since last filing</div><div class="v">${
+          a.weekEstBtc!=null ? "₿"+fmt(a.weekEstBtc,2) : "—"}</div>
+          <div class="s">${dollars(a.weekEstUsd)} est. proceeds</div></div>
+        <div><div class="k">Last confirmed (8-K)</div><div class="v">${
+          c.shares!=null ? fmt(Math.round(c.shares/1e3))+"k sh" : "—"}</div>
+          <div class="s">${c.proceedsM!=null ? "$"+fmt(c.proceedsM,1)+"M · "+(c.to||"") : "awaiting filing"}</div></div>
+      </div>
+      <div class="ch-sub atm-foot">${
+        c.proceedsM > 0 && wkElig > 0
+          ? `Capture rate is solved on this window, so it is in-sample by construction: the 8-K reported <b>$${fmt(c.proceedsM,1)}M</b> issued ${c.from} → ${c.to} against ${dollars(wkElig)} of eligible volume. The next filing will be the first out-of-sample test.`
+          : live ? "No confirmed issuance in the last filing window — estimate is uncalibrated until the next 8-K."
+                 : `Below par, so the ATM cannot issue. ${tk==="MSTR" ? "Strategy has been repurchasing STRC at the discount instead." : ""}`}</div>
+    </div>`;
+  });
+  el.innerHTML = h;
+  const tag=document.getElementById("tag-atm");
+  if(tag){ tag.textContent="seed data"; tag.style.display = any ? "none" : ""; }
+}
+
 function renderActions(){
   const el = document.getElementById("grid-actions"); if(!el) return;
   const acts = DATA.actions || [];
@@ -1181,7 +1253,7 @@ function renderActions(){
   }).join("");
 }
 
-function renderAll(){ renderPriceHeader(); renderCompany(); renderHoldings(); renderCost(); renderPerShare(); renderValuation(); renderCapital(); renderActions(); if(typeof runCalc==="function") runCalc();
+function renderAll(){ renderPriceHeader(); renderCompany(); renderHoldings(); renderCost(); renderPerShare(); renderValuation(); renderCapital(); renderATM(); renderActions(); if(typeof runCalc==="function") runCalc();
   // keep every hint reachable by keyboard (re-rendered markup loses the attribute)
   document.querySelectorAll(".evhint, .defhint").forEach(el => {
     if(!el.hasAttribute("tabindex")){ el.setAttribute("tabindex","0"); el.setAttribute("role","button"); } });
