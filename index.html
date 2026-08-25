@@ -428,9 +428,9 @@
 
   <nav class="secnav" id="secnav">
     <div class="secnav-links">
-      <a href="#company">Company</a><a href="#holdings">Holdings</a><a href="#cost">Cost</a>
+      <a href="#atm">ATM</a><a href="#company">Company</a><a href="#holdings">Holdings</a><a href="#cost">Cost</a>
       <a href="#pershare">Per-Share</a><a href="#valuation">Valuation</a><a href="#capital">Capital</a>
-      <a href="#atm">ATM</a><a href="#shorts">Shorts</a><a href="#actions">Actions</a>
+      <a href="#shorts">Shorts</a><a href="#actions">Actions</a>
     </div>
     <span class="freshness" id="freshness"><span class="livedot"></span>live<span class="fresh-ago" id="fresh-ago"></span></span>
     <div class="rangechips" id="rangechips" title="Applies to every time-series chart, so both companies show the same window">
@@ -439,7 +439,16 @@
     </div>
   </nav>
 
-  <!-- 0. Company Stats -->
+  <!-- 0. Preferred ATM Tracker (lead section) -->
+  <section id="atm">
+    <div class="sec-head"><h2>Preferred ATM Tracker</h2><span class="tag stub" id="tag-atm">seed data</span></div>
+    <p class="sec-note">These preferreds are engineered to trade at their $100 stated amount, and each company can only issue new shares — and buy bitcoin with the proceeds — while the stock holds at or above that level. Dollar volume printed at par is therefore a live proxy for issuance.
+      <span class="evhint" data-title="How this estimate is built" data-rows="1. Eligible volume~15-min bars with price at/above $99.95, prorated when a bar straddles it|2. Capture rate~what share of that volume was really ATM issuance|3. Calibration~capture solved from the last 8-K that disclosed actual shares issued|4. To bitcoin~estimated proceeds ÷ live BTC price|Why $99.95 not $100~SATA hugs par to the cent; a strict cutoff undercounted a confirmed \$44.1M week by ~4x|Confirmed vs estimate~the 8-K figure is fact, the intraday number is an estimate between filings">methodology&#9432;</span></p>
+    <div class="charts" id="atm-cards"></div>
+  </section>
+
+
+  <!-- 1. Company Stats -->
   <section id="company">
     <div class="sec-head"><h2>Company Stats</h2><span class="tag stub" id="tag-company">seed data</span></div>
     <p class="sec-note">Where each company stands right now — share price, size, and the balance-sheet building blocks that every metric below is built from. Hover any line item for how it's calculated and why it matters.</p>
@@ -585,14 +594,6 @@
       <div class="chartwrap" style="height:260px; padding: 0 16px 14px;"><canvas id="ch-calc"></canvas></div>
       <p class="footnote" style="padding:0 18px 14px; margin:0;">A model, not a forecast: BTC and mNAV move linearly to your targets; issuance is constant per month <i>while the ATM is open</i>. Not modeled: in-the-money converts flipping to shares, variable preferred-rate resets, and taxes on unrealized gains. EV basis prices the whole structure (mcap = mNAV × BTC NAV − claims); net basis prices the common's residual (mcap = mNAV × net NAV). Converts are held at notional throughout — the model doesn't flip in-the-money tranches into share count. Runway cash offsets claims at face value but never earns the multiple — only BTC-bought dollars capture the issuance premium.</p>
     </div>
-  </section>
-
-  <!-- 7. ATM Tracker -->
-  <section id="atm">
-    <div class="sec-head"><h2>Preferred ATM Tracker</h2><span class="tag stub" id="tag-atm">seed data</span></div>
-    <p class="sec-note">These preferreds are engineered to trade at their $100 stated amount, and each company can only issue new shares — and buy bitcoin with the proceeds — while the stock holds at or above that level. Dollar volume printed at par is therefore a live proxy for issuance.
-      <span class="evhint" data-title="How this estimate is built" data-rows="1. Eligible volume~15-min bars with price at/above $99.95, prorated when a bar straddles it|2. Capture rate~what share of that volume was really ATM issuance|3. Calibration~capture solved from the last 8-K that disclosed actual shares issued|4. To bitcoin~estimated proceeds ÷ live BTC price|Why $99.95 not $100~SATA hugs par to the cent; a strict cutoff undercounted a confirmed \$44.1M week by ~4x|Confirmed vs estimate~the 8-K figure is fact, the intraday number is an estimate between filings">methodology&#9432;</span></p>
-    <div class="charts" id="atm-cards"></div>
   </section>
 
   <!-- 8. Short Interest -->
