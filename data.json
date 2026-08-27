@@ -1,7 +1,7 @@
 {
   "asOf": "2026-08-27",
   "priceAsOf": "2026-08-27",
-  "btcPriceUsd": 80004,
+  "btcPriceUsd": 80269,
   "btcSupply": 21000000,
   "btcCirculating": 20076034,
   "companies": {
@@ -136,7 +136,7 @@
       "capStructAsOf": "2026-03-31 (10-Q)",
       "dilutedShares": 423.85,
       "marketCapBasic": 29540,
-      "navPremiumBasic": 0.806,
+      "navPremiumBasic": 0.803,
       "treasuryDate": "2026-08-21",
       "bpsHistory": {
         "dates": [
@@ -3304,7 +3304,7 @@
           1.014,
           1.048,
           1.021,
-          1.099
+          1.096
         ],
         "net": [
           1.564,
@@ -3637,7 +3637,7 @@
           1.018,
           1.064,
           1.028,
-          1.131
+          1.127
         ]
       },
       "strcNotionalSteps": [
@@ -3976,7 +3976,7 @@
       "borrowFee": {
         "pct": 0.28,
         "avail": 10000000,
-        "asOf": "2026-08-27 16:41:30"
+        "asOf": "2026-08-27 18:46:41"
       },
       "borrowFeeHist": {
         "iso": [
@@ -4039,7 +4039,7 @@
       "prefBorrowFee": {
         "pct": 0.28,
         "avail": 3100000,
-        "asOf": "2026-08-27 16:41:30"
+        "asOf": "2026-08-27 18:46:41"
       },
       "prefBorrowFeeHist": {
         "iso": [
@@ -4101,12 +4101,12 @@
       },
       "assumedDilutedShares": 445.58,
       "_dilOverlayM": 29.647,
-      "netSatsPerShare": 155396,
+      "netSatsPerShare": 155529,
       "netMnavPub": 1.1068,
-      "amplificationPub": 1.2879,
-      "breakevenArrPub": 2.5313,
+      "amplificationPub": 1.2868,
+      "breakevenArrPub": 2.5238,
       "hurdleArrPub": 10.7409,
-      "floorArrPub": -15.8576,
+      "floorArrPub": -15.9013,
       "creditDurationPub": 6.4138,
       "netDilutedShares": 419.95,
       "atm": {
@@ -4337,7 +4337,7 @@
       "capStructAsOf": "2026-06-18 (8-K)",
       "dilutedShares": 119.55,
       "marketCapBasic": 925,
-      "navPremiumBasic": 1.214,
+      "navPremiumBasic": 1.21,
       "treasuryDate": "2026-08-21",
       "bpsHistory": {
         "dates": [
@@ -6245,7 +6245,7 @@
           1.383,
           1.479,
           1.476,
-          1.543
+          1.538
         ],
         "net": [
           1.214,
@@ -6486,7 +6486,7 @@
           1.574,
           1.721,
           1.714,
-          1.81
+          1.801
         ]
       },
       "cashUsd": 171.9,
@@ -6626,9 +6626,9 @@
         "dtcLive": 2.19
       },
       "borrowFee": {
-        "pct": 0.93,
+        "pct": 1.03,
         "avail": 1600000,
-        "asOf": "2026-08-27 16:41:30"
+        "asOf": "2026-08-27 18:46:41"
       },
       "borrowFeeHist": {
         "iso": [
@@ -6685,13 +6685,13 @@
           0.92,
           0.92,
           0.86,
-          0.93
+          1.03
         ]
       },
       "prefBorrowFee": {
-        "pct": 33.32,
+        "pct": 32.12,
         "avail": 250000,
-        "asOf": "2026-08-27 16:41:30"
+        "asOf": "2026-08-27 18:46:41"
       },
       "prefBorrowFeeHist": {
         "iso": [
@@ -6748,12 +6748,12 @@
           28.59,
           36.17,
           29.62,
-          33.32
+          32.12
         ]
       },
       "_dilOverlayM": 3.2658,
       "assumedDilutedShares": 92.95,
-      "netSatsPerShare": 15418,
+      "netSatsPerShare": 15443,
       "netDilutedShares": 92.95,
       "atm": {
         "ticker": "SATA",
@@ -6767,10 +6767,10 @@
         "todayTotalUsd": 41629503,
         "todayEligUsd": 41629503,
         "todayEstUsd": 38242098,
-        "todayEstBtc": 478.0,
+        "todayEstBtc": 476.42,
         "weekEligUsd": 101487770,
         "weekEstUsd": 93229682,
-        "weekEstBtc": 1165.31,
+        "weekEstBtc": 1161.47,
         "confirmed": {
           "from": "2026-08-14",
           "to": "2026-08-21",
@@ -8556,7 +8556,6 @@
         "Jan 16",
         "Jan 28",
         "Mar 9",
-        "Mar 17",
         "Apr 2",
         "Apr 13",
         "Apr 24",
@@ -8584,8 +8583,7 @@
         "Jan 13 \u2013 Jan 16",
         "Jan 16 \u2013 Jan 28",
         "Jan 28 \u2013 Mar 9",
-        "Mar 9 \u2013 Mar 17",
-        "Mar 17 \u2013 Apr 2",
+        "Mar 9 \u2013 Apr 2",
         "Apr 2 \u2013 Apr 13",
         "Apr 13 \u2013 Apr 24",
         "Apr 24 \u2013 May 1",
@@ -8612,7 +8610,6 @@
         5048,
         334,
         null,
-        317,
         null,
         27,
         789,
@@ -8640,7 +8637,6 @@
         12797,
         13131,
         13311,
-        13628,
         13741,
         13768,
         14557,
