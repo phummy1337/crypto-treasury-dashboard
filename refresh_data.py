@@ -320,6 +320,12 @@ def fetch_strategytracker(data):
                 notM = p.get("notionalMillions") or round((p.get("notionalUSD") or 0) / 1e6)
                 if t == "STRE" and data.get("eurUsd"):
                     notM = round(STRE_EUR_NOTIONAL * data["eurUsd"])
+                if t == "SATA" and _SATA.get("steps"):
+                    filed = _SATA["steps"][-1][1]     # filed count x par; filings win
+                    if abs(filed - notM) > 1:
+                        log(f"[drift] SATA notional: tracker ${notM:,.1f}M vs filed "
+                            f"${filed:,.1f}M (as of {_SATA['steps'][-1][0]}) — using filed")
+                    notM = filed
                 rate = p.get("dividendRate")
                 lab = PREF_LABEL.get(t, "{r}%").format(r=("%g" % rate) if rate is not None else "?")
                 bd.append([t, lab, round(notM)])
@@ -341,6 +347,14 @@ def fetch_strategytracker(data):
                         chg = [{"effective_date": d, "notional_millions": n}
                                for d, n in STRC_BACKFILL if d < first] + chg
                         co["strcNotionalSteps"] = [[e["effective_date"], e["notional_millions"]] for e in chg]
+                    if t == "SATA" and _SATA.get("steps"):
+                        # same stall as the scalar: the tracker's change log ends at
+                        # 2026-06-22, so the notional line on the preferred chart ran
+                        # flat through every issuance since. Filed levels win.
+                        mg = {e["effective_date"]: e["notional_millions"] for e in chg}
+                        mg.update({d: n for d, n in _SATA["steps"]})
+                        chg = [{"effective_date": d, "notional_millions": n}
+                               for d, n in sorted(mg.items())]
                     _VOL_HIST[t] = [(q["date"], q.get("volume") or 0) for q in hp]
                     _ATM_CANDLES[t] = p.get("intradayCandles") or []
                     dts, isod, px, no = [], [], [], []
@@ -365,6 +379,9 @@ def fetch_strategytracker(data):
             pref_div = sum(corr.get(p["ticker"], 0) * (p.get("dividendRate") or 0) / 100 for p in ps)
             debt_int = sum(x["principal"] * x["coupon"] / 100 for x in (co.get("debtSchedule") or []))
             co["annualObligations"] = round(pref_div + debt_int)
+            # net reserve moved with the notional — rebase the per-share figures that
+            # were computed above, before this block knew the preferred stack
+            _apply_per_share(co, tk)
         sp = [x for x in hd["stock_prices"][-365:] if x is not None]
         if sp:
             co["week52Low"], co["week52High"] = round(min(sp), 2), round(max(sp), 2)
@@ -458,9 +475,11 @@ def fetch_strategytracker(data):
             else:
                 # ASST: the tracker carries daily cash/debt (useEv basis) + the SATA log
                 sata = next((p for p in ps if p["ticker"] == "SATA"), None)
-                sata_st = sorted(((e["effective_date"], e["notional_millions"])
-                                  for e in ((sata or {}).get("history") or [])
-                                  if e.get("effective_date") and e.get("notional_millions") is not None))
+                sata_st = dict((e["effective_date"], e["notional_millions"])
+                               for e in ((sata or {}).get("history") or [])
+                               if e.get("effective_date") and e.get("notional_millions") is not None)
+                sata_st.update({d: n for d, n in _SATA.get("steps") or []})   # filings win
+                sata_st = sorted(sata_st.items())
                 cb, db = hd.get("cash_balance") or [], hd.get("debt") or []
                 _ff = [0.0] * len(hd["dates"])          # forward-filled cash
                 lastc = 0.0
@@ -668,12 +687,21 @@ EDGAR_UA = {"User-Agent": "crypto-treasury-dashboard pete@defidevcorp.com"}
 CIK = {"MSTR": "0001050446", "ASST": "0001920406"}
 
 
+_EDGAR_TXT = {}
+
+
 def _edgar_text(url):
+    # memoised: three passes read the same 8-Ks (SATA notional, holdings, ATM
+    # calibration) and EDGAR asks callers not to re-request what they already have
+    if url in _EDGAR_TXT:
+        return _EDGAR_TXT[url]
     req = urllib.request.Request(url, headers=EDGAR_UA)
     html = urllib.request.urlopen(req, timeout=25, context=_SSL_CTX).read().decode("utf-8", "ignore")
     t = re.sub(r"<[^>]+>", " ", html)
     t = re.sub(r"&#\d+;|&nbsp;|&#160;", " ", t)
-    return re.sub(r"\s+", " ", t)
+    t = re.sub(r"\s+", " ", t)
+    _EDGAR_TXT[url] = t
+    return t
 
 
 def _edgar_json(url):
@@ -942,6 +970,88 @@ def _asst_snapshot(text):
         return (_pdate(m.group(1)), {"cash": g(2), "strc": None, "btc": int(g(3)),
                                      "classA": int(g(4)), "sata": int(g(5))})
     return None
+
+
+_SATA = {}
+
+
+def _asst_sata_counts(text):
+    """[(as-of date, SATA shares outstanding)] from one Strive 8-K.
+
+    Two filing shapes: the weekly position table ("As of <d1> As of <d2>" with a
+    "SATA Stock <a> <b> <delta>" row) and the pre-May-2026 prose snapshot. We want
+    the ABSOLUTE counts, not the deltas _asst_items already reports — notional has
+    to be rebuilt from a filed level, not accumulated from parsed changes.
+    """
+    out = []
+    per = re.search(r"As of ([A-Z][a-z]+ \d{1,2}, \d{4}) As of ([A-Z][a-z]+ \d{1,2}, \d{4})", text)
+    m = re.search(r"SATA Stock ([\d,]+) ([\d,]+)", text)
+    if per and m:
+        for d, v in zip(per.groups(), m.groups()):
+            try:
+                out.append((_pdate(d).isoformat(), int(v.replace(",", ""))))
+            except Exception:
+                pass
+    else:
+        snap = _asst_snapshot(text)
+        if snap and snap[1].get("sata"):
+            out.append((snap[0].isoformat(), int(snap[1]["sata"])))
+    return out
+
+
+def fetch_sata_notional(data):
+    """Rebuild Strive's preferred notional from its own 8-Ks.
+
+    prefNotional is passed through from strategytracker's `notionalMillions`, and
+    that field stopped stepping on 2026-06-22 at $782.95M — it never picked up the
+    Aug 21 issuance, even though our actions parser reads the very same filing
+    ("Issued 441,313 SATA preferred shares", 8-K of 2026-08-24). SATA notional is
+    just the filed share count x $100 par, so take it from the filings and let them
+    win, the way the STRC dividend rate already does in fetch_holdings.
+
+    Runs before fetch_strategytracker so the notional is right everywhere it feeds:
+    prefBreakdown, annualObligations, both durations, net reserve and the mNAV
+    series. Steps persist in data.json, so later runs stop at the first filing whose
+    dates we already hold (typically one fetch).
+    """
+    co = data["companies"].get("ASST")
+    if not co:
+        return
+    steps = {d: n for d, n in (co.get("sataNotionalSteps") or [])}
+    known = set(steps)
+    try:
+        sub = get_json(f"https://data.sec.gov/submissions/CIK{CIK['ASST']}.json")
+    except Exception as e:
+        log(f"[skip] SATA notional: {e} — keeping filed steps")
+        _SATA["steps"] = co.get("sataNotionalSteps") or []
+        return
+    r = sub["filings"]["recent"]
+    docpat = re.compile(r"^(?:asst-\d{8}\.htm|.*8k.*\.htm)$", re.I)
+    scanned = 0
+    for i in range(len(r["form"])):          # EDGAR lists newest first
+        if r["form"][i] != "8-K" or not docpat.match(r["primaryDocument"][i] or ""):
+            continue
+        acc = r["accessionNumber"][i].replace("-", "")
+        url = (f"https://www.sec.gov/Archives/edgar/data/{int(CIK['ASST'])}/"
+               f"{acc}/{r['primaryDocument'][i]}")
+        try:
+            got = _asst_sata_counts(_edgar_text(url))
+        except Exception:
+            got = []
+        scanned += 1
+        if got and all(d in known for d, _ in got):
+            break                            # newest-first: everything older is held
+        for d, sh in got:
+            steps[d] = round(sh / 1e4, 4)    # shares x $100 par, in $mm
+        if scanned >= 40:
+            break
+        time.sleep(0.12)
+    if steps:
+        co["sataNotionalSteps"] = [[d, n] for d, n in sorted(steps.items())]
+        _SATA["steps"] = co["sataNotionalSteps"]
+        d, n = co["sataNotionalSteps"][-1]
+        log(f"[SATA] notional from filings: ${n:,.1f}M ({n * 1e4:,.0f} sh as of {d}) "
+            f"from {len(steps)} filed steps, {scanned} filings scanned")
 
 
 def fetch_holdings(data, max_points=60):
@@ -1664,6 +1774,7 @@ def main():
     print("Refreshing treasury data…")
     fetch_btc_market(data)            # CoinGecko: BTC price + supply
     fetch_strategy_kpi(data)          # strategy.com API: shares, debt, USD reserve (MSTR)
+    fetch_sata_notional(data)         # SEC EDGAR: filed SATA count (the tracker's stalls)
     fetch_strategytracker(data)       # PRIMARY: current metrics + real history (both names)
     fetch_holdings(data)             # SEC EDGAR: weekly accumulation (8-K period ranges)
     fetch_strategy_kpi(data)          # re-apply: holdings clobbers cash with its own estimate
