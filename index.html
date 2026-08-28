@@ -277,6 +277,9 @@
     display:inline-block; }
   .act-src:hover { color:var(--text); border-color:rgba(255,255,255,0.4); text-decoration:none; }
   .act-src.none { opacity:.45; }
+  .hint-icon { border-bottom:none !important; font-size:15px; line-height:1;
+    padding:0 3px; margin-left:2px; vertical-align:baseline; color:var(--faint); }
+  .hint-icon:hover { color:var(--text); }
   /* ATM tracker */
   .atm-pill { font-size:10.5px; font-weight:700; letter-spacing:.8px; padding:2px 7px; border-radius:3px;
     margin-left:8px; vertical-align:middle; border:1px solid; }
@@ -449,7 +452,7 @@
   <section id="atm">
     <div class="sec-head"><h2>Preferred ATM Tracker</h2><span class="tag stub" id="tag-atm">seed data</span></div>
     <p class="sec-note">An estimate of how much bitcoin each company is buying through its preferred ATM today, inferred from live trading and calibrated to the filings.
-      <span class="evhint" data-title="How this estimate is built" data-rows="Eligible volume~15-min bars printed at/above $99.95, prorated when a bar straddles it|Capture rate~the share of that volume that was really ATM issuance|Calibration~capture solved from the last 8-K that disclosed actual shares issued|To bitcoin~estimated proceeds ÷ live BTC price|Why $99.95, not $100~SATA hugs par to the cent; a strict cutoff undercounted a confirmed $44.1M week roughly 4x|Assumption~issuance tracks at-par volume evenly through the session|Confirmed vs estimate~the 8-K figure is fact; the intraday number is an estimate between filings">methodology&#9432;</span></p>
+      <span class="evhint hint-icon" aria-label="Methodology" data-title="How this estimate is built" data-rows="Eligible volume~15-min bars printed at/above $99.95, prorated when a bar straddles it|Capture rate~the share of that volume that was really ATM issuance|Calibration~capture solved from the last 8-K that disclosed actual shares issued|To bitcoin~estimated proceeds ÷ live BTC price|Why $99.95, not $100~SATA hugs par to the cent; a strict cutoff undercounted a confirmed $44.1M week roughly 4x|Assumption~issuance tracks at-par volume evenly through the session|Confirmed vs estimate~the 8-K figure is fact; the intraday number is an estimate between filings">&#9432;</span></p>
     <div class="charts" id="atm-cards"></div>
   </section>
 
@@ -606,7 +609,7 @@
   <section id="shorts">
     <div class="sec-head"><h2>Short Interest</h2><span class="tag stub" id="tag-shorts">seed data</span></div>
     <p class="sec-note">How crowded the short side is, instrument by instrument — and what it costs to stay short.
-      <span class="evhint" data-title="Short interest methodology" data-rows="Source~FINRA semi-monthly settlements, via Nasdaq|Bars~shares short ÷ float, at that settlement date|Common float~shares outstanding then − insider Class B|Preferred float~notional ÷ $100 par|Line~days to cover on trailing 10-day avg volume|Why 10 days~≈ FINRA's own reporting window|Cost to short~IBKR indicative annualized borrow rate">methodology&#9432;</span></p>
+      <span class="evhint hint-icon" aria-label="Methodology" data-title="Short interest methodology" data-rows="Source~FINRA semi-monthly settlements, via Nasdaq|Bars~shares short ÷ float, at that settlement date|Common float~shares outstanding then − insider Class B|Preferred float~notional ÷ $100 par|Line~days to cover on trailing 10-day avg volume|Why 10 days~≈ FINRA's own reporting window|Cost to short~IBKR indicative annualized borrow rate">&#9432;</span></p>
     <div class="charts">
       <div class="chartcard">
         <h3><span class="dot" style="background:var(--mstr)"></span>MSTR — Short Interest</h3>
