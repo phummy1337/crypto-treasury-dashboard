@@ -282,13 +282,13 @@
     margin-left:8px; vertical-align:middle; border:1px solid; }
   .atm-pill.on  { color:var(--pos); border-color:rgba(52,211,153,.45); background:rgba(52,211,153,.10); }
   .atm-pill.off { color:var(--faint); border-color:var(--border); }
-  .atm-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; padding:2px 0 10px; }
-  .atm-grid .k { font-size:11.5px; text-transform:uppercase; letter-spacing:.9px; color:var(--muted); }
-  .atm-grid .v { font-size:21px; font-weight:700; font-style:italic; margin-top:3px;
-    font-variant-numeric:tabular-nums; color:var(--text); }
-  .atm-grid .s { font-size:12px; color:var(--faint); margin-top:2px; }
-  .atm-foot { margin-top:2px; padding-bottom:4px; }
-  .atm-foot b { color:var(--text); }
+  .atm-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; padding:6px 0 14px; }
+  .atm-grid > div { cursor:help; border-bottom:none; }
+  .atm-grid .k { font-size:11px; text-transform:uppercase; letter-spacing:.9px; color:var(--muted);
+    white-space:nowrap; }
+  .atm-grid .v { font-size:22px; font-weight:700; font-style:italic; margin-top:4px;
+    font-variant-numeric:tabular-nums; color:var(--text); line-height:1.15; }
+  .atm-grid .s { font-size:11.5px; color:var(--faint); margin-top:3px; }
   @media (max-width:640px){ .atm-grid { grid-template-columns:repeat(2,1fr); } .atm-grid .v { font-size:18px; } }
   /* short-interest stat chips */
   .si-chips { display:flex; flex-wrap:wrap; gap:8px; margin:2px 0 10px; }
@@ -448,8 +448,8 @@
   <!-- 0. Preferred ATM Tracker (lead section) -->
   <section id="atm">
     <div class="sec-head"><h2>Preferred ATM Tracker</h2><span class="tag stub" id="tag-atm">seed data</span></div>
-    <p class="sec-note">These preferreds are engineered to trade at their $100 stated amount, and each company can only issue new shares — and buy bitcoin with the proceeds — while the stock holds at or above that level. Dollar volume printed at par is therefore a live proxy for issuance.
-      <span class="evhint" data-title="How this estimate is built" data-rows="1. Eligible volume~15-min bars with price at/above $99.95, prorated when a bar straddles it|2. Capture rate~what share of that volume was really ATM issuance|3. Calibration~capture solved from the last 8-K that disclosed actual shares issued|4. To bitcoin~estimated proceeds ÷ live BTC price|Why $99.95 not $100~SATA hugs par to the cent; a strict cutoff undercounted a confirmed \$44.1M week by ~4x|Confirmed vs estimate~the 8-K figure is fact, the intraday number is an estimate between filings">methodology&#9432;</span></p>
+    <p class="sec-note">An estimate of how much bitcoin each company is buying through its preferred ATM today, inferred from live trading and calibrated to the filings.
+      <span class="evhint" data-title="How this estimate is built" data-rows="Eligible volume~15-min bars printed at/above $99.95, prorated when a bar straddles it|Capture rate~the share of that volume that was really ATM issuance|Calibration~capture solved from the last 8-K that disclosed actual shares issued|To bitcoin~estimated proceeds ÷ live BTC price|Why $99.95, not $100~SATA hugs par to the cent; a strict cutoff undercounted a confirmed $44.1M week roughly 4x|Assumption~issuance tracks at-par volume evenly through the session|Confirmed vs estimate~the 8-K figure is fact; the intraday number is an estimate between filings">methodology&#9432;</span></p>
     <div class="charts" id="atm-cards"></div>
   </section>
 
@@ -1204,42 +1204,36 @@ function renderATM(){
     const a = o.atm; if(!a) return;
     any = true;
     const live = a.status === "active";
-    const dollars = v => v >= 1e6 ? "$"+fmt(v/1e6,1)+"M" : "$"+fmt(Math.round(v/1e3))+"k";
     const c = a.confirmed || {};
-    // accuracy check: our estimate over the confirmed window vs what the filing said
-    const wkElig = (a.daily||[]).filter(d => c.from && d.d > c.from && d.d <= c.to)
-                                .reduce((s,d) => s + d.elig, 0);
-    const ourEst = wkElig * a.captureRate;
+    const usd = v => !v ? "$0" : v >= 1e6 ? "$"+fmt(v/1e6,1)+"M" : "$"+fmt(Math.round(v/1e3))+"k";
+    const btc = v => v==null ? "—" : "₿"+fmt(v,2);
+    // detail that used to sit in chips and a footnote now rides on the numbers it explains
+    const capTip = `Capture rate ${fmt(a.captureRate*100,0)}% — ${a.captureBasis}. `
+      + `Applied to volume printed at/above $${fmt(a.threshold,2)}, then divided by the BTC price.`;
+    const confTip = c.proceedsM!=null
+      ? `Actual issuance disclosed in the 8-K for ${c.from} → ${c.to}.`
+        + (c.capacityM!=null ? ` ATM capacity remaining: $${fmt(c.capacityM/1000,1)}B.` : "")
+      : "Awaiting the next 8-K.";
+    const cell = (k, v, sub, tip, color) =>
+      `<div class="evhint" data-title="${k}" data-rows="${tip}">
+         <div class="k">${k}</div>
+         <div class="v"${color?` style="color:${color}"`:""}>${v}</div>
+         <div class="s">${sub}</div></div>`;
     h += `<div class="chartcard">
       <h3><span class="dot" style="background:${ac}"></span>${a.ticker} — ATM
         <span class="atm-pill ${live?"on":"off"}">${live ? "ACTIVE" : "STANDBY"}</span></h3>
-      <div class="si-chips">
-        <span class="si-chip" title="Latest price against the $100 stated amount. The ATM can only issue at or above par.">
-          vs par <b class="${a.vsPar>=0?"":"warn"}">${a.vsPar>=0?"+":""}${fmt(a.vsPar,2)}</b></span>
-        <span class="si-chip" title="Share of the capture rate applied to eligible volume — ${a.captureBasis}">
-          capture <b>${fmt(a.captureRate*100,0)}%</b></span>
-        ${c.capacityM!=null ? `<span class="si-chip" title="Remaining ATM capacity disclosed in the latest 8-K">
-          capacity <b>$${fmt(c.capacityM/1000,1)}B</b></span>` : ""}
-      </div>
       <div class="atm-grid">
-        <div><div class="k">Est. BTC today</div><div class="v" style="color:${ac}">${
-          a.todayEstBtc!=null ? "₿"+fmt(a.todayEstBtc,2) : "—"}</div>
-          <div class="s">${dollars(a.todayEstUsd)} est. proceeds</div></div>
-        <div><div class="k">Eligible volume today</div><div class="v">${dollars(a.todayEligUsd)}</div>
-          <div class="s">of ${dollars(a.todayTotalUsd)} traded${
-            a.todayTotalUsd>0 ? " · "+fmt(a.todayEligUsd/a.todayTotalUsd*100,0)+"%" : ""}</div></div>
-        <div><div class="k">Since last filing</div><div class="v">${
-          a.weekEstBtc!=null ? "₿"+fmt(a.weekEstBtc,2) : "—"}</div>
-          <div class="s">${dollars(a.weekEstUsd)} est. proceeds</div></div>
-        <div><div class="k">Last confirmed (8-K)</div><div class="v">${
-          c.shares!=null ? fmt(Math.round(c.shares/1e3))+"k sh" : "—"}</div>
-          <div class="s">${c.proceedsM!=null ? "$"+fmt(c.proceedsM,1)+"M · "+(c.to||"") : "awaiting filing"}</div></div>
+        ${cell("Est. BTC today", btc(a.todayEstBtc), usd(a.todayEstUsd)+" est. proceeds",
+               "Estimate~"+capTip, ac)}
+        ${cell("Eligible volume", usd(a.todayEligUsd),
+               a.todayTotalUsd>0 ? fmt(a.todayEligUsd/a.todayTotalUsd*100,0)+"% of "+usd(a.todayTotalUsd)+" traded" : "no volume yet",
+               "At-par volume~Dollar volume printed at or above $"+fmt(a.threshold,2)+" today — the pool the ATM could have sold into.")}
+        ${cell("Since last filing", btc(a.weekEstBtc), usd(a.weekEstUsd)+" est. proceeds",
+               "Running estimate~Accumulated since the last confirmed 8-K. "+capTip)}
+        ${cell("Confirmed (8-K)", c.shares ? fmt(Math.round(c.shares/1e3))+"k sh" : "none",
+               c.proceedsM ? "$"+fmt(c.proceedsM,1)+"M · "+(c.to||"") : (c.to||"—"),
+               "Filed~"+confTip)}
       </div>
-      <div class="ch-sub atm-foot">${
-        c.proceedsM > 0 && wkElig > 0
-          ? `Capture rate is solved on this window, so it is in-sample by construction: the 8-K reported <b>$${fmt(c.proceedsM,1)}M</b> issued ${c.from} → ${c.to} against ${dollars(wkElig)} of eligible volume. The next filing will be the first out-of-sample test.`
-          : live ? "No confirmed issuance in the last filing window — estimate is uncalibrated until the next 8-K."
-                 : `Below par, so the ATM cannot issue. ${tk==="MSTR" ? "Strategy has been repurchasing STRC at the discount instead." : ""}`}</div>
     </div>`;
   });
   el.innerHTML = h;
