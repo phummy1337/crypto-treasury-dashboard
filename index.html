@@ -770,10 +770,18 @@ function netParts(o){
   const nav = o.holdings*btcPrice/1e6;
   const reserve = nav + o.cash;
   const netReserve = reserve - otm - o.prefNotional;
-  const shares = o.sharesOutstanding + itmSh;
+  // Strategy divides by its published fully-diluted count (~420M vs 416M basic) —
+  // basic plus the in-the-money converts, options and RSUs. netDilutedShares is
+  // backed out of their own net-sats figure, so prefer it and fall back to the
+  // debt-schedule reconstruction only when it's missing (ASST publishes no net).
+  const shares = o.netDilutedShares || (o.sharesOutstanding + itmSh);
   return { nav, reserve, netReserve, shares, mcap: px*shares, otm, itmSh };
 }
 function netMnav(o){
+  // Strategy publishes its own mNAV every minute; take it verbatim so the headline
+  // can never drift from strategy.com/btc. The computed path below is the fallback
+  // (and the only path for ASST, which publishes no net figure).
+  if(o._netMnavLive != null) return o._netMnavLive;
   if(!(o.stockPrice && o.sharesOutstanding)) return null;
   const p = netParts(o);
   return p.netReserve > 0 ? p.mcap/p.netReserve : null;
@@ -1095,8 +1103,11 @@ function renderValuation(){
     ["BTC Reserve", bil(p.nav)], ["+ USD Reserve", bil(o.cash)],
     ["− OTM Convertible Debt", bil(p.otm)], ["− Preferred", bil(o.prefNotional)],
     ["= Net Reserve", bil(p.netReserve)],
-    ["Mkt Cap (incl. ITM dilution)", bil(p.mcap)],
-    ["= Net mNAV  (mcap ÷ net reserve)", fmt(netMnav(o),2)+"x"]
+    [`Mkt Cap (${fmt(p.shares,2)}M fully-diluted sh)`, bil(p.mcap)],
+    // the arithmetic shown is always our own, even when the headline takes
+    // strategy.com's published mNAV — otherwise the rows wouldn't reconcile
+    ["= Net mNAV  (mcap ÷ net reserve)",
+      fmt(p.netReserve>0 ? p.mcap/p.netReserve : null,2)+"x"]
   ].map(r=>r.join("~")).join("|"); };
   const cell = (v,rows,title) => `<span class="evhint" data-title="${title}" data-rows="${rows}"><span class="${cls(v)}">${fmt(v,2)}x</span></span>`;
 
@@ -2002,9 +2013,15 @@ async function fetchLiveEquity(){
     for(const tk of ["MSTR","ASST"]){
       const src = light.companies && light.companies[tk], co = DATA.companies[tk];
       if(!src || !co) continue;
-      if(src.stockPrice > 0 && Math.abs(src.stockPrice - co.stockPrice) > 0.005){
-        co.stockPrice = Math.round(src.stockPrice*100)/100; changed = true;
-        if(co._prevClose) co.dayChangePct = Math.round((co.stockPrice/co._prevClose - 1)*10000)/100;
+      if(src.stockPrice > 0){
+        const px = Math.round(src.stockPrice*100)/100;
+        if(Math.abs(px - co.stockPrice) > 0.005){ co.stockPrice = px; changed = true; }
+        // rebase the day-change on every tick, not only when the price moved —
+        // otherwise a stale snapshot's percentage survives a flat first quote
+        if(co._prevClose > 0){
+          const d = Math.round((co.stockPrice/co._prevClose - 1)*10000)/100;
+          if(d !== co.dayChangePct){ co.dayChangePct = d; changed = true; }
+        }
       }
       if(src.holdings > 0 && Math.round(src.holdings) !== co.holdings){
         co.holdings = Math.round(src.holdings); changed = true;
@@ -2014,11 +2031,73 @@ async function fetchLiveEquity(){
   }catch(e){ /* keep last refresh's values */ }
 }
 
+// strategy.com's own KPI APIs (open, CORS-* , refreshed about once a minute). They
+// are the source refresh_data.py already treats as authoritative for MSTR, but the
+// cron only lands a few times a day — GitHub drops most of the 10-minute schedule —
+// so everything downstream of them (Net mNAV, net sats/share, EV mNAV, duration)
+// used to sit frozen on the last successful run. Pulling them client-side keeps the
+// headline live and guarantees it reads the same as strategy.com/btc.
+//
+// Runs after fetchLiveEquity so MSTR's official consolidated quote wins over the
+// tracker's light feed, and runs after the close too: mstrKpiData carries the
+// settled 4:00pm print, and mNAV keeps moving with BTC overnight.
+const num = s => parseFloat(String(s).replace(/,/g,""));
+async function fetchStrategyLive(){
+  const co = DATA.companies && DATA.companies.MSTR;
+  if(!co) return;
+  let changed = false;
+  try{
+    const raw = await (await fetch("https://api.strategy.com/btc/mstrKpiData",{cache:"no-store"})).json();
+    const q = Array.isArray(raw) ? raw[0] : raw;
+    const px = num(q.ufPrice || q.price);
+    if(px > 0){
+      // priceVarPerc arrives signed with a `negative` flag beside it; honour the
+      // flag so a source-side sign drop can't invert the move
+      let chg = Math.abs(num(q.priceVarPerc));
+      if(!isNaN(chg)){
+        if(q.negative) chg = -chg;
+        chg = Math.round(chg*100)/100;
+        if(chg !== co.dayChangePct){ co.dayChangePct = chg; changed = true; }
+        if(chg !== -100) co._prevClose = px / (1 + chg/100);
+      }
+      const rp = Math.round(px*100)/100;
+      if(Math.abs(rp - co.stockPrice) > 0.005){ co.stockPrice = rp; changed = true; }
+      // same EV identity refresh_data.py uses: cash = mcap + debt + pref − EV
+      const mcap = num(q.marketCap), debt = num(q.debt), pref = num(q.pref), ev = num(q.entVal);
+      if(mcap > 0 && ev > 0){
+        const cash = Math.round(mcap + debt + pref - ev);
+        if(debt > 0 && debt !== co.seniorDebt){ co.seniorDebt = Math.round(debt); changed = true; }
+        if(cash > 0 && cash !== co.cash){ co.cash = cash; changed = true; }
+        const sh = Math.round(mcap/px*100)/100;
+        if(sh > 0 && sh !== co.sharesOutstanding){ co.sharesOutstanding = sh; changed = true; }
+      }
+    }
+  }catch(e){ /* keep the cron's values */ }
+  try{
+    const r = (await (await fetch("https://api.strategy.com/btc/bitcoinKpis",{cache:"no-store"})).json()).results || {};
+    if(r.mNav > 0){ co._netMnavLive = +r.mNav; changed = true; }
+    if(r.satsPerShare > 0) co.satsPerShareDiluted = Math.round(+r.satsPerShare);
+    if(r.netSatsPerShare > 0 && r.netBtcReserve > 0 && r.ufPrice > 0){
+      co.netSatsPerShare = Math.round(+r.netSatsPerShare);
+      // back out the fully-diluted count they divide by, so netParts keeps the
+      // figure live as BTC moves instead of freezing on the cron's copy
+      co.netDilutedShares = Math.round(+r.netBtcReserve / +r.ufPrice * 1e8 / +r.netSatsPerShare / 1e6 * 100)/100;
+    }
+    [["amplification","amplificationPub"],["btcBreakevenArr","breakevenArrPub"],
+     ["bitcoinHurdleArr","hurdleArrPub"],["btcFailureArr","floorArrPub"],
+     ["totalDuration","creditDurationPub"]].forEach(([src,dst]) => {
+       if(r[src] != null) co[dst] = +r[src];
+     });
+  }catch(e){ /* keep the cron's values */ }
+  if(changed){ renderAll(); markFresh(); }
+}
+
 // Only overlay live quotes while the market is open. After the close, data.json
 // holds the settled 4:00pm consolidated prices (MSTR straight from strategy.com);
 // the tracker's light feed lags the closing auction by minutes and would otherwise
 // overwrite the official close with a staler intraday print.
-loadData().then(() => { if(marketOpenET()){ return fetchLiveEquity().then(fetchLivePrefs); } });
+loadData().then(() => (marketOpenET() ? fetchLiveEquity().then(fetchLivePrefs) : Promise.resolve())
+                        .then(fetchStrategyLive));
 
 // live preferred quotes — the cron only lands ~hourly (GitHub throttles its
 // schedule), so the prefs tick client-side like the commons do:
@@ -2047,14 +2126,34 @@ async function fetchLivePrefs(){
   // flagged. SATA stays current via the cron refresh + 5-min data.json repoll.
   if(changed){ renderAll(); markFresh(); }
 }
-// previous close derived from the cron snapshot (px and day-change at refresh time)
+// ET calendar date ("2026-08-28") — sessions are named by their ET date, never UTC
+function etDateStr(d){
+  try{
+    return new Intl.DateTimeFormat("en-CA",{timeZone:"America/New_York",
+      year:"numeric",month:"2-digit",day:"2-digit"}).format(d || new Date());
+  }catch(e){ return (d||new Date()).toISOString().slice(0,10); }
+}
+
+// The base for "today's change". GitHub throttles the refresh cron to a handful of
+// runs a day, so data.json usually holds a *previous* session's settled close — and
+// then that close IS the previous close. Unwinding its day-change (the old
+// behaviour) reached one session too far back: on 2026-08-28 it based MSTR on
+// Tuesday's $123.18 instead of Wednesday's $137.40, turning a -7.2% day into +3.0%.
 function derivePrevClose(){
+  const today = etDateStr();
   for(const tk of ["MSTR","ASST"]){
     const c = DATA.companies && DATA.companies[tk];
-    if(c && c.stockPrice) c._prevClose = c.stockPrice / (1 + (c.dayChangePct||0)/100);
+    if(!c || !c.stockPrice) continue;
+    // priceDateET is stamped by the cron; priceAsOf is the pre-stamp fallback
+    const quoted = c.priceDateET || DATA.priceAsOf;
+    c._staleSession = !!(quoted && quoted < today);
+    c._prevClose = c._staleSession
+      ? c.stockPrice
+      : (c.prevClose || c.stockPrice / (1 + (c.dayChangePct||0)/100));
+    // a prior session's move is not today's; show flat until the first live tick
+    if(c._staleSession && marketOpenET()) c.dayChangePct = 0;
   }
 }
-derivePrevClose();
 
 // 9:30am-4:00pm ET, Mon-Fri (holidays just mean nothing moves)
 function marketOpenET(){
@@ -2074,7 +2173,8 @@ async function repollData(){
       DATA = await r.json(); btcPrice = DATA.btcPriceUsd;
       derivePrevClose();
       renderAll(); renderCharts();
-      fetchLiveEquity();                     // re-apply the freshest tape on top
+      // re-apply the freshest tape on top, strategy.com last
+      fetchLiveEquity().then(fetchStrategyLive);
     }
   }catch(e){ /* keep current data */ }
 }
@@ -2108,8 +2208,12 @@ async function repollData(){
   });
 })();
 
-setInterval(() => { if(marketOpenET()) fetchLiveEquity(); }, 60000);
-setInterval(() => { if(marketOpenET()) fetchLivePrefs(); }, 60000);
+// one chain, not three racing timers: the tracker feed and strategy.com both carry
+// an MSTR quote, and strategy.com (the official consolidated print) has to land last
+setInterval(() => {
+  (marketOpenET() ? fetchLiveEquity().then(fetchLivePrefs) : Promise.resolve())
+    .then(fetchStrategyLive);
+}, 60000);
 setInterval(fetchBtcPrice, 60000);          // BTC trades 24/7 — tick every minute always
 setInterval(() => { if(marketOpenET()) repollData(); }, 5*60*1000);
 </script>

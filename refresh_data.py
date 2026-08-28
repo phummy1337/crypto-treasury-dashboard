@@ -56,6 +56,7 @@ import datetime
 import urllib.request
 import urllib.error
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 DATA_PATH = Path(__file__).with_name("data.json")
 DAILY_POINTS = 260          # trailing daily closes kept for the price chart (~1 year)
@@ -206,6 +207,47 @@ def _iso_lbl(iso, fmt):
     return datetime.date(int(y), int(m), int(d)).strftime(fmt)
 
 
+ET = ZoneInfo("America/New_York")
+
+
+def _et_date(dt):
+    """ET calendar date of an aware/naive-UTC datetime, as an ISO string.
+
+    Sessions are named by their ET date, never UTC: a refresh at 00:04 UTC is
+    8:04pm the *previous* ET day, and a UTC stamp would file that evening's
+    close under tomorrow's session.
+    """
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=datetime.timezone.utc)
+    return dt.astimezone(ET).date().isoformat()
+
+
+def _stamp_price(co, price, chg_pct, date_et):
+    """Record a quote together with the ET session it belongs to and that
+    session's previous close.
+
+    A reported day-change is only meaningful for the session it quotes, and the
+    dashboard has to keep the figure live between refreshes (GitHub throttles the
+    cron to a handful of runs a day). Storing `prevClose` + `priceDateET` lets the
+    frontend rebase on the tape instead of unwinding a stale percentage.
+
+    Sources zero their delta once the session is over — strategytracker reports
+    +0.00% for ASST every evening — so a previous close already recorded for this
+    same session is never overwritten with the price itself; that would erase the
+    day's move from the after-hours refresh onward.
+    """
+    prev = co.get("prevClose")
+    if co.get("priceDateET") != date_et:      # new session: last close is the base
+        prev = None
+    if chg_pct:                               # source still reporting the move
+        prev = price / (1 + chg_pct / 100)
+    elif prev is None:                        # first quote of a session, nothing moved yet
+        prev = price
+    co["prevClose"]    = round(prev, 4)
+    co["priceDateET"]  = date_et
+    co["dayChangePct"] = round((price / prev - 1) * 100, 2) if prev else 0.0
+
+
 def fetch_strategytracker(data):
     """Refresh current metrics + real history for MSTR/ASST from strategytracker."""
     try:
@@ -215,6 +257,11 @@ def fetch_strategytracker(data):
         log(f"[skip] strategytracker failed: {e} — keeping existing values")
         return
     comps = full.get("companies", {})
+    try:
+        tracker_date = _et_date(datetime.datetime.fromisoformat(
+            (full.get("timestamp") or idx["timestamp"]).replace("Z", "+00:00")))
+    except Exception:
+        tracker_date = _et_date(datetime.datetime.now(datetime.timezone.utc))
     try:    # live EURUSD (ECB) for the EUR-denominated STRE notional
         data["eurUsd"] = round(get_json("https://api.frankfurter.dev/v1/latest?base=EUR&symbols=USD")["rates"]["USD"], 4)
     except Exception:
@@ -231,7 +278,8 @@ def fetch_strategytracker(data):
         co["holdings"]      = int(round(pm["latestBtcBalance"]))
         co["avgCost"]       = round(pm["avgCostPerBtc"])
         co["stockPrice"]    = round(pm["stockPrice"], 2)
-        co["dayChangePct"]  = round(pm["stockPriceDelta"]["percent"], 2)
+        _stamp_price(co, co["stockPrice"],
+                     round(pm["stockPriceDelta"]["percent"], 2), tracker_date)
         co["sharesOutstanding"] = round(pm["latestTotalShares"] / 1e6, 2)
         co["floatSharesM"] = round(co["sharesOutstanding"] - CLASS_B_SHARES_M.get(tk, 0), 2)
         # daily shares outstanding (split-adjusted, millions) for per-date float
@@ -391,8 +439,14 @@ def fetch_strategytracker(data):
                         live.setdefault(t, []).append([today, round(cur, 1)])
                     series[t] = st
                 cash_st = sorted(set(map(tuple, MSTR_CASH_STEPS + [tuple(x) for x in live.get("cash", [])])))
-                if abs(cash_st[-1][1] - co["cash"]) > 1.5:
-                    cash_st.append((today, co["cash"])); live.setdefault("cash", []).append([today, co["cash"]])
+                # anchor the newest step on strategy.com's USD reserve, not co["cash"]:
+                # a few lines up the tracker's latestCashBalance overwrote it (it reads
+                # ~$1.6B light today) and kpi #2 only restores the live field afterwards.
+                # Without this the mNAV *series* is built on a different balance sheet
+                # than the live headline and the chart's last point sits ~3% above it.
+                cash_now = (_KPI.get(tk) or {}).get("cash") or co["cash"]
+                if abs(cash_st[-1][1] - cash_now) > 1.5:
+                    cash_st.append((today, cash_now)); live.setdefault("cash", []).append([today, cash_now])
                 debt_st = sorted(set(map(tuple, MSTR_DEBT_STEPS + [tuple(x) for x in live.get("debt", [])])))
                 if abs(debt_st[-1][1] - co["seniorDebt"]) > 1.5:
                     debt_st.append((today, co["seniorDebt"])); live.setdefault("debt", []).append([today, co["seniorDebt"]])
@@ -440,6 +494,21 @@ def fetch_strategytracker(data):
                 span = max(1, len(shs) - 1 - j0)
                 for k in range(j0, len(shs)):
                     shs[k] = shs[j0] + (true_sh - shs[j0]) * (k - j0) / span
+            # Strategy divides its net figure by a fully-diluted count that is basic
+            # plus in-the-money converts plus vested options/RSUs. The converts are
+            # already priced per-point below; the options sliver is not in the feed,
+            # so back it out of today's published count and carry it across the
+            # window. Without it the history sits ~1% under the live headline and the
+            # "today vs trailing average" chips inherit a standing bias.
+            # base on the live basic count netDilutedShares is defined against, NOT
+            # shs[-1] — the tracker's trailing count can sit a filing behind, which
+            # would fold that whole gap into the overlay
+            opt_sh, base_sh = 0.0, true_sh or co.get("sharesOutstanding")
+            net_dil = (_KPI.get(tk) or {}).get("netSharesM") or co.get("netDilutedShares")
+            if net_dil and base_sh:
+                itm_now = sum(t["principal"] * t["convRate"] / 1000
+                              for t in sched if co["stockPrice"] >= t["convPrice"])
+                opt_sh = max(0.0, net_dil - base_sh - itm_now)
             dts_m, px_m, mnv, netv = [], [], [], []
             for idx, (i, d, mc, b, bp, sp) in enumerate(rows):
                 nav = b * bp / 1e6
@@ -456,7 +525,7 @@ def fetch_strategytracker(data):
                 else:
                     otm, itm_sh = debt_at(d, i), 0.0
                 net_res = nav + cash_at(d, i) - otm - pref_at(d)
-                netv.append(round(sp * (shs[idx] + itm_sh) / net_res, 3)
+                netv.append(round(sp * (shs[idx] + itm_sh + opt_sh) / net_res, 3)
                             if net_res > 0 else None)
             if mnv:
                 co["mnavHistory"] = {"dates": dts_m, "px": px_m, "mnav": mnv, "net": netv}
@@ -1350,7 +1419,17 @@ def fetch_strategy_kpi(data):
             # feed lags it by a few minutes after the closing auction settles
             co["stockPrice"] = round(px, 2)
             try:
-                co["dayChangePct"] = round(float(str(k["priceVarPerc"]).replace(",", "")), 2)
+                # priceVarPerc arrives signed, with a `negative` flag alongside it;
+                # honour the flag so a source-side sign drop can't invert the move
+                chg = abs(float(str(k["priceVarPerc"]).replace(",", "")))
+                if k.get("negative"):
+                    chg = -chg
+                # timeStamp is ET ("08/28/2026 02:04 PM") — the session this quote is in
+                try:
+                    d = datetime.datetime.strptime(k["timeStamp"], "%m/%d/%Y %I:%M %p").date().isoformat()
+                except Exception:
+                    d = _et_date(datetime.datetime.now(datetime.timezone.utc))
+                _stamp_price(co, co["stockPrice"], round(chg, 2), d)
             except Exception:
                 pass
         co["seniorDebt"] = round(debt)
@@ -1370,6 +1449,10 @@ def fetch_strategy_kpi(data):
                 # can keep the figure live as BTC moves instead of freezing it
                 net_btc = float(r["netBtcReserve"]) / float(r["ufPrice"])
                 co["netDilutedShares"] = round(net_btc * 1e8 / float(r["netSatsPerShare"]) / 1e6, 2)
+                # stash it: fetch_strategytracker calls _apply_per_share, which
+                # transiently resets the field to the ASSUMED-diluted count, and the
+                # mNAV history builder runs while that stand-in is in place
+                _KPI.setdefault("MSTR", {})["netSharesM"] = co["netDilutedShares"]
             for src, dst in (("mNav", "netMnavPub"), ("amplification", "amplificationPub"),
                              ("btcBreakevenArr", "breakevenArrPub"),
                              ("bitcoinHurdleArr", "hurdleArrPub"),
