@@ -194,6 +194,9 @@ _SHARES_HIST = {}
 _VOL_HIST = {}
 # intraday 15-min candles per preferred ticker, for the ATM tracker
 _ATM_CANDLES = {}
+# 8-K filing index per company: [(filing date, primary doc url)] — lets each
+# action in the log link back to the filing that disclosed it
+_FILINGS = {}
 
 PREF_LABEL = {"STRC": "Stretch · {r}% var", "STRK": "Strike · {r}%", "STRF": "Strife · {r}%",
               "STRD": "Stride · {r}%", "STRE": "STRE · {r}% (EUR)", "SATA": "Strive pref · {r}%"}
@@ -897,6 +900,8 @@ def fetch_holdings(data, max_points=60):
                 if r["form"][i] == "8-K" and docpat.match(r["primaryDocument"][i] or ""):
                     acc = r["accessionNumber"][i].replace("-", "")
                     base = f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{acc}/"
+                    _FILINGS.setdefault(tk, []).append((r["filingDate"][i],
+                                                        base + r["primaryDocument"][i]))
                     yield (base + r["primaryDocument"][i], base)
 
         if tk == "MSTR":
@@ -1118,10 +1123,21 @@ def fetch_holdings(data, max_points=60):
     if "MSTR" in weekly or "ASST" in weekly:
         data["weekly"] = weekly
     if acts:    # merge with previously stored actions so old weeks never drop off
+        # link each action to its source filing: the earliest 8-K filed on or after
+        # the period it covers is the one that disclosed it
+        for a in acts:
+            cand = sorted(x for x in _FILINGS.get(a["co"], []) if x[0] >= a["d"])
+            if cand:
+                a["filed"], a["url"] = cand[0]
         old = {(a["d"], a["co"]): a for a in (data.get("actions") or [])}
         for a in acts:
+            prev = old.get((a["d"], a["co"])) or {}
+            if not a.get("url") and prev.get("url"):     # keep a link we already had
+                a["filed"], a["url"] = prev.get("filed"), prev["url"]
             old[(a["d"], a["co"])] = a
         data["actions"] = sorted(old.values(), key=lambda a: a["d"], reverse=True)[:120]
+        linked = sum(1 for a in data["actions"] if a.get("url"))
+        log(f"[actions] {len(data['actions'])} entries, {linked} linked to a filing")
 
 
 # --------------------------------------------------------------------------- #

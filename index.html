@@ -271,6 +271,12 @@
   .rangechips button:hover { color: var(--text); }
   .rangechips button.active { color: #fff; border-color: rgba(255,255,255,0.45); background: rgba(255,255,255,0.06); }
   section { scroll-margin-top: 54px; }
+  .act-filing { list-style:none; margin-left:-1em; margin-top:5px; }
+  .act-src { font-size:11.5px; font-weight:600; letter-spacing:.4px; color:var(--faint);
+    text-decoration:none; border:1px solid var(--border); border-radius:3px; padding:2px 7px;
+    display:inline-block; }
+  .act-src:hover { color:var(--text); border-color:rgba(255,255,255,0.4); text-decoration:none; }
+  .act-src.none { opacity:.45; }
   /* ATM tracker */
   .atm-pill { font-size:10.5px; font-weight:700; letter-spacing:.8px; padding:2px 7px; border-radius:3px;
     margin-left:8px; vertical-align:middle; border:1px solid; }
@@ -627,8 +633,8 @@
 
   <!-- 9. Company Actions -->
   <section id="actions">
-    <div class="sec-head"><h2>Company Actions</h2></div>
-    <p class="sec-note">A running log of what each company actually did, week by week, straight from their SEC filings — raises, buys, sales, and dividend changes. Newest first; scroll for history.</p>
+    <div class="sec-head"><h2>Company Actions &amp; Filings</h2></div>
+    <p class="sec-note">A running log of what each company actually did, week by week, parsed straight from their SEC filings — raises, buys, sales, buybacks, and dividend changes. Every entry links to the 8-K it came from. Newest first; scroll for history.</p>
     <div class="grid actionsbox" id="grid-actions"></div>
   </section>
 
@@ -1248,9 +1254,14 @@ function renderActions(){
   const dt = iso => new Date(iso+"T00:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});
   el.innerHTML = acts.map(a => {
     const o = DATA.companies[a.co] || {};
+    const src = a.url
+      ? `<a class="act-src" href="${a.url}" target="_blank" rel="noopener"
+           title="Form 8-K filed ${a.filed||""} — opens on SEC EDGAR">8-K${a.filed?" · "+dt(a.filed):""} &#8599;</a>`
+      : `<span class="act-src none" title="No filing linked for this entry">8-K —</span>`;
     return `<div class="act-week"><div class="act-date">${dt(a.d)}</div>
       <div class="act-co" style="color:${o.accent||'#fff'}">${a.co}</div>
-      <ul class="act-items">${a.items.map(x=>`<li>${x}</li>`).join("")}</ul></div>`;
+      <ul class="act-items">${a.items.map(x=>`<li>${x}</li>`).join("")}${
+        `<li class="act-filing">${src}</li>`}</ul></div>`;
   }).join("");
 }
 
