@@ -804,6 +804,8 @@ const METRIC_DEFS = {
     m:"What common shareholders pay per dollar of bitcoin that's actually left for them after the senior claims are satisfied. Strategy adopted this as its headline mNAV in July 2026, and it fixes the accretion threshold at exactly 1.0× — above it, issuing stock to buy bitcoin raises bitcoin-per-share; below it, issuing destroys it."},
   "Net Reserve": {c:"BTC reserve + USD reserve − out-of-the-money convertible debt − preferred notional.",
     m:"The bitcoin value genuinely attributable to common equity once everyone senior has been paid. This is the denominator common shareholders are actually buying, and it's what makes leverage cut both ways: it grows faster than bitcoin on the way up and shrinks faster on the way down."},
+  "Net Leverage": {c:"Senior debt left uncovered by the USD assets (USD Reserve + USD Cash), divided by the BTC reserve. Zero once the dollars on hand fully offset the converts. Taken from strategy.com's published figure for MSTR; the same arithmetic for ASST, which carries no debt.",
+    m:"How much of the bitcoin is really financed rather than owned outright. Strategy reached 0.0% on 30 Aug 2026 — every convertible dollar is matched by a dollar of USD assets, so a bitcoin drawdown can no longer force the debt into the money's way. It is the cleanest single read on whether the leverage story is currently a risk or a formality; it climbs again the moment new debt is issued or the reserve is spent."},
   "Amplification": {c:"BTC reserve ÷ net reserve.",
     m:"How much the residual moves for a given move in bitcoin. At 1.5×, a 20% rise in bitcoin lifts net bitcoin-per-share roughly 30% — that's the leverage common holders are paying a premium to access. It rises as bitcoin falls (the fixed claims eat a bigger share) and decays as bitcoin rises unless the company keeps issuing preferred."},
   "BTC Hurdle Rate": {c:"The effective annual cost of the credit stack. MSTR: taken from strategy.com's published figure, which uses the option-adjusted financing cost of the converts, not just cash coupons. ASST: annual SATA dividends ÷ preferred notional — no converts, so no option adjustment is needed.",
@@ -1128,6 +1130,16 @@ function renderValuation(){
     MSTR:cell(nM,netRows(M),"Net mNAV"), ASST:cell(nA,netRows(A),"Net mNAV")});
   h += row({label:"Net Reserve", sub:"BTC + USD − OTM debt − pref", MSTR:bil(netRes(M)), ASST:bil(netRes(A))});
   h += row({label:"Amplification", sub:"BTC reserve ÷ net reserve", MSTR:fmt(amp(M),2)+"x", ASST:fmt(amp(A),2)+"x"});
+  // Strategy's headline "Net Leverage": senior debt left uncovered by the USD
+  // assets, as a % of BTC NAV. Hits 0.0% once the reserve fully offsets the
+  // converts. Published verbatim for MSTR; the same arithmetic for ASST, which
+  // has no debt and so sits at 0 by construction.
+  const netLev = o => { const n = nav(o);
+    return o.netLeveragePub != null ? o.netLeveragePub
+         : n > 0 ? Math.max(0, (o.seniorDebt || 0) - (o.cash || 0)) / n * 100 : null; };
+  h += row({label:"Net Leverage", sub:"debt not covered by USD assets ÷ BTC NAV",
+    MSTR:fmt(netLev(M),1)+"%", ASST:fmt(netLev(A),1)+"%",
+    betterFor: netLev(M) < netLev(A) ? "MSTR" : netLev(A) < netLev(M) ? "ASST" : null});
   h += row({label:"Duration", sub:"reserve ÷ annual obligations", MSTR:fmt(durY(M),1)+" yrs", ASST:fmt(durY(A),1)+" yrs",
     betterFor: durY(M)>durY(A)?"MSTR":"ASST"});
   h += row({label:"Breakeven BTC Rate", sub:"obligations ÷ reserve", MSTR:fmt(brkE(M),2)+"%/yr", ASST:fmt(brkE(A),2)+"%/yr",
@@ -2118,6 +2130,7 @@ async function fetchStrategyLive(){
     }
     [["amplification","amplificationPub"],["btcBreakevenArr","breakevenArrPub"],
      ["bitcoinHurdleArr","hurdleArrPub"],["btcFailureArr","floorArrPub"],
+     ["debtByBN","netLeveragePub"],
      ["totalDuration","creditDurationPub"]].forEach(([src,dst]) => {
        if(r[src] != null) co[dst] = +r[src];
      });

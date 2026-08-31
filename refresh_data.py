@@ -1677,9 +1677,12 @@ def fetch_strategy_kpi(data):
                 # transiently resets the field to the ASSUMED-diluted count, and the
                 # mNAV history builder runs while that stand-in is in place
                 _KPI.setdefault("MSTR", {})["netSharesM"] = co["netDilutedShares"]
+            # debtByBN is convertible debt as a % of BTC NAV *after* the USD assets
+            # offset it — the figure Strategy markets as "Net Leverage" (it printed
+            # 0.0% on 2026-08-30, when USD assets first fully covered the debt).
             for src, dst in (("mNav", "netMnavPub"), ("amplification", "amplificationPub"),
                              ("btcBreakevenArr", "breakevenArrPub"),
-                             ("bitcoinHurdleArr", "hurdleArrPub"),
+                             ("bitcoinHurdleArr", "hurdleArrPub"), ("debtByBN", "netLeveragePub"),
                              ("btcFailureArr", "floorArrPub"), ("totalDuration", "creditDurationPub")):
                 if r.get(src) is not None:
                     co[dst] = round(float(r[src]), 4)
