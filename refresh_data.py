@@ -857,20 +857,108 @@ def _mstr_dividends_paid(data, start, end):
 _ATM_LABEL = {"STRC": "STRC", "STRF": "STRF", "STRK": "STRK", "STRD": "STRD", "MSTR": "common stock"}
 
 
+def _atm_table(text):
+    """Just the ATM Update table, so per-series rows can't match narrative prose.
+
+    The 2026-08-24 USD Cash framework text says "repurchasing Strategy's MSTR
+    Stock or preferred stock" ~1,900 chars ABOVE the table. An unscoped search
+    anchored on that sentence and read $5.10 billion (the USD Reserve balance)
+    as the common-stock raise — $5M reported against a real $2,006.5M.
+    """
+    # boundary is the section HEADING: the allocation footnote itself contains
+    # "Digital Credit Securities Repurchase Program", and cutting there dropped
+    # every proceeds bucket after the first
+    m = re.search(r"ATM Update(.*?)(?:BTC Update|Repurchase Program Update|Item\s+7\.01|$)", text, re.S)
+    return m.group(1) if m else ""
+
+
+def _atm_rows(text):
+    """{series: net proceeds $mm} from the ATM table. Rows look like
+       '<SER> Stock <shares|-> $ <notional|-> $ <net> (n) $ <available>'
+    so the row must start with a share count or a dash to be a row at all."""
+    tbl, out = _atm_table(text), {}
+    for ser in ("STRC", "STRF", "STRK", "STRD", "STRE", "MSTR"):
+        m = re.search(rf"{ser} Stock\s+(?:[\d,]+|[-–—])\s*(.*?)"
+                      rf"(?=(?:STRC|STRF|STRK|STRD|STRE|MSTR) Stock|Total)", tbl, re.S)
+        if not m:
+            continue
+        nums = [float(x.replace(",", "")) for x in re.findall(r"\$\s*([\d,.]+)", m.group(1))]
+        if len(nums) >= 2 and nums[-2] >= 0.5:     # ... net proceeds, available
+            out[ser] = nums[-2]
+    return out
+
+
+def _atm_check(text, rows):
+    """The table prints its own Total; the per-series rows must reconcile to it.
+
+    This is the guard the 2026-08-24 filing needed: a narrative "MSTR Stock"
+    mention upstream of the table made the common row read $5M against a $2,006M
+    Total, and nothing complained. Any future wording change that breaks a row
+    now shows up as a [drift] line instead of a quietly wrong number.
+    """
+    m = re.search(r"Total\s*\$\s*([\d,.]+)", _atm_table(text))
+    if not m:
+        return
+    total, got = float(m.group(1).replace(",", "")), sum(rows.values())
+    if abs(total - got) > max(1.0, total * 0.01):
+        log(f"[drift] ATM rows sum to ${got:,.1f}M but the table Total is "
+            f"${total:,.1f}M — a row failed to parse (rows: {rows})")
+
+
 def _atm_netM(text):
     """Per-filing ATM net proceeds ($mm): preferred series vs common."""
     out = {"pref": 0.0, "common": 0.0}
-    for ser in ("STRC", "STRF", "STRK", "STRD", "STRE", "MSTR"):
-        m = re.search(rf"{ser} (?:ATM|Stock)\s*(.*?)(?=(?:STRC|STRF|STRK|STRD|STRE|MSTR)\s+(?:ATM|Stock)|Total)", text)
-        if not m:
-            continue
-        seg = m.group(1)
-        if "billion of" in seg:
-            seg = seg[:seg.rfind("$", 0, seg.find("billion of"))]
-        nums = [float(x.replace(",", "")) for x in re.findall(r"\$\s*([\d,.]+)", seg)]
-        if len(nums) >= 2 and nums[-2] >= 0.5:
-            out["common" if ser == "MSTR" else "pref"] += nums[-2]
+    rows = _atm_rows(text)
+    _atm_check(text, rows)
+    for ser, v in rows.items():
+        out["common" if ser == "MSTR" else "pref"] += v
     return out
+
+
+# Where the ATM footnote says the net proceeds went. Match on the noun, not on
+# the verb or word order: Strategy writes "fund bitcoin purchases" one week and
+# "used to purchase bitcoin" another, "fund dividends on" here and "pay dividends"
+# there. Keyed too tightly, a bucket silently vanishes from the summary — which is
+# how the 2026-08-30 filing lost its $369.7M bitcoin and $50.7M dividend lines.
+# Most specific first: a buyback phrase also contains the series name.
+_ALLOC = [(r"repurchases? of (STRC|STRF|STRK|STRD|MSTR) Stock", lambda m: f"{m.group(1)} buybacks"),
+          (r"dividends? on[^.]{0,40}?(STRC|STRF|STRK|STRD)", lambda m: f"{m.group(1)} dividends"),
+          (r"convertible", lambda m: "convert retirement"),
+          (r"dividend", lambda m: "dividends"),
+          (r"bitcoin", lambda m: "bitcoin"),
+          (r"USD Cash", lambda m: "USD Cash"),
+          (r"USD Reserve", lambda m: "USD Reserve")]
+
+
+def _alloc_label(phrase):
+    for pat, lab in _ALLOC:
+        m = re.search(pat, phrase)
+        if m:
+            return lab(m)
+    return None
+
+
+def _atm_allocation(text, raised):
+    """['STRC buybacks $136M', 'USD Reserve $300M', 'USD Cash ~$1,570M'] from the
+    footnote under the ATM table. The 'remaining net proceeds' bucket carries no
+    figure of its own, so it is backed out of the total."""
+    tbl, parts, named = _atm_table(text), [], 0.0
+    for m in re.finditer(r"\$\s?([\d,.]+)\s*(million|billion)\s+in net proceeds[^.$]{0,80}?"
+                         r"were used to ([^,.]{0,90})", tbl):
+        v = float(m.group(1).replace(",", "")) * (1000 if m.group(2) == "billion" else 1)
+        lab = _alloc_label(m.group(3))
+        if lab:
+            parts.append(f"{lab} ${v:,.0f}M"); named += v
+    rem = re.search(r"remaining net proceeds[^.]{0,80}?were used to ([^,.]{0,90})", tbl)
+    if rem and (lab := _alloc_label(rem.group(1))):
+        left = raised - named
+        parts.append(f"{lab} ~${left:,.0f}M" if left > 1 else lab)
+    elif parts and raised and abs(raised - named) > max(1.0, raised * 0.02):
+        # every bucket is itemised (no "remaining" catch-all) yet they don't add up:
+        # a purpose phrase we don't recognise got dropped on the floor
+        log(f"[drift] ATM allocation buckets total ${named:,.1f}M of ${raised:,.1f}M raised "
+            f"— an unrecognised purpose was skipped (got: {parts})")
+    return parts
 
 
 def _mstr_actions(text, rec, fl):
@@ -881,20 +969,20 @@ def _mstr_actions(text, rec, fl):
         items.append(f"Bought {rec[2]:,} BTC" + (f" (~${fl['btcSpent']:,.0f}M at ~${avg:,}/BTC)" if avg else ""))
     elif rec[2] < 0:
         items.append(f"Sold {-rec[2]:,} BTC for ~${fl['btcSold']:,.0f}M")
-    # per-series ATM sales: segment each row, net proceeds = second-to-last $ figure
-    raises = []
-    for s in ("STRC", "STRF", "STRK", "STRD", "MSTR"):
-        m = re.search(rf"{s} (?:ATM|Stock)\s*(.*?)(?=(?:STRC|STRF|STRK|STRD|STRE|MSTR)\s+(?:ATM|Stock)|Total)", text)
-        if not m:
-            continue
-        seg = m.group(1)
-        if "billion of" in seg:
-            seg = seg[:seg.rfind("$", 0, seg.find("billion of"))]
-        nums = [float(x.replace(",", "")) for x in re.findall(r"\$\s*([\d,.]+)", seg)]
-        if len(nums) >= 2 and nums[-2] >= 0.5:
-            raises.append(f"{_ATM_LABEL[s]} ${nums[-2]:,.0f}M")
+    elif re.search(r"No bitcoin purchases or sales were made", text):
+        # say it outright — an omitted line reads like a parse failure, and a week
+        # Strategy did NOT buy is itself the story
+        items.append(f"No bitcoin bought or sold — holdings unchanged at {rec[3]:,} BTC")
+    # per-series ATM sales, scoped to the ATM table (see _atm_table)
+    rows = _atm_rows(text)
+    raises = [f"{_ATM_LABEL[s]} ${v:,.0f}M" for s, v in rows.items() if s in _ATM_LABEL]
     if raises:
-        items.append(f"Raised ~${fl['raised']:,.0f}M net via ATM ({', '.join(raises)})")
+        sh = re.search(r"MSTR Stock\s+([\d,]{7,})\s*\$", _atm_table(text))
+        via = f" ({', '.join(raises)}" + (f", {int(sh.group(1).replace(',','')) / 1e6:.1f}M shares)" if sh else ")")
+        items.append(f"Raised ~${fl['raised']:,.0f}M net via ATM{via}")
+        alloc = _atm_allocation(text, fl["raised"])
+        if alloc:
+            items.append("Proceeds to " + " · ".join(alloc))
     rm = re.search(r"dividend rate[^.]{0,200}?from ([\d.]+)% to ([\d.]+)%", text)
     if rm and "STRC" in text:
         items.append(f"{'Raised' if float(rm.group(2)) > float(rm.group(1)) else 'Cut'} STRC dividend rate "
@@ -913,11 +1001,35 @@ def _mstr_actions(text, rec, fl):
     if cm2:
         v = float(cm2.group(1).replace(",", "")) * (1000 if cm2.group(2) == "billion" else 1)
         items.append(f"Repurchased ~${v:,.0f}M principal of {cm2.group(3)} convertible notes")
-    # weekly USD Reserve balance (disclosed since the Jun-2026 framework)
-    um = re.search(r"balance of the USD Reserve is \$([\d,.]+)\s*(billion|million)", text)
-    if um:
-        v = float(um.group(1).replace(",", "")) * (1000 if um.group(2) == "billion" else 1)
-        items.append(f"USD Reserve at ${v:,.0f}M")
+    # remaining repurchase headroom — sizes what the program can still do
+    auth = []
+    for m in re.finditer(r"\$\s?([\d,.]+)\s*(billion|million) aggregate purchase price of"
+                         r"([^.]{0,60}?)remains available", text):
+        v = float(m.group(1).replace(",", "")) * (1000 if m.group(2) == "billion" else 1)
+        auth.append(f"${v:,.0f}M {'MSTR' if 'MSTR' in m.group(3) else 'preferred'}")
+    if auth:
+        items.append("Buyback capacity left: " + " · ".join(auth))
+    # Weekly balances. The Jun-2026 framework filings wrote one prose sentence;
+    # from 2026-08-24 it became a bulleted pair once USD Cash was introduced.
+    mm = lambda v, u: float(v.replace(",", "")) * (1000 if u == "billion" else 1)
+    bal = [f"{k} ${mm(v, u):,.0f}M"
+           for k, v, u in re.findall(r"USD (Reserve|Cash): \$\s?([\d,.]+)\s*(billion|million)", text)]
+    if not bal:
+        # 2026-08-31 folded the bullets back into one sentence: "the balances of the
+        # USD Reserve and USD Cash were $5.10 billion and $1.61 billion, respectively"
+        pm = re.search(r"balances of the USD Reserve and USD Cash were \$\s?([\d,.]+)\s*(billion|million)"
+                       r"\s*and\s*\$\s?([\d,.]+)\s*(billion|million)", text)
+        if pm:
+            bal = [f"Reserve ${mm(pm.group(1), pm.group(2)):,.0f}M",
+                   f"Cash ${mm(pm.group(3), pm.group(4)):,.0f}M"]
+    if not bal:
+        um = re.search(r"balance of the USD Reserve is \$([\d,.]+)\s*(billion|million)", text)
+        if um:
+            bal = [f"Reserve ${mm(um.group(1), um.group(2)):,.0f}M"]
+    if bal:
+        items.append("USD " + " · ".join(bal))
+    if re.search(r"establishment of\s*[\"“]USD Cash[\"”]", text):
+        items.append("Established USD Cash — a flexible liquidity pool alongside the USD Reserve")
     return items
 
 
@@ -926,7 +1038,9 @@ def _asst_actions(text):
     items = []
     m = re.search(r"purchased ([\d,]+) bitcoin at an average price of approximately \$\s?([\d,]+)", text)
     if m and int(m.group(1).replace(",", "")) > 0:
-        items.append(f"Bought {m.group(1)} BTC at ~${m.group(2)}/BTC avg")
+        # the filings are inconsistent about thousands separators ("1,110" vs "1800")
+        n, px = (int(g.replace(",", "")) for g in m.groups())
+        items.append(f"Bought {n:,} BTC at ~${px:,}/BTC avg")
     cm = re.search(r"Cash and cash equivalents \(in thousands\)\s*\$\s*([\d,]+)\s*\$\s*([\d,]+)", text)
     if cm:
         a, b = (int(cm.group(i).replace(",", "")) / 1000 for i in (1, 2))
@@ -1760,6 +1874,34 @@ def fetch_borrow_fees(data):
         time.sleep(1)                       # be polite: 8 requests total per refresh
 
 
+def record_filing_watermark(data):
+    """Stamp the newest 8-K on EDGAR next to the newest one we actually ingested.
+
+    Filing-derived figures (cash, holdings, share counts, preferred notional)
+    only move when this script runs, and GitHub delivers a fraction of the cron
+    schedule — so the dashboard can sit a filing behind with nothing on the page
+    saying so. The frontend compares these two dates and shows a notice when
+    EDGAR is ahead, instead of presenting last week's balance sheet as current.
+    """
+    for tk, cik in CIK.items():
+        co = data["companies"].get(tk)
+        if not co:
+            continue
+        newest = None
+        try:
+            r = get_json(f"https://data.sec.gov/submissions/CIK{cik}.json")["filings"]["recent"]
+            newest = max((r["filingDate"][i] for i in range(len(r["form"]))
+                          if r["form"][i] == "8-K"), default=None)
+        except Exception as e:
+            log(f"[skip] filing watermark {tk}: {e}")
+        ingested = max((a["filed"] for a in (data.get("actions") or [])
+                        if a["co"] == tk and a.get("filed")), default=None)
+        co["filingWatch"] = {"latestOnEdgar": newest, "ingested": ingested}
+        if newest and ingested and newest > ingested:
+            log(f"[stale] {tk}: EDGAR has an 8-K filed {newest} but the newest "
+                f"ingested is {ingested} — filing-derived figures are behind")
+
+
 # --------------------------------------------------------------------------- #
 # main
 # --------------------------------------------------------------------------- #
@@ -1785,6 +1927,7 @@ def main():
     # cebe / per-share / valuation are computed live in the dashboard.
 
     data["asOf"] = datetime.date.today().isoformat()
+    record_filing_watermark(data)
 
     after = json.dumps(data, sort_keys=True)
     if before == after:

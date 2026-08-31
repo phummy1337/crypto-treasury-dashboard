@@ -301,6 +301,9 @@
   .si-chip b { font-size:14.5px; font-weight:700; font-style:italic; color:#fff; }
   .si-chip b.warn { color:var(--btc); }
   .si-chip b.hot { color:#ff7a7a; }
+  .stale-note { margin: 0 0 12px; padding: 10px 14px; border-radius: 10px; font-size: 13px;
+    color: #FFD9A0; background: rgba(237,25,70,0.10); border: 1px solid rgba(237,25,70,0.35); }
+  .stale-note b { color: #fff; }
   .mnav-ctx { margin: 0 0 8px; }
   .mnav-ctx .si-chip { padding: 3px 9px; font-size: 12px; }
   .mnav-ctx .si-chip b { font-size: 13.5px; }
@@ -638,6 +641,7 @@
   <section id="actions">
     <div class="sec-head"><h2>Company Actions &amp; Filings</h2></div>
     <p class="sec-note">A running log of what each company actually did, week by week, parsed straight from their SEC filings — raises, buys, sales, buybacks, and dividend changes. Every entry links to the 8-K it came from. Newest first; scroll for history.</p>
+    <div id="filing-stale"></div>
     <div class="grid actionsbox" id="grid-actions"></div>
   </section>
 
@@ -1255,6 +1259,34 @@ function renderATM(){
   if(tag){ tag.textContent="seed data"; tag.style.display = any ? "none" : ""; }
 }
 
+/* Filing-derived figures (cash, holdings, share counts, preferred notional) move
+   only when the refresh cron runs, and GitHub delivers a fraction of the schedule.
+   data.sec.gov's submissions index is CORS-open, so the page can at least tell the
+   reader a filing has landed that these numbers don't include yet. The filing
+   BODIES are not CORS-open (200 to a server, no allow-origin header), so this can
+   flag the gap but cannot close it — the cron still has to do the parsing. */
+const SEC_CIK = { MSTR: '0001050446', ASST: '0001920406' };
+async function checkFilingFreshness(){
+  const box = document.getElementById('filing-stale'); if(!box) return;
+  const behind = [];
+  await Promise.all(Object.entries(SEC_CIK).map(async ([tk, cik]) => {
+    const seen = (DATA.companies[tk] || {}).filingWatch?.ingested
+              || Math.max(...(DATA.actions||[]).filter(a=>a.co===tk).map(a=>a.filed||''), '');
+    try{
+      const r = await fetch(`https://data.sec.gov/submissions/CIK${cik}.json`, {cache:'no-store'});
+      if(!r.ok) return;
+      const f = (await r.json()).filings.recent;
+      let newest = '';
+      for(let i=0;i<f.form.length;i++)
+        if(f.form[i]==='8-K' && f.filingDate[i] > newest) newest = f.filingDate[i];
+      if(newest && seen && newest > seen) behind.push({tk, newest, seen});
+    }catch(e){ /* SEC unreachable — say nothing rather than cry wolf */ }
+  }));
+  box.innerHTML = behind.length ? `<div class="stale-note">⚠ ${behind.map(b =>
+      `<b>${b.tk}</b> filed an 8-K on ${b.newest} that isn't reflected here yet (latest ingested: ${b.seen})`
+    ).join(' · ')} — balance-sheet figures are a filing behind until the next refresh.</div>` : '';
+}
+
 function renderActions(){
   const el = document.getElementById("grid-actions"); if(!el) return;
   const acts = DATA.actions || [];
@@ -1681,6 +1713,7 @@ async function loadData(){
   renderCharts();
   initCalc();
   fetchBtcPrice();
+  checkFilingFreshness();
 }
 
 // ---------- implied price calculator ----------

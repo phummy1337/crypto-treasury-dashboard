@@ -4,17 +4,31 @@ name: Refresh data
 
 on:
   schedule:
-    # off-peak minutes — GitHub delays/drops crons scheduled on :00/:30
-    - cron: "40 10 * * 1-5"         # ~6:40 am ET pre-market (UTC-4)
-    - cron: "7,17,27,37,47,57 13-20 * * 1-5"   # ~every 10 min during US market hours
-    # Friday close capture. Requested at 4:01pm ET, but the closing auction needs a
-    # few minutes to settle (a 16:03 run caught MSTR at 118.94 vs the official
+    # off-peak minutes — GitHub delays/drops crons scheduled on :00/:30.
+    #
+    # This used to ask for ~240 runs a week (every 10 min, 13-20 UTC) and GitHub
+    # delivered 2-3 a DAY: it sheds scheduled runs from dense schedules, so the
+    # extra entries were actively costing us delivery. Live prices and mNAV now
+    # refresh client-side from strategy.com, so the cron's real job is the data
+    # only it can reach — SEC filings, short interest, borrow fees, settled
+    # closes. That job needs reliability, not frequency.
+    #
+    # MSTR and ASST both file their weekly 8-Ks on Monday morning ET, so Monday
+    # gets deliberate redundancy across the filing window rather than one shot.
+    - cron: "12 11 * * 1"           # Mon 7:12 am ET — filing window
+    - cron: "22 12 * * 1"           # Mon 8:22 am ET
+    - cron: "32 13 * * 1"           # Mon 9:32 am ET
+    - cron: "42 15 * * 1"           # Mon 11:42 am ET — backstop if the above are dropped
+    - cron: "40 10 * * 2-5"         # ~6:40 am ET pre-market, Tue-Fri
+    - cron: "23 14,17 * * 1-5"      # twice during US market hours
+    # Daily close capture. Requested after 4:00pm ET, but the closing auction needs
+    # a few minutes to settle (a 16:03 run caught MSTR at 118.94 vs the official
     # 119.25), so these fire at ~4:09pm ET. GitHub is UTC-only and delays crons off
-    # :00/:30, hence two entries — 20:09 UTC is EDT, 21:09 UTC is EST. The off-season
-    # one lands ~3:09pm ET, which is harmless (market-hours cron already runs then).
-    - cron: "9 20 * * 5"            # Fri 4:09pm EDT (summer)
-    - cron: "9 21 * * 5"            # Fri 4:09pm EST (winter)
-    - cron: "7 22 * * 5"            # Fri ~5-6pm ET — safety net if the close run is delayed or drops
+    # :00/:30, hence two entries — 20:09 UTC is EDT, 21:09 UTC is EST.
+    - cron: "9 20 * * 1-5"          # 4:09pm EDT (summer)
+    - cron: "9 21 * * 1-5"          # 4:09pm EST (winter)
+    - cron: "7 22 * * 5"            # Fri ~5-6pm ET — safety net if the close run drops
+    - cron: "17 14 * * 6"           # Sat — catch anything filed late Friday
   workflow_dispatch:               # manual "Run workflow" button
 
 permissions:
