@@ -5,13 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>APYX — BTC Treasury &amp; Digital Credit Tracker</title>
 <meta name="description" content="Live analytics on Strategy (MSTR · STRC) and Strive (ASST · SATA): mNAV, CEBE, accumulation, capital structure, and implied price models. Powered by APYX.">
-<link rel="canonical" href="https://treasurytracker.xyz/">
+<link rel="canonical" href="https://treasurytracker.net/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Treasury Tracker">
 <meta property="og:title" content="BTC Treasury &amp; Digital Credit Tracker">
 <meta property="og:description" content="Live analytics on Strategy (MSTR · STRC) and Strive (ASST · SATA): mNAV, CEBE, accumulation, capital structure, and implied price models. Powered by APYX.">
-<meta property="og:url" content="https://treasurytracker.xyz/">
-<meta property="og:image" content="https://treasurytracker.xyz/og-card-v2.jpg">
+<meta property="og:url" content="https://treasurytracker.net/">
+<meta property="og:image" content="https://treasurytracker.net/og-card-v2.jpg">
   <meta property="og:image:type" content="image/jpeg">
   <meta property="og:image:alt" content="BTC Treasury &amp; Digital Credit Tracker — live MSTR, STRC, ASST and SATA analytics">
 <meta property="og:image:width" content="1200">
@@ -19,7 +19,7 @@
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="BTC Treasury &amp; Digital Credit Tracker">
 <meta name="twitter:description" content="Live MSTR · STRC · ASST · SATA analytics — mNAV, CEBE, accumulation, capital structure, implied price models. Powered by APYX.">
-<meta name="twitter:image" content="https://treasurytracker.xyz/og-card-v2.jpg">
+<meta name="twitter:image" content="https://treasurytracker.net/og-card-v2.jpg">
   <meta name="twitter:image:alt" content="BTC Treasury &amp; Digital Credit Tracker — live MSTR, STRC, ASST and SATA analytics">
 <link rel="icon" href="apyx-logo.svg" type="image/svg+xml">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
@@ -1975,7 +1975,7 @@ async function shareCard(){
   }catch(e){}
   // footer
   x.font=F("400 16px"); x.fillStyle="#9aa0a6";
-  x.fillText("treasurytracker.xyz  ·  a model, not investment advice  ·  "+new Date().toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}), 56, H-34);
+  x.fillText("treasurytracker.net  ·  a model, not investment advice  ·  "+new Date().toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}), 56, H-34);
   cv.toBlob(async blob => {
     try{ await navigator.clipboard.write([new ClipboardItem({"image/png": blob})]); }catch(e){}
     const a = document.createElement("a");
