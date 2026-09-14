@@ -1,7 +1,7 @@
 {
   "asOf": "2026-09-14",
   "priceAsOf": "2026-09-14",
-  "btcPriceUsd": 78553,
+  "btcPriceUsd": 78273,
   "btcSupply": 21000000,
   "btcCirculating": 20084421,
   "companies": {
@@ -136,7 +136,7 @@
       "capStructAsOf": "2026-03-31 (10-Q)",
       "dilutedShares": 450.09,
       "marketCapBasic": 29540,
-      "navPremiumBasic": 0.867,
+      "navPremiumBasic": 0.87,
       "treasuryDate": "2026-08-31",
       "bpsHistory": {
         "dates": [
@@ -3404,7 +3404,7 @@
           1.074,
           1.073,
           1.079,
-          1.092
+          1.096
         ],
         "net": [
           1.584,
@@ -3755,7 +3755,7 @@
           1.106,
           1.105,
           1.114,
-          1.13
+          1.135
         ]
       },
       "strcNotionalSteps": [
@@ -4128,7 +4128,7 @@
       "borrowFee": {
         "pct": 0.26,
         "avail": 10000000,
-        "asOf": "2026-09-14 18:55:48"
+        "asOf": "2026-09-14 19:42:41"
       },
       "borrowFeeHist": {
         "iso": [
@@ -4219,7 +4219,7 @@
       "prefBorrowFee": {
         "pct": 0.41,
         "avail": 2600000,
-        "asOf": "2026-09-14 18:55:48"
+        "asOf": "2026-09-14 19:42:41"
       },
       "prefBorrowFeeHist": {
         "iso": [
@@ -4309,12 +4309,12 @@
       },
       "assumedDilutedShares": 450.11,
       "_dilOverlayM": 29.607,
-      "netSatsPerShare": 154631,
+      "netSatsPerShare": 154515,
       "netMnavPub": 1.1187,
-      "amplificationPub": 1.2874,
-      "breakevenArrPub": 2.4809,
-      "hurdleArrPub": 10.7,
-      "floorArrPub": -15.9244,
+      "amplificationPub": 1.2883,
+      "breakevenArrPub": 2.4874,
+      "hurdleArrPub": 10.6941,
+      "floorArrPub": -15.8862,
       "creditDurationPub": 6.4279,
       "netDilutedShares": 424.5,
       "atm": {
@@ -4499,7 +4499,7 @@
         "latestOnEdgar": "2026-09-14",
         "ingested": "2026-09-14"
       },
-      "netLeveragePub": 0.4767
+      "netLeveragePub": 0.478
     },
     "ASST": {
       "name": "Strive",
@@ -4552,7 +4552,7 @@
       "capStructAsOf": "2026-06-18 (8-K)",
       "dilutedShares": 124.74,
       "marketCapBasic": 925,
-      "navPremiumBasic": 1.403,
+      "navPremiumBasic": 1.409,
       "treasuryDate": "2026-09-11",
       "bpsHistory": {
         "dates": [
@@ -6560,7 +6560,7 @@
           1.766,
           1.765,
           1.775,
-          1.804
+          1.81
         ],
         "net": [
           1.3,
@@ -6819,7 +6819,7 @@
           2.369,
           2.366,
           2.39,
-          2.417
+          2.433
         ]
       },
       "cashUsd": 204.2,
@@ -6967,7 +6967,7 @@
       "borrowFee": {
         "pct": 0.88,
         "avail": 550000,
-        "asOf": "2026-09-14 18:55:48"
+        "asOf": "2026-09-14 19:42:41"
       },
       "borrowFeeHist": {
         "iso": [
@@ -7058,7 +7058,7 @@
       "prefBorrowFee": {
         "pct": 26.89,
         "avail": 450000,
-        "asOf": "2026-09-14 18:55:48"
+        "asOf": "2026-09-14 19:42:41"
       },
       "prefBorrowFeeHist": {
         "iso": [
@@ -7148,7 +7148,7 @@
       },
       "_dilOverlayM": 3.1703,
       "assumedDilutedShares": 98.14,
-      "netSatsPerShare": 15278,
+      "netSatsPerShare": 15242,
       "netDilutedShares": 98.14,
       "atm": {
         "ticker": "SATA",
@@ -7162,10 +7162,10 @@
         "todayTotalUsd": 46920116,
         "todayEligUsd": 41951573,
         "todayEstUsd": 11248109,
-        "todayEstBtc": 143.19,
+        "todayEstBtc": 143.7,
         "weekEligUsd": 41951573,
         "weekEstUsd": 11248109,
-        "weekEstBtc": 143.19,
+        "weekEstBtc": 143.7,
         "confirmed": {
           "from": "2026-09-04",
           "to": "2026-09-11",
