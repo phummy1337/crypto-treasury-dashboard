@@ -1,9 +1,9 @@
 {
   "asOf": "2026-09-16",
   "priceAsOf": "2026-09-16",
-  "btcPriceUsd": 76397,
+  "btcPriceUsd": 75702,
   "btcSupply": 21000000,
-  "btcCirculating": 20085225,
+  "btcCirculating": 20085368,
   "companies": {
     "MSTR": {
       "name": "Strategy",
@@ -12,13 +12,13 @@
       "prefTicker": "STRC",
       "asset": "BTC",
       "accent": "#ed1946",
-      "stockPrice": 126.04,
-      "dayChangePct": -2.75,
+      "stockPrice": 126.18,
+      "dayChangePct": -2.64,
       "sharesOutstanding": 420.49,
       "betaBtc": 1.37,
       "week52Low": 82.31,
       "week52High": 359.69,
-      "prefPrice": 97.85,
+      "prefPrice": 97.07,
       "holdings": 845050,
       "pctSupply": 4.024,
       "netChangeYtd": 172550,
@@ -41,7 +41,7 @@
       "prefNotional": 14617,
       "annualObligations": 1661,
       "staking": 0,
-      "prefChangePct": 0.73,
+      "prefChangePct": -0.07,
       "yearEnd": {
         "2020": 70470,
         "2021": 124391,
@@ -136,7 +136,7 @@
       "capStructAsOf": "2026-03-31 (10-Q)",
       "dilutedShares": 450.09,
       "marketCapBasic": 29540,
-      "navPremiumBasic": 0.825,
+      "navPremiumBasic": 0.83,
       "treasuryDate": "2026-08-31",
       "bpsHistory": {
         "dates": [
@@ -1197,7 +1197,7 @@
         "dtcLive": 1.47
       },
       "daysToCover": 1.0,
-      "prefMarket": 13672,
+      "prefMarket": 13541,
       "prefHistory": {
         "dates": [
           "Jul 25",
@@ -2067,7 +2067,7 @@
           98.64,
           98.91,
           97.14,
-          97.86
+          97.07
         ],
         "notional": [
           null,
@@ -3065,7 +3065,7 @@
           130.97,
           136.94,
           129.6,
-          125.71
+          126.18
         ],
         "mnav": [
           1.474,
@@ -3418,7 +3418,7 @@
           1.079,
           1.098,
           1.087,
-          1.059
+          1.063
         ],
         "net": [
           1.584,
@@ -3771,7 +3771,7 @@
           1.114,
           1.137,
           1.124,
-          1.087
+          1.093
         ]
       },
       "strcNotionalSteps": [
@@ -4139,7 +4139,7 @@
           2.17,
           1.54
         ],
-        "dtcLive": 1.81
+        "dtcLive": 1.76
       },
       "borrowFee": {
         "pct": 0.25,
@@ -4333,24 +4333,24 @@
       },
       "assumedDilutedShares": 450.1,
       "_dilOverlayM": 29.607,
-      "netSatsPerShare": 153143,
-      "netMnavPub": 1.084,
-      "amplificationPub": 1.2999,
-      "breakevenArrPub": 2.564,
+      "netSatsPerShare": 152961,
+      "netMnavPub": 1.0838,
+      "amplificationPub": 1.3014,
+      "breakevenArrPub": 2.5742,
       "hurdleArrPub": 10.6907,
-      "floorArrPub": -15.7508,
-      "creditDurationPub": 6.3219,
+      "floorArrPub": -15.8833,
+      "creditDurationPub": 6.2579,
       "netDilutedShares": 424.5,
       "atm": {
         "ticker": "STRC",
         "par": 100.0,
         "threshold": 99.95,
         "status": "standby",
-        "vsPar": -2.15,
+        "vsPar": -2.93,
         "captureRate": 0.75,
         "captureBasis": "no issuance in the week to 2026-08-30",
         "asOf": "2026-09-16",
-        "todayTotalUsd": 72591744,
+        "todayTotalUsd": 111518212,
         "todayEligUsd": 0,
         "todayEstUsd": 0,
         "todayEstBtc": 0.0,
@@ -4512,18 +4512,18 @@
           },
           {
             "d": "2026-09-16",
-            "tot": 72591744,
+            "tot": 111518212,
             "elig": 0
           }
         ]
       },
-      "prevClose": 129.6041,
+      "prevClose": 129.6015,
       "priceDateET": "2026-09-16",
       "filingWatch": {
         "latestOnEdgar": "2026-09-14",
         "ingested": "2026-09-14"
       },
-      "netLeveragePub": 0.4927
+      "netLeveragePub": 0.4946
     },
     "ASST": {
       "name": "Strive",
@@ -4532,13 +4532,13 @@
       "prefTicker": "SATA",
       "asset": "BTC",
       "accent": "#4c9fff",
-      "stockPrice": 27.61,
-      "dayChangePct": 0.16,
+      "stockPrice": 27.41,
+      "dayChangePct": -0.58,
       "sharesOutstanding": 94.97,
       "betaBtc": 1.4,
       "week52Low": 7.16,
       "week52High": 86.0,
-      "prefPrice": 99.93,
+      "prefPrice": 100.01,
       "holdings": 25000,
       "pctSupply": 0.119,
       "netChangeYtd": 17373,
@@ -4556,12 +4556,12 @@
       "satsPer100": 81000,
       "mnav": 1.18,
       "cebeMnav": 1.88,
-      "cash": 254,
+      "cash": 253,
       "seniorDebt": 0,
       "prefNotional": 1040,
       "annualObligations": 135,
       "staking": 0,
-      "prefChangePct": -0.07,
+      "prefChangePct": 0.01,
       "yearEnd": {
         "2025": 7627
       },
@@ -4576,7 +4576,7 @@
       "capStructAsOf": "2026-06-18 (8-K)",
       "dilutedShares": 124.74,
       "marketCapBasic": 925,
-      "navPremiumBasic": 1.384,
+      "navPremiumBasic": 1.376,
       "treasuryDate": "2026-09-11",
       "bpsHistory": {
         "dates": [
@@ -4945,7 +4945,7 @@
         "dtcLive": 1.93
       },
       "daysToCover": 1.89,
-      "prefMarket": 1039,
+      "prefMarket": 1040,
       "prefHistory": {
         "dates": [
           "Nov 6",
@@ -5596,7 +5596,7 @@
           99.75,
           100.01,
           100.0,
-          99.92
+          100.01
         ],
         "notional": [
           null,
@@ -6337,7 +6337,7 @@
           27.62,
           29.03,
           27.57,
-          27.61
+          27.41
         ],
         "mnav": [
           1.172,
@@ -6598,7 +6598,7 @@
           1.775,
           1.813,
           1.801,
-          1.799
+          1.791
         ],
         "net": [
           1.3,
@@ -6859,7 +6859,7 @@
           2.39,
           2.438,
           2.451,
-          2.444
+          2.432
         ]
       },
       "cashUsd": 204.2,
@@ -7002,7 +7002,7 @@
           5.02,
           0.68
         ],
-        "dtcLive": 0.52
+        "dtcLive": 0.49
       },
       "borrowFee": {
         "pct": 0.85,
@@ -7196,24 +7196,24 @@
       },
       "_dilOverlayM": 3.1703,
       "assumedDilutedShares": 98.14,
-      "netSatsPerShare": 14990,
+      "netSatsPerShare": 14894,
       "netDilutedShares": 98.14,
       "atm": {
         "ticker": "SATA",
         "par": 100.0,
         "threshold": 99.95,
-        "status": "standby",
-        "vsPar": -0.07,
+        "status": "active",
+        "vsPar": 0.01,
         "captureRate": 0.268,
         "captureBasis": "calibrated: $40.3M issued 2026-09-04 to 2026-09-11",
         "asOf": "2026-09-16",
-        "todayTotalUsd": 24815392,
-        "todayEligUsd": 1051612,
-        "todayEstUsd": 281960,
-        "todayEstBtc": 3.69,
-        "weekEligUsd": 80848312,
-        "weekEstUsd": 21677153,
-        "weekEstBtc": 283.74,
+        "todayTotalUsd": 44467241,
+        "todayEligUsd": 19151817,
+        "todayEstUsd": 5135010,
+        "todayEstBtc": 67.83,
+        "weekEligUsd": 93167774,
+        "weekEstUsd": 24980263,
+        "weekEstBtc": 329.98,
         "confirmed": {
           "from": "2026-09-04",
           "to": "2026-09-11",
@@ -7364,17 +7364,17 @@
           },
           {
             "d": "2026-09-15",
-            "tot": 69790844,
-            "elig": 37848851
+            "tot": 46724791,
+            "elig": 32068107
           },
           {
             "d": "2026-09-16",
-            "tot": 24815392,
-            "elig": 1051612
+            "tot": 44467241,
+            "elig": 19151817
           }
         ]
       },
-      "prevClose": 27.5659,
+      "prevClose": 27.5699,
       "priceDateET": "2026-09-16",
       "sataNotionalSteps": [
         [
@@ -8578,7 +8578,7 @@
       130.97,
       136.94,
       129.6,
-      125.71
+      126.18
     ],
     "ASST": [
       73.6,
@@ -8945,7 +8945,7 @@
       27.62,
       29.03,
       27.57,
-      27.61
+      27.41
     ]
   },
   "weekly": {
