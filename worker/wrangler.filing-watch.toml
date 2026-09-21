@@ -1,0 +1,18 @@
+name = "treasurytracker-filing-watch"
+main = "filing-watch-worker.js"
+compatibility_date = "2026-09-21"
+
+# Cloudflare cron triggers (UTC). Both issuers file Monday morning ET, so Monday
+# is watched tightly and the rest of the week loosely. Each tick is two cheap
+# EDGAR reads plus one data.json read, and only dispatches when EDGAR is ahead —
+# so the tight Monday cadence costs essentially nothing.
+[triggers]
+crons = [
+  "*/10 11-20 * * 1",   # Mon 07:10–16:50 ET, every 10 min — the filing window
+  "*/30 11-21 * * 2-5", # Tue–Fri, every 30 min
+  "25 */6 * * *",       # safety net, four times a day, any day
+]
+
+# Secret (set once, never committed):
+#   wrangler secret put GH_TOKEN
+# Fine-grained PAT, this repo only, Actions = Read and write.
