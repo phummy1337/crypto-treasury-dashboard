@@ -1,0 +1,12 @@
+name = "treasurytracker-quotes"
+main = "quotes-worker.js"
+compatibility_date = "2026-09-18"
+
+# Deploy:  cd worker && wrangler deploy
+#
+# Optionally bind it to a route on a domain you already own so the page calls a
+# first-party host rather than *.workers.dev:
+# routes = [
+#   { pattern = "quotes.treasurytracker.net/*", zone_name = "treasurytracker.net" }
+# ]
+# (that needs a proxied DNS record for `quotes` in the treasurytracker.net zone)

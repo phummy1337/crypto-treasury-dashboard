@@ -176,6 +176,10 @@ def _step(steps, iso):
 # offering, per 8-K) = €775mm, converted at the live ECB EURUSD rate each refresh.
 # The tracker carries a stale fixed conversion ($899mm), so we override it.
 STRE_EUR_NOTIONAL = 775.0
+# The USD stated amount Strategy carries STRE at in its own preferred total: the
+# issue-date conversion of the €775M, fixed since Nov 2025. Kept as a constant
+# rather than EUR x spot so our five-series sum ties to strategy.com's figure.
+STRE_USD_STATED = 899.0
 
 # Insider super-voting Class B shares (millions) — never part of the float.
 # From the 2026-03-31 10-Q covers (iXBRL dei:EntityCommonStockSharesOutstanding):
@@ -318,8 +322,14 @@ def fetch_strategytracker(data):
             for p in ps:
                 t = p["ticker"]
                 notM = p.get("notionalMillions") or round((p.get("notionalUSD") or 0) / 1e6)
-                if t == "STRE" and data.get("eurUsd"):
-                    notM = round(STRE_EUR_NOTIONAL * data["eurUsd"])
+                if t == "STRE":
+                    # Carry STRE at the fixed USD stated amount Strategy itself uses
+                    # ($899M, the issue-date conversion of €775M), NOT a live-FX mark.
+                    # Marking it to spot made our total read ~$9M under theirs, and
+                    # readers reconcile this page against strategy.com. The economic
+                    # argument for a live mark is real — the claim is EUR-denominated —
+                    # but matching the source everyone checks against wins here.
+                    notM = STRE_USD_STATED
                 if t == "SATA" and _SATA.get("steps"):
                     filed = _SATA["steps"][-1][1]     # filed count x par; filings win
                     if abs(filed - notM) > 1:
@@ -371,6 +381,24 @@ def fetch_strategytracker(data):
                         no.append(round(n) if n is not None else None)
                     if px:
                         co["prefHistory"] = {"dates": dts, "iso": isod, "px": px, "notional": no}
+            # STRC is the only series with a live ATM and buyback programme, and the
+            # tracker's notional for it runs one filing behind — on 2026-09-18 it still
+            # carried the 1,420,467 shares Strategy had already retired, putting our
+            # total $132M over theirs. Strategy publishes the authoritative preferred
+            # total in its KPI API, so back STRC out as the residual: the other four
+            # series are static between issuances, so the residual IS STRC, and this
+            # self-corrects every week without us chasing buyback disclosures.
+            pub_total = (_KPI.get("MSTR") or {}).get("prefTotal")
+            if tk == "MSTR" and pub_total and len(bd) >= 4:
+                others = sum(x[2] for x in bd if x[0] != "STRC")
+                implied = pub_total - others
+                for row in bd:
+                    if row[0] == "STRC" and implied > 0:
+                        if abs(implied - row[2]) > 1:
+                            log(f"[drift] STRC notional: tracker ${row[2]:,.0f}M vs "
+                                f"${implied:,.0f}M implied by strategy.com's ${pub_total:,.0f}M "
+                                f"preferred total — using implied")
+                        row[2] = round(implied)
             bd.sort(key=lambda x: -x[2])
             co["prefBreakdown"] = bd
             co["prefNotional"] = round(sum(x[2] for x in bd))
@@ -776,11 +804,35 @@ def _parse_mstr(text):
         acquired = 0 if tm.group(1).strip() == "-" else int(tm.group(1).replace(",", ""))
         return (start, end, acquired, int(tm.group(2).replace(",", "")), int(tm.group(3).replace(",", "")))
 
-    # prose no-purchase week
+    # Prose no-purchase week. The sentence carries the restated cost basis —
+    # "...acquired at an aggregate purchase price of $63.73 billion and an average
+    # purchase price of approximately $75,412 per bitcoin" — and dropping it let
+    # strategytracker's own (higher) avgCostPerBtc stand unchallenged, which is how
+    # the basis drifted 75,412 -> 75,678 over two purchase-free weeks.
     pm = re.search(r"holds approximately ([\d,]{5,}) bitcoin", text, re.I)
     if pm and re.search(r"did not (?:purchase|acquire)", text, re.I):
-        return (start, end, 0, int(pm.group(1).replace(",", "")), None)
+        am = re.search(r"average purchase price of approximately \$\s?([\d,]+)", text, re.I)
+        avg = int(am.group(1).replace(",", "")) if am else None
+        return (start, end, 0, int(pm.group(1).replace(",", "")), avg)
     return None
+
+
+def _mstr_cost_basis(text):
+    """(aggregate purchase price $M, average $/BTC) from an MSTR 8-K, either shape.
+
+    Used to reconcile holdings x avgCost against the filed aggregate — the check
+    that would have caught the 2026-09-11 drift on the day it happened.
+    """
+    pm = re.search(r"aggregate purchase price of \$\s?([\d,.]+)\s*(billion|million)"
+                   r".{0,120}?average purchase price of approximately \$\s?([\d,]+)", text, re.I)
+    if pm:
+        agg = float(pm.group(1).replace(",", "")) * (1000 if pm.group(2).lower() == "billion" else 1)
+        return agg, int(pm.group(3).replace(",", ""))
+    # table shape: "<holdings> $ <aggregate in billions> $ <average>"
+    tm = re.search(r"Aggregate BTC Holdings.*?[\d,]{5,}\s+\$\s*([\d,.]+)\s+\$\s*([\d,]+)", text, re.S)
+    if tm:
+        return float(tm.group(1).replace(",", "")) * 1000, int(tm.group(2).replace(",", ""))
+    return None, None
 
 
 def _asst_obs(text):
@@ -1204,6 +1256,7 @@ def fetch_holdings(data, max_points=60):
             flows = {"raised": 0.0, "btcSpent": 0.0, "btcSold": 0.0}
             flow_asof = anchor
             pts, seen, fetched = [], set(), 0
+            newest_txt = ""          # EDGAR lists newest first, so the first hit is it
             for url, base in docs():
                 try:
                     t8 = _edgar_text(url)
@@ -1213,6 +1266,8 @@ def fetch_holdings(data, max_points=60):
                 fetched += 1
                 if rec and rec[1] and rec[3] and rec[1] not in seen:
                     seen.add(rec[1]); pts.append(rec)
+                    if not newest_txt:
+                        newest_txt = t8
                     fl = _parse_flows(t8) if t8 else {"raised": 0, "btcSpent": 0, "btcSold": 0}
                     if rec[1] > anchor:                    # roll cash forward from filed anchor
                         for k in flows: flows[k] += fl[k]
@@ -1248,6 +1303,21 @@ def fetch_holdings(data, max_points=60):
             cur = pts[-1][3]
             if pts[-1][4]:      # authoritative avg purchase price from the latest 8-K
                 data["companies"][tk]["avgCost"] = pts[-1][4]
+            # Reconcile the cost basis against the aggregate the filing states.
+            # strategytracker publishes its own avgCostPerBtc and it drifts from the
+            # filed figure; without this the two can diverge silently for weeks.
+            agg_filed, avg_filed = _mstr_cost_basis(newest_txt) if newest_txt else (None, None)
+            if agg_filed and avg_filed:
+                co_ = data["companies"][tk]
+                co_["avgCost"] = avg_filed
+                co_["costBasisFiledM"] = round(agg_filed)
+                implied = cur * avg_filed / 1e6          # $M
+                if abs(implied - agg_filed) > max(50.0, agg_filed * 0.005):
+                    log(f"[drift] {tk} cost basis: {cur:,} BTC x ${avg_filed:,} = "
+                        f"${implied:,.0f}M but the filing states ${agg_filed:,.0f}M")
+                else:
+                    log(f"[cost basis] {tk}: {cur:,} BTC @ ${avg_filed:,} = ${implied/1000:,.2f}B "
+                        f"(filed ${agg_filed/1000:,.2f}B)")
             # estimated current cash: filed anchor + weekly flows − scheduled dividends
             divs = _mstr_dividends_paid(data, anchor, flow_asof)
             est = MSTR_CASH_FILED[1] + flows["raised"] + flows["btcSold"] - flows["btcSpent"] - divs
@@ -1659,7 +1729,8 @@ def fetch_strategy_kpi(data):
         co["seniorDebt"] = round(debt)
         if cash > 0:
             co["cash"] = cash
-        _KPI["MSTR"] = {"sharesM": co["sharesOutstanding"], "debt": round(debt), "cash": cash}
+        _KPI["MSTR"] = {"sharesM": co["sharesOutstanding"], "debt": round(debt), "cash": cash,
+                        "prefTotal": round(pref)}   # authoritative preferred total
         _apply_per_share(co, "MSTR")      # rebase per-share onto the live count
         # Strategy publishes BTC-per-share and Net-BTC-per-share itself; take those
         # verbatim so our headline can never drift from strategy.com/btc.
