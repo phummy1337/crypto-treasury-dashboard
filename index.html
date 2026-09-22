@@ -586,6 +586,7 @@
         <button class="cobtn" data-co="ASST">ASST · Strive</button>
         <span class="calc-snap" id="calc-snap"></span>
         <button class="cobtn" id="ci-share" title="Download a shareable image of these assumptions and results">&#128247; Share Card</button>
+        <button class="cobtn" id="ci-link" title="Copy a link that reopens these exact assumptions">&#128279; Copy link</button>
       </div>
       <div class="calc-inputs">
         <label>BTC Price Target ($)<input type="number" id="ci-btc" value="150000" step="5000" min="1000"></label>
@@ -2139,12 +2140,92 @@ async function shareCard(){
   exportCanvas(cv, `apyx-${calcCo.toLowerCase()}-implied-price.png`, btn);
 }
 
+// ---------- calculator permalinks: the scenario travels in the URL ----------
+// Short keys keep the link readable; the DOM id is the source of truth for bounds.
+const CALC_HASH_KEYS = { btc:"ci-btc", m:"ci-months", pref:"ci-pref", common:"ci-common",
+  floor:"ci-floor", rate:"ci-rate", fund:"ci-fund", runway:"ci-runway", mnav:"ci-mnav" };
+// The markup is the schema -- every input carries min and step -- but only four
+// carry max. These are the ceilings for the five that do not, so a hand-edited
+// link cannot push simulate() somewhere it renders NaN all the way through.
+const CALC_HASH_MAX = { "ci-btc":1e7, "ci-pref":1e5, "ci-common":1e5, "ci-rate":100, "ci-mnav":100 };
+
+function clampCalcInput(el, raw){
+  const v = parseFloat(raw);
+  if(!isFinite(v)) return null;
+  const min = el.min !== "" ? parseFloat(el.min) : -Infinity;
+  const max = el.max !== "" ? parseFloat(el.max)
+            : (CALC_HASH_MAX[el.id] !== undefined ? CALC_HASH_MAX[el.id] : Infinity);
+  return Math.min(max, Math.max(min, v));
+}
+
+// Everything in the hash is untrusted: numbers are clamped, the company and the
+// mNAV basis are whitelists. Returns null when the link carries no query at all.
+function parseCalcHash(){
+  const q = location.hash.indexOf("?");
+  if(q < 0) return null;
+  const p = new URLSearchParams(location.hash.slice(q+1));
+  const out = { inputs:{} };
+  const co = (p.get("co") || "").toUpperCase();
+  if(DATA.companies && DATA.companies[co]) out.co = co;
+  for(const key in CALC_HASH_KEYS){
+    if(!p.has(key)) continue;
+    const el = document.getElementById(CALC_HASH_KEYS[key]);
+    if(!el) continue;
+    const v = clampCalcInput(el, p.get(key));
+    if(v !== null) out.inputs[CALC_HASH_KEYS[key]] = v;
+  }
+  const b = p.get("basis");
+  if(b === "net" || b === "ev") out.basis = b;
+  return out;
+}
+
+// Write the validated values back into the inputs and let runCalc() read them, so
+// the DOM stays the single source of truth and no second field list exists.
+function applyCalcHash(link){
+  for(const id in link.inputs){
+    const el = document.getElementById(id);
+    if(el) el.value = link.inputs[id];
+  }
+  if(link.basis){
+    const sel = document.getElementById("ci-basis");
+    if(sel) sel.value = link.basis;
+  }
+  document.querySelectorAll(".cobtn[data-co]").forEach(b =>
+    b.classList.toggle("active", b.dataset.co === calcCo));
+}
+
+// replaceState, not a hash assignment: typing in a number field should not push a
+// history entry per keystroke. replaceState also fires no hashchange, so the
+// writer cannot loop back into the reader.
+function writeCalcToHash(){
+  const cfg = readCalcCfg();      // same read the calculator and share card use
+  const p = new URLSearchParams();
+  p.set("co", calcCo);
+  for(const key in CALC_HASH_KEYS){
+    const el = document.getElementById(CALC_HASH_KEYS[key]);
+    if(el) p.set(key, el.value);
+  }
+  p.set("basis", cfg.basis);
+  lastCalcQuery = p.toString();
+  try{ history.replaceState(null, "", location.pathname + "#calc?" + lastCalcQuery); }catch(e){}
+}
+let calcHashTimer = null;
+// Leaving the calculator strips the hash, so hold the scenario here: otherwise
+// building one, glancing at the dashboard and coming back would lose the link.
+let lastCalcQuery = "";
+function queueCalcHash(){
+  clearTimeout(calcHashTimer);
+  calcHashTimer = setTimeout(writeCalcToHash, 400);
+}
+
 function initCalc(){
   if(!document.getElementById("calc-out")) return;
   // Tab routing owns ONLY the #calc hash. Section anchors (#valuation etc.) must
   // pass straight through to the browser — routing them as "not calc" used to
   // scroll to top and strip the hash, which broke every section-nav link.
-  const isCalcHash = () => /^#calc(ulator)?$/i.test(location.hash);
+  // The (\?|$) is what lets a permalink through: #calc?btc=... must still route
+  // to the calculator, not fall through to the browser as a section anchor.
+  const isCalcHash = () => /^#calc(ulator)?(\?|$)/i.test(location.hash);
   const setTab = (tab, opts={}) => {
     const changing = document.body.classList.contains("tab-calc") !== (tab==="calc");
     document.querySelectorAll(".tabbtn").forEach(x=>x.classList.toggle("active", x.dataset.tab===tab));
@@ -2154,16 +2235,32 @@ function initCalc(){
       if(tab==="calc") runCalc();   // re-render the chart once visible
     }
     if(opts.writeHash){             // only tab clicks rewrite the hash
-      const want = tab==="calc" ? "#calc" : "";
-      if(location.hash !== want && (want || isCalcHash()))
-        try{ history.replaceState(null, "", location.pathname + want); }catch(e){}
+      // Entering calc leaves an incoming permalink alone and otherwise restores the
+      // scenario; leaving strips the hash only when it was ours, so a section
+      // anchor is never touched -- the regression 8cd72c3 fixed.
+      if(tab === "calc"){
+        if(!isCalcHash()){
+          const want = "#calc" + (lastCalcQuery ? "?" + lastCalcQuery : "");
+          try{ history.replaceState(null, "", location.pathname + want); }catch(e){}
+        }
+      } else if(isCalcHash()){
+        try{ history.replaceState(null, "", location.pathname); }catch(e){}
+      }
     }
   };
   document.querySelectorAll(".tabbtn").forEach(b =>
     b.addEventListener("click", () => setTab(b.dataset.tab, {writeHash:true})));
   // deep link: /#calc or /#calculator (the /calculator path redirects here)
   window.addEventListener("hashchange", () => {
-    if(isCalcHash()) setTab("calc");
+    if(isCalcHash()){
+      const link = parseCalcHash();
+      if(link){
+        if(link.co && link.co !== calcCo){ calcCo = link.co; setDefaults(); }
+        applyCalcHash(link);
+        runCalc();
+      }
+      setTab("calc");
+    }
     else if(!location.hash && document.body.classList.contains("tab-calc")) setTab("dash");
     // any other hash is a section anchor — leave it to the browser
   });
@@ -2180,9 +2277,10 @@ function initCalc(){
     document.querySelectorAll(".cobtn[data-co]").forEach(x=>x.classList.toggle("active", x===b));
     setDefaults();
     runCalc();
+    queueCalcHash();
   }));
   ["ci-btc","ci-months","ci-pref","ci-common","ci-rate","ci-mnav","ci-runway","ci-floor"].forEach(id =>
-    document.getElementById(id).addEventListener("input", runCalc));
+    document.getElementById(id).addEventListener("input", () => { runCalc(); queueCalcHash(); }));
   const basisSel = document.getElementById("ci-basis");
   if(basisSel) basisSel.addEventListener("change", () => {
     // prefill the target with today's multiple on the chosen basis (no re-rate)
@@ -2192,12 +2290,28 @@ function initCalc(){
                                        : (o.stockPrice*o.sharesOutstanding + cl)/nav0;
     document.getElementById("ci-mnav").value = (Math.round(cur*20)/20).toFixed(2);
     runCalc();
+    queueCalcHash();
   });
-  document.getElementById("ci-fund").addEventListener("input", runCalc);
+  document.getElementById("ci-fund").addEventListener("input", () => { runCalc(); queueCalcHash(); });
   document.getElementById("ci-share").addEventListener("click", shareCard);
+  const linkBtn = document.getElementById("ci-link");
+  if(linkBtn) linkBtn.addEventListener("click", async () => {
+    writeCalcToHash();                       // flush the debounce before copying
+    try{ await navigator.clipboard.writeText(location.href); }catch(e){}
+    const t = linkBtn.innerHTML;
+    linkBtn.innerHTML = "Copied &#10003;";
+    setTimeout(()=>linkBtn.innerHTML = t, 2500);
+  });
+  // Order matters: the company decides the defaults, and the link overrides both.
+  const link = parseCalcHash();
+  if(link && link.co) calcCo = link.co;
   setDefaults();
+  if(link) applyCalcHash(link);
   runCalc();
-  if(isCalcHash()) setTab("calc");   // arrived via /calculator or /#calc
+  // Rewrite an incoming link from the values actually used, so a hand-edited or
+  // out-of-range one shows its clamped form rather than the junk that was pasted.
+  if(link) writeCalcToHash();
+  if(isCalcHash()) setTab("calc");   // arrived via /calculator, /#calc or a permalink
 }
 
 // real-time equity layer: the tracker's light feed (CORS-open, ~140KB) carries live
