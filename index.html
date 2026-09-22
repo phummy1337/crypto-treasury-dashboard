@@ -1835,15 +1835,20 @@ function simulate(s, cfg){
            endClaims:claims(pref,buf)/nav(hold,cfg.btcTarget)*100,
            idxStock, idxBtc, labels };
 }
-function runCalc(){
-  const out=document.getElementById("calc-out"); if(!out || !DATA.companies) return;
-  const s = calcSnapshot(calcCo);
+// Every calculator input, read once. runCalc() and shareCard() need the same field
+// list and the same coercions, so a new input is added here and works in both.
+function readCalcCfg(){
   const gv = id => parseFloat(document.getElementById(id).value)||0;
-  const cfg = { btcTarget:gv("ci-btc"), months:Math.max(1,Math.round(gv("ci-months"))),
+  return { btcTarget:gv("ci-btc"), months:Math.max(1,Math.round(gv("ci-months"))),
     prefMo:gv("ci-pref"), commonMo:gv("ci-common"), rate:gv("ci-rate"),
     fundMix:gv("ci-fund")/100, endMnav:gv("ci-mnav"), runway:Math.max(0,gv("ci-runway")),
     basis:(document.getElementById("ci-basis")||{}).value || "ev",
     atmFloor:Math.max(0, gv("ci-floor")) };
+}
+function runCalc(){
+  const out=document.getElementById("calc-out"); if(!out || !DATA.companies) return;
+  const s = calcSnapshot(calcCo);
+  const cfg = readCalcCfg();
   const lbl = document.getElementById("ci-fund-lbl");
   if(lbl){ const m=Math.round(cfg.fundMix*100);
     lbl.textContent = m===0 ? "100% common issuance" : m===100 ? "100% BTC sales" : m+"% BTC sales · "+(100-m)+"% common"; }
@@ -1893,12 +1898,7 @@ function runCalc(){
 }
 async function shareCard(){
   const btn = document.getElementById("ci-share");
-  const gv = id => parseFloat(document.getElementById(id).value)||0;
-  const cfg = { btcTarget:gv("ci-btc"), months:Math.max(1,Math.round(gv("ci-months"))),
-    prefMo:gv("ci-pref"), commonMo:gv("ci-common"), rate:gv("ci-rate"),
-    fundMix:gv("ci-fund")/100, endMnav:gv("ci-mnav"), runway:Math.max(0,gv("ci-runway")),
-    basis:(document.getElementById("ci-basis")||{}).value || "ev",
-    atmFloor:Math.max(0, gv("ci-floor")) };
+  const cfg = readCalcCfg();
   const snap = calcSnapshot(calcCo), r = simulate(snap, cfg), o = DATA.companies[calcCo];
   if(!r) return;
   const W=1200, H=675, SCALE=2;                 // render 2x for crisp social images
