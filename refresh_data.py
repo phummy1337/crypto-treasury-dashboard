@@ -252,6 +252,32 @@ def _stamp_price(co, price, chg_pct, date_et):
     co["dayChangePct"] = round((price / prev - 1) * 100, 2) if prev else 0.0
 
 
+def _rvol(series, window=30):
+    """Relative volume: {mult, todayUsd, avg30Usd, asOf} from [(iso, $vol)] ascending.
+
+    Anchored to the last SETTLED session, never the running one. The tracker appends
+    today's row at the open and grows it all day, so dividing a part-session by full
+    ones reads backwards: at 11:23 ET on 2026-09-22 MSTR printed 0.55x ("quiet")
+    against 2.15x for the session that had actually closed. `asOf` names the session
+    used, so the number always says what it describes.
+
+    Holding still between closes also keeps main()'s before/after no-op check
+    meaningful — a figure that drifted every run would commit data.json every cron.
+    """
+    rows = sorted((d, v) for d, v in series if v and v > 0)
+    now = datetime.datetime.now(ET)
+    if rows and rows[-1][0] == now.date().isoformat() and now.hour < 16:
+        rows = rows[:-1]                      # still trading; not comparable yet
+    if len(rows) < window + 1:
+        return None
+    day = rows[-1]
+    avg = sum(v for _, v in rows[-1 - window:-1]) / window
+    if avg <= 0:
+        return None
+    return {"mult": round(day[1] / avg, 2), "todayUsd": round(day[1]),
+            "avg30Usd": round(avg), "asOf": day[0]}
+
+
 def fetch_strategytracker(data):
     """Refresh current metrics + real history for MSTR/ASST from strategytracker."""
     try:
@@ -310,6 +336,15 @@ def fetch_strategytracker(data):
         co["pctSupply"]     = round(co["holdings"] / data["btcSupply"] * 100, 4)
         co["navPremiumBasic"] = round(pm["navPremiumBasic"], 3)
         co["treasuryDate"]  = pm.get("latestTreasuryDate")
+        # relative volume. `historicalLiquidity` ships daily_traded_values already
+        # equal to volumes x prices, trading-day shaped (no weekend rows) — so this
+        # needs no join against stockHistory, which is calendar-shaped and would
+        # misalign by a growing offset.
+        liq = pm.get("historicalLiquidity") or {}
+        if liq.get("dates") and liq.get("daily_traded_values"):
+            rv = _rvol(list(zip(liq["dates"], liq["daily_traded_values"])))
+            if rv:
+                co["rvol"] = rv
         # the tracker zeroes cash/debt when it values a name on market-cap basis
         # (useEv False) — only trust it when useEv is True; else keep filing values.
         if pm.get("latestUseEv"):
@@ -367,11 +402,12 @@ def fetch_strategytracker(data):
                                for d, n in sorted(mg.items())]
                     _VOL_HIST[t] = [(q["date"], q.get("volume") or 0) for q in hp]
                     _ATM_CANDLES[t] = p.get("intradayCandles") or []
-                    dts, isod, px, no = [], [], [], []
+                    dts, isod, px, no, dvol = [], [], [], [], []
                     for q in hp:
                         dts.append(_iso_lbl(q["date"], "%b %-d"))
                         isod.append(q["date"])
                         px.append(round(q["close"], 2))
+                        dvol.append((q["date"], (q.get("volume") or 0) * (q.get("close") or 0)))
                         n = None
                         for e in chg:
                             if e["effective_date"] <= q["date"]:
@@ -381,6 +417,9 @@ def fetch_strategytracker(data):
                         no.append(round(n) if n is not None else None)
                     if px:
                         co["prefHistory"] = {"dates": dts, "iso": isod, "px": px, "notional": no}
+                        rv = _rvol(dvol)
+                        if rv:
+                            co["prefRvol"] = rv
             # STRC is the only series with a live ATM and buyback programme, and the
             # tracker's notional for it runs one filing behind — on 2026-09-18 it still
             # carried the 1,420,467 shares Strategy had already retired, putting our
