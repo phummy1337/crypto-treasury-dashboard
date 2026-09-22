@@ -1,7 +1,7 @@
 {
   "asOf": "2026-09-22",
   "priceAsOf": "2026-09-22",
-  "btcPriceUsd": 86181,
+  "btcPriceUsd": 86166,
   "btcSupply": 21000000,
   "btcCirculating": 20088034,
   "companies": {
@@ -3813,7 +3813,7 @@
           1.214,
           1.215,
           1.229,
-          1.226
+          1.227
         ]
       },
       "strcNotionalSteps": [
@@ -4198,7 +4198,7 @@
       "borrowFee": {
         "pct": 0.27,
         "avail": 10000000,
-        "asOf": "2026-09-22 18:46:30"
+        "asOf": "2026-09-22 19:33:21"
       },
       "borrowFeeHist": {
         "iso": [
@@ -4301,7 +4301,7 @@
       "prefBorrowFee": {
         "pct": 1.23,
         "avail": 3700000,
-        "asOf": "2026-09-22 18:46:30"
+        "asOf": "2026-09-22 19:33:21"
       },
       "prefBorrowFeeHist": {
         "iso": [
@@ -4403,12 +4403,12 @@
       },
       "assumedDilutedShares": 450.1,
       "_dilOverlayM": 29.6011,
-      "netSatsPerShare": 158705,
+      "netSatsPerShare": 158708,
       "netMnavPub": 1.2228,
-      "amplificationPub": 1.2402,
-      "breakevenArrPub": 2.2255,
-      "hurdleArrPub": 10.6691,
-      "floorArrPub": -17.4246,
+      "amplificationPub": 1.2401,
+      "breakevenArrPub": 2.2253,
+      "hurdleArrPub": 10.6666,
+      "floorArrPub": -17.426,
       "creditDurationPub": 6.3814,
       "netDilutedShares": 429.84,
       "atm": {
@@ -4593,7 +4593,7 @@
         "latestOnEdgar": "2026-09-21",
         "ingested": "2026-09-21"
       },
-      "netLeveragePub": 0.8533,
+      "netLeveragePub": 0.8532,
       "costBasisFiledM": 63800
     },
     "ASST": {
@@ -6972,7 +6972,7 @@
           2.315,
           2.318,
           2.105,
-          2.05
+          2.051
         ]
       },
       "cashUsd": 229.6,
@@ -7120,7 +7120,7 @@
       "borrowFee": {
         "pct": 1.02,
         "avail": 750000,
-        "asOf": "2026-09-22 18:46:30"
+        "asOf": "2026-09-22 19:33:21"
       },
       "borrowFeeHist": {
         "iso": [
@@ -7223,7 +7223,7 @@
       "prefBorrowFee": {
         "pct": 27.79,
         "avail": 350000,
-        "asOf": "2026-09-22 18:46:30"
+        "asOf": "2026-09-22 19:33:21"
       },
       "prefBorrowFeeHist": {
         "iso": [
@@ -7325,7 +7325,7 @@
       },
       "_dilOverlayM": 3.1421,
       "assumedDilutedShares": 100.14,
-      "netSatsPerShare": 16596,
+      "netSatsPerShare": 16595,
       "netDilutedShares": 100.14,
       "atm": {
         "ticker": "SATA",
@@ -7339,10 +7339,10 @@
         "todayTotalUsd": 63626087,
         "todayEligUsd": 63626087,
         "todayEstUsd": 23994078,
-        "todayEstBtc": 278.41,
+        "todayEstBtc": 278.46,
         "weekEligUsd": 116143574,
         "weekEstUsd": 43798984,
-        "weekEstBtc": 508.22,
+        "weekEstBtc": 508.31,
         "confirmed": {
           "from": "2026-09-11",
           "to": "2026-09-18",
