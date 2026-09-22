@@ -350,6 +350,10 @@
   .chartcard h3 { margin:0; font-weight:700; font-size: 14.5px; letter-spacing:.3px;
     display:flex; align-items:center; gap:7px; color:#fff; }
   .chartcard h3 .dot { width:9px; height:9px; }
+  .chartcard h3 .pngbtn { margin-left:auto; flex:0 0 auto; background:none;
+    border:1px solid var(--border); border-radius:4px; color:var(--faint);
+    font:inherit; font-size:11.5px; font-weight:600; padding:2px 8px; cursor:pointer; }
+  .chartcard h3 .pngbtn:hover { color:#fff; border-color:rgba(255,255,255,0.45); }
   .chartcard .ch-sub { color: var(--faint); font-size: 12.5px; margin: 4px 0 10px; font-style: italic; }
   .chartwrap { position: relative; height: 250px; }
   .illus { color: var(--btc); font-size: 12.5px; margin-top: 6px; opacity:.9; }
@@ -1331,11 +1335,16 @@ function renderAll(){ renderPriceHeader(); renderCompany(); renderHoldings(); re
 
 // ---------- charts (Chart.js) ----------
 const CHARTS = {};
+// Chart.js normalises a config in place and resolves options through proxies, so a
+// live chart's own config cannot be reused to build a second one for export. Keep a
+// pristine copy of what was authored instead, taken before Chart.js ever sees it.
+const CHART_CFG = {};
 function mkChart(id, cfg){
   if(typeof Chart === "undefined") return;           // CDN offline -> skip gracefully
   const el = document.getElementById(id); if(!el) return;
   const prev = Chart.getChart(el);                   // destroy any chart bound to this canvas
   if(prev) prev.destroy();
+  CHART_CFG[id] = cloneCfg(cfg);
   CHARTS[id] = new Chart(el.getContext("2d"), cfg);
 }
 const GRID = "rgba(255,255,255,0.07)", AX = "#9aa0a6";
@@ -1591,6 +1600,7 @@ function renderCharts(){
       options: shOpts });
   });
   setStatus("shorts", !anyShorts);
+  wireExportButtons();
 }
 
 // ---------- generic hover breakdown tooltip (position:fixed, not clipped by the grid) ----------
@@ -1896,27 +1906,183 @@ function runCalc(){
       options: mnOpts });
   }
 }
+// ---------- image export: the share card, and a PNG of any registered chart ----------
+const EXPORT_SCALE = 2;                 // 2x, so axis labels survive being reposted
+const APYX_EYEBROW = "APYX  ·  BTC TREASURY & DIGITAL CREDIT TRACKER";
+const EXPORT_FONT = w => `${w} 'Google Sans Flex','Google Sans',sans-serif`;
+
+// Copy plain objects and arrays; pass everything else through by reference. That
+// "everything else" is the point: several charts here configure tick and tooltip
+// callbacks, and JSON round-tripping would silently drop them.
+function cloneCfg(v){
+  if(Array.isArray(v)) return v.map(cloneCfg);
+  if(v && typeof v === "object"){
+    const proto = Object.getPrototypeOf(v);
+    if(proto === Object.prototype || proto === null){
+      const out = {};
+      for(const k in v) out[k] = cloneCfg(v[k]);
+      return out;
+    }
+  }
+  return v;
+}
+
+// Shared chrome: near-black ground, crimson radial, eyebrow, two-tone headline, notes.
+function apyxFrame(x, W, H, {eyebrow, head, tail, tailColor, note, titlePx}){
+  x.fillStyle="#0a0a0b"; x.fillRect(0,0,W,H);
+  const g = x.createRadialGradient(W*0.96,0,60,W*0.96,0,560);
+  g.addColorStop(0,"rgba(220,20,60,0.18)"); g.addColorStop(1,"rgba(220,20,60,0)");
+  x.fillStyle=g; x.fillRect(0,0,W,H);
+  x.fillStyle="#9aa0a6"; x.font=EXPORT_FONT("600 19px"); x.fillText(eyebrow, 56, 62);
+  const base = 76 + titlePx;
+  x.font=EXPORT_FONT(`italic 700 ${titlePx}px`); x.fillStyle="#ffffff";
+  x.fillText(head, 56, base);
+  if(tail){ x.fillStyle=tailColor; x.fillText(tail, 56 + x.measureText(head).width, base); }
+  x.fillStyle="#b9bdc2"; x.font=EXPORT_FONT("400 22px");
+  (Array.isArray(note) ? note : [note]).forEach((line, i) => x.fillText(line, 56, base + 40 + i*28));
+}
+
+// "Powered by" + logo bottom right, then the footer line bottom left. The address
+// leads in crimson rather than sitting grey inside a run-on sentence: the whole
+// point of an exported image is that it travels, and it should say where from.
+// Left-aligned because the bottom right belongs to the logo.
+async function apyxFooter(x, W, H, {left}){
+  try{
+    const img = new Image();
+    await new Promise((res,rej)=>{ img.onload=res; img.onerror=rej; img.src="apyx-logo.svg"; });
+    x.textAlign="right";
+    x.font=EXPORT_FONT("400 15px"); x.fillStyle="#9aa0a6";
+    x.fillText("Powered by", W-56, H-62);
+    x.textAlign="left";
+    x.drawImage(img, W-56-150, H-52, 150, 31);
+  }catch(e){}
+  const cta = "treasurytracker.net →";
+  const date = new Date().toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});
+  x.font=EXPORT_FONT("400 16px");
+  x.fillStyle="#dc143c"; x.fillText(cta, 56, H-34);
+  x.fillStyle="#9aa0a6";
+  x.fillText("  ·  "+left+"  ·  "+date, 56 + x.measureText(cta).width, H-34);
+}
+
+// Rebuild the chart offscreen rather than copying the on-page canvas, which gives
+// soft, unreadable axis labels (the bug fixed in 66f773d). devicePixelRatio does
+// the 2x, so every font and line weight keeps its authored size.
+// Chart.destroy() clears the canvas it drew on, so take the pixels off first.
+async function snapshotChart(id, w, h){
+  if(typeof Chart === "undefined" || !CHART_CFG[id]) return null;
+  const oc = document.createElement("canvas");
+  oc.width = w; oc.height = h;
+  const cfg = cloneCfg(CHART_CFG[id]);
+  const o = cfg.options = cfg.options || {};
+  o.responsive = false; o.animation = false; o.devicePixelRatio = EXPORT_SCALE;
+  o.plugins = o.plugins || {};
+  o.plugins.tooltip = {enabled:false};
+  const tmp = new Chart(oc.getContext("2d"), cfg);
+  await new Promise(res => setTimeout(res, 80));
+  const out = document.createElement("canvas");
+  out.width = oc.width; out.height = oc.height;
+  out.getContext("2d").drawImage(oc, 0, 0);
+  tmp.destroy();
+  return out;
+}
+
+// toBlob -> clipboard -> download. The clipboard write throws outside a secure
+// context and in some browsers; the download must still fire, hence the catch.
+function exportCanvas(cv, filename, btn){
+  cv.toBlob(async blob => {
+    try{ await navigator.clipboard.write([new ClipboardItem({"image/png": blob})]); }catch(e){}
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
+    if(btn){ const t=btn.innerHTML; btn.innerHTML="Saved &#10003;"; setTimeout(()=>btn.innerHTML=t, 2500); }
+  }, "image/png");
+}
+
+// A downloaded PNG has no page around it, so the note carries what the image loses:
+// the series names, which axis each sits on where that is ambiguous, the active
+// range, and the as-of date.
+function chartExportMeta(id, card){
+  const cfg = CHART_CFG[id] || {};
+  const h3 = card.querySelector("h3");
+  const title = [...h3.childNodes]
+    .filter(n => !(n.nodeType === 1 && n.classList.contains("pngbtn")))
+    .map(n => n.textContent).join("").trim();
+  const dash = title.indexOf("—");
+  const scales = (cfg.options && cfg.options.scales) || {};
+  const sets = ((cfg.data && cfg.data.datasets) || []).filter(d => d.label);
+  // Which side, not which axis title: on a dual-axis chart the series label usually
+  // already echoes the title ("Shorts % of Float" / "% float"), and what a reader
+  // cannot recover from a flat image is which of the two scales to read against.
+  const side = d => {
+    const sc = scales[d.yAxisID];
+    return sc && sc.position ? sc.position : null;
+  };
+  const twoAxes = new Set(sets.map(d => d.yAxisID).filter(Boolean)).size > 1;
+  const dot = h3.querySelector(".dot");
+  const chip = document.querySelector("#rangechips button.active");
+  return {
+    head: dash >= 0 ? title.slice(0, dash+1)+" " : title+" ",
+    tail: dash >= 0 ? title.slice(dash+1).trim() : "",
+    tailColor: dot ? getComputedStyle(dot).backgroundColor : "#ffffff",
+    note: [
+      sets.map(d => { const a = twoAxes && side(d); return a ? `${d.label} (${a})` : d.label; })
+          .join("  ·  "),
+      `${chip ? chip.textContent : chartRange}  ·  as of ${DATA.asOf || "—"}`,
+    ],
+    // name the file after the heading a reader saw, not the canvas id: "ch-si-MSTR"
+    // is the price-and-mNAV chart, which nobody could guess from apyx-si-mstr.png
+    filename: `apyx-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}-${chartRange}.png`,
+  };
+}
+
+async function downloadChartImage(id, meta, btn){
+  const W=1200, H=675, PX=56, PY=196, PW=1088, PH=392, PAD=14;
+  const cv=document.createElement("canvas"); cv.width=W*EXPORT_SCALE; cv.height=H*EXPORT_SCALE;
+  const x=cv.getContext("2d"); x.scale(EXPORT_SCALE, EXPORT_SCALE);
+  apyxFrame(x, W, H, {eyebrow:APYX_EYEBROW, head:meta.head, tail:meta.tail,
+                      tailColor:meta.tailColor, note:meta.note, titlePx:40});
+  x.strokeStyle="rgba(255,255,255,0.18)"; x.fillStyle="rgba(255,255,255,0.02)";
+  x.fillRect(PX,PY,PW,PH); x.strokeRect(PX,PY,PW,PH);
+  const oc = await snapshotChart(id, PW-PAD*2, PH-PAD*2);
+  if(oc) x.drawImage(oc, PX+PAD, PY+PAD, PW-PAD*2, PH-PAD*2);
+  await apyxFooter(x, W, H, {left:"not investment advice"});
+  exportCanvas(cv, meta.filename, btn);
+}
+
+// One pass over the rendered cards, so a new chart gets an export button for free.
+// renderCharts() re-runs on every range-chip click, so reuse any button already
+// there rather than appending a second one. Cards without a registered canvas --
+// the ATM cards, which reuse .chartcard for a stat grid -- are skipped.
+function wireExportButtons(){
+  document.querySelectorAll(".chartcard").forEach(card => {
+    const cv = card.querySelector(".chartwrap canvas");
+    const h3 = card.querySelector("h3");
+    if(!cv || !h3 || !CHART_CFG[cv.id]) return;
+    let btn = h3.querySelector(".pngbtn");
+    if(!btn){
+      btn = document.createElement("button");
+      btn.className = "pngbtn"; btn.type = "button";
+      btn.innerHTML = "&#10515; PNG";
+      btn.title = "Download this chart as an image";
+      h3.appendChild(btn);
+    }
+    btn.onclick = () => downloadChartImage(cv.id, chartExportMeta(cv.id, card), btn);
+  });
+}
 async function shareCard(){
   const btn = document.getElementById("ci-share");
   const cfg = readCalcCfg();
   const snap = calcSnapshot(calcCo), r = simulate(snap, cfg), o = DATA.companies[calcCo];
   if(!r) return;
-  const W=1200, H=675, SCALE=2;                 // render 2x for crisp social images
+  const W=1200, H=675, SCALE=EXPORT_SCALE;      // render 2x for crisp social images
   const cv=document.createElement("canvas"); cv.width=W*SCALE; cv.height=H*SCALE;
   const x = cv.getContext("2d"); x.scale(SCALE, SCALE);
-  x.fillStyle="#0a0a0b"; x.fillRect(0,0,W,H);
-  const g = x.createRadialGradient(W*0.96,0,60,W*0.96,0,560);
-  g.addColorStop(0,"rgba(220,20,60,0.18)"); g.addColorStop(1,"rgba(220,20,60,0)");
-  x.fillStyle=g; x.fillRect(0,0,W,H);
-  const F = w => `${w} 'Google Sans Flex','Google Sans',sans-serif`;
-  // header
-  x.fillStyle="#9aa0a6"; x.font=F("600 19px"); x.fillText("APYX  ·  BTC TREASURY & DIGITAL CREDIT TRACKER", 56, 62);
-  x.font=F("italic 700 62px"); x.fillStyle="#ffffff";
-  x.fillText(`${calcCo} → `, 56, 138);
-  const w1 = x.measureText(`${calcCo} → `).width;
-  x.fillStyle=o.accent; x.fillText(`$${fmt(r.implied,2)}`, 56+w1, 138);
-  x.fillStyle="#b9bdc2"; x.font=F("400 22px");
-  x.fillText(`implied in ${cfg.months} months`, 56, 178);
+  const F = EXPORT_FONT;
+  apyxFrame(x, W, H, {eyebrow:APYX_EYEBROW, head:`${calcCo} \u2192 `,
+                      tail:`$${fmt(r.implied,2)}`, tailColor:o.accent,
+                      note:`implied in ${cfg.months} months`, titlePx:62});
   // stat boxes beside the price: stock return (BTC subtly noted) + amplification
   const statBox = (bx, label, val, valColor, sub) => {
     x.strokeStyle="rgba(255,255,255,0.18)"; x.fillStyle="rgba(255,255,255,0.02)";
@@ -1969,28 +2135,8 @@ async function shareCard(){
     x.drawImage(oc, 652, 222, 480, 344);
     tmp.destroy();
   }
-  // "Powered by" + APYX logo, bottom right (top right now holds the stat boxes)
-  try{
-    const img = new Image();
-    await new Promise((res,rej)=>{ img.onload=res; img.onerror=rej; img.src="apyx-logo.svg"; });
-    x.textAlign="right";
-    x.font=F("400 15px"); x.fillStyle="#9aa0a6";
-    x.fillText("Powered by", W-56, H-62);
-    x.textAlign="left";
-    x.drawImage(img, W-56-150, H-52, 150, 31);
-  }catch(e){}
-  // footer
-  x.font=F("400 16px"); x.fillStyle="#9aa0a6";
-  x.fillText("treasurytracker.net  ·  a model, not investment advice  ·  "+new Date().toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}), 56, H-34);
-  cv.toBlob(async blob => {
-    try{ await navigator.clipboard.write([new ClipboardItem({"image/png": blob})]); }catch(e){}
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `apyx-${calcCo.toLowerCase()}-implied-price.png`;
-    a.click();
-    setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
-    if(btn){ const t=btn.innerHTML; btn.innerHTML="Saved &#10003;"; setTimeout(()=>btn.innerHTML=t, 2500); }
-  }, "image/png");
+  await apyxFooter(x, W, H, {left:"a model, not investment advice"});
+  exportCanvas(cv, `apyx-${calcCo.toLowerCase()}-implied-price.png`, btn);
 }
 
 function initCalc(){
