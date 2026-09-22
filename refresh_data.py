@@ -194,8 +194,9 @@ SI_SPLITS = {"ASST": [("2026-02-06", 20)]}
 # daily shares-outstanding history (millions) per ticker, filled by
 # fetch_strategytracker (mcap / price) and used for per-date float below
 _SHARES_HIST = {}
-# daily share volume per ticker: preferreds from the tracker's price log,
-# commons from Yahoo — used for trailing-20-day days-to-cover
+# daily share volume per PREFERRED ticker, from the tracker's price log — used for
+# the preferreds' days-to-cover. Commons volume is not kept here: fetch_short_interest
+# pulls it from Nasdaq (_nasdaq_vol) and consumes it within the loop iteration.
 _VOL_HIST = {}
 # intraday 15-min candles per preferred ticker, for the ATM tracker
 _ATM_CANDLES = {}
@@ -650,7 +651,7 @@ def _yahoo_chart(symbol, tries=6):
         except urllib.error.HTTPError as e:
             last = e
             if e.code in (429, 500, 502, 503):
-                time.sleep(2 ** i)                    # 1s, 2s, 4s, 8s backoff
+                time.sleep(2 ** i)                    # 1,2,4,8,16,32s — ~63s over tries=6
                 continue
             raise
     raise last
@@ -661,7 +662,7 @@ def _yahoo_daily(symbol):
     res = _yahoo_chart(symbol)["chart"]["result"][0]
     ts = res["timestamp"]
     closes = res["indicators"]["quote"][0]["close"]
-    series = [(datetime.datetime.utcfromtimestamp(t).date(), float(c))
+    series = [(datetime.datetime.fromtimestamp(t, datetime.timezone.utc).date(), float(c))
               for t, c in zip(ts, closes) if c is not None]
     series.sort()
     return series, res.get("meta", {})
@@ -1593,7 +1594,7 @@ def _yahoo_vol(symbol):
     res = _yahoo_chart(symbol)["chart"]["result"][0]
     ts = res["timestamp"]
     vols = res["indicators"]["quote"][0]["volume"]
-    return sorted((datetime.datetime.utcfromtimestamp(t).date().isoformat(), int(v))
+    return sorted((datetime.datetime.fromtimestamp(t, datetime.timezone.utc).date().isoformat(), int(v))
                   for t, v in zip(ts, vols) if v)
 
 
