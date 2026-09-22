@@ -104,6 +104,9 @@
     color:var(--bx); font-variant-numeric:tabular-nums; }
   .sg-item .sub { font-size:12px; color:var(--faint); margin-top:2px; }
   .sg-item .defhint { margin-left:4px; }
+  /* relative volume is its own hint — the figure carries the tooltip rather than a
+     separate glyph, so it must not pick up the glyph's spacing or size */
+  .sg-item .sub .defhint { margin-left:0; font-size:inherit; vertical-align:0; }
   .statbox {
     background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
     padding: 13px 15px; position: relative; overflow: hidden;
@@ -375,6 +378,9 @@
     .sg-items { gap: 8px; }
     .sg-item .val { font-size: 17px; }
     .sg-item .lbl, .sg-item .sub { font-size: 10.5px; letter-spacing: .6px; }
+    /* .sg-items stays repeat(3, 1fr) here, so the sub-line has a third of the width
+       for three clauses. The multiple carries more than the word does. */
+    .sg-item .sub .secword { display: none; }
     /* one sticky row on phones: links scroll sideways, chips stay put */
     .secnav { margin: -14px 0 18px; gap: 10px; flex-wrap: nowrap; padding: 7px 0; }
     .secnav-links { gap: 15px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
@@ -822,6 +828,8 @@ const METRIC_DEFS = {
     m:"What the market charges for one share of common stock — the starting point for market cap and every valuation ratio below."},
   "Day Change": {c:"Today's price versus the prior close, in percent.",
     m:"Direction and size of today's move — worth reading next to BTC's own 24-hour change above."},
+  "Relative Volume": {c:"Dollar volume (shares traded × close) on the last settled session, ÷ the mean of the 30 sessions before it. The session it measures is named in data.json's asOf; today is excluded until it closes, because a part-day divided by full ones reads low all morning.",
+    m:"Whether a price move carries conviction or is just noise. A 3% fall on 2× normal volume is the market repricing the name; the same 3% on 0.4× volume is a thin tape. Above 1 is busier than usual, below 1 quieter."},
   "Market Cap": {c:"Stock price × basic shares outstanding.",
     m:"The market's total value on the common equity — what all common shares are worth together."},
   "Shares Outstanding": {c:"Basic share count across common classes, from the latest SEC filing.",
@@ -1226,16 +1234,36 @@ function renderPriceHeader(){
   set("hdr-mnav-ASST", fmt(netMnav(A),2)+"x");
   set("hdr-strc", usd(M.prefPrice,2));
   set("hdr-sata", usd(A.prefPrice,2));
-  const chg = v => (v==null||isNaN(v)) ? "" : `<span class="${v>=0?'pos':'neg'}">${sig(v)}${fmt(v,2)}%</span> · `;
+  const chg = v => (v==null||isNaN(v)) ? "" : `<span class="${v>=0?'pos':'neg'}">${sig(v)}${fmt(v,2)}%</span>`;
+  // Relative volume qualifies the day change: "-3.24% · 2.4x vol" says something
+  // "-3.24%" cannot. Returns "" when the field is absent, so the header still renders
+  // against a data.json written before this shipped — refresh_data.py fills it on the
+  // next cron run, and until then the line reads exactly as it did before.
+  const rvolToken = r => {
+    const m = r && r.mult;
+    if(typeof m !== "number" || !isFinite(m)) return "";
+    // busy is neither good nor bad, so this borrows the page's emphasis colours
+    // rather than the pos/neg vocabulary
+    const c = m >= 2 ? "var(--btc)" : m >= 1.5 ? "#FFD9A0" : "var(--faint)";
+    return `<span class="defhint" data-def="Relative Volume" style="color:${c}">${fmt(m,1)}× vol</span>`;
+  };
   // After the bell the tile should carry the official 4:00pm consolidated print.
   // strategy.com can sit on a pre-close last trade for a while (on 2026-09-18 it
   // still showed 150.52 at 5:20pm against a 153.92 close), so say which one it is
   // rather than passing a last trade off as the close.
-  const tag = (o, k, base) => (o && o[k]) ? '<span class="lasttrade">last trade</span>' : base;
-  set("hdr-px-MSTR-sub", chg(M.dayChangePct)+tag(M,"_preClose","common"));
-  set("hdr-px-ASST-sub", chg(A.dayChangePct)+tag(A,"_preClose","common"));
-  set("hdr-strc-sub", chg(M.prefChangePct)+tag(M,"_prefPreClose","preferred"));
-  set("hdr-sata-sub", chg(A.prefChangePct)+tag(A,"_prefPreClose","preferred"));
+  const sub = (o, chgV, rv, k, base) => {
+    const head = [chg(chgV), rvolToken(rv)].filter(Boolean).join(" · ");
+    const sep = head ? " · " : "";
+    return (o && o[k])
+      ? `${head}${sep}<span class="lasttrade">last trade</span>`
+      // the separator sits inside .secword so the <=640px rule drops the word and
+      // its separator together, rather than stranding a dangling "·"
+      : `${head}<span class="secword">${sep}${base}</span>`;
+  };
+  set("hdr-px-MSTR-sub", sub(M, M.dayChangePct,  M.rvol,     "_preClose",     "common"));
+  set("hdr-px-ASST-sub", sub(A, A.dayChangePct,  A.rvol,     "_preClose",     "common"));
+  set("hdr-strc-sub",    sub(M, M.prefChangePct, M.prefRvol, "_prefPreClose", "preferred"));
+  set("hdr-sata-sub",    sub(A, A.prefChangePct, A.prefRvol, "_prefPreClose", "preferred"));
 }
 function renderATM(){
   const el = document.getElementById("atm-cards"); if(!el) return;
