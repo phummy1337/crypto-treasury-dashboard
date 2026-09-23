@@ -105,8 +105,9 @@
   .sg-item .sub { font-size:12px; color:var(--faint); margin-top:2px; }
   .sg-item .defhint { margin-left:4px; }
   /* relative volume is its own hint — the figure carries the tooltip rather than a
-     separate glyph, so it must not pick up the glyph's spacing or size */
-  .sg-item .sub .defhint { margin-left:0; font-size:inherit; vertical-align:0; }
+     separate glyph, so it must not pick up the glyph's spacing or size. nowrap: on
+     phones a wrapped "Mon · last trade" reads as Monday's last trade */
+  .sg-item .sub .defhint { margin-left:0; font-size:inherit; vertical-align:0; white-space:nowrap; }
   .statbox {
     background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
     padding: 13px 15px; position: relative; overflow: hidden;
@@ -828,7 +829,7 @@ const METRIC_DEFS = {
     m:"What the market charges for one share of common stock — the starting point for market cap and every valuation ratio below."},
   "Day Change": {c:"Today's price versus the prior close, in percent.",
     m:"Direction and size of today's move — worth reading next to BTC's own 24-hour change above."},
-  "Relative Volume": {c:"Dollar volume (shares traded × close) on the last settled session, ÷ the mean of the 30 sessions before it. The session it measures is named in data.json's asOf; today is excluded until it closes, because a part-day divided by full ones reads low all morning.",
+  "Relative Volume": {c:"Dollar volume (shares traded × close) of one full session, ÷ the mean of the 30 sessions before it. The running session never counts — a part-day divided by full ones reads low all morning — so from the open until the evening refresh this is the previous session's figure, and the tile names that day (\"2.2× vol Mon\"). Once the session it measures is today's, no day is shown; past 6 days old it is hidden.",
     m:"Whether a price move carries conviction or is just noise. A 3% fall on 2× normal volume is the market repricing the name; the same 3% on 0.4× volume is a thin tape. Above 1 is busier than usual, below 1 quieter."},
   "Market Cap": {c:"Stock price × basic shares outstanding.",
     m:"The market's total value on the common equity — what all common shares are worth together."},
@@ -1235,17 +1236,23 @@ function renderPriceHeader(){
   set("hdr-strc", usd(M.prefPrice,2));
   set("hdr-sata", usd(A.prefPrice,2));
   const chg = v => (v==null||isNaN(v)) ? "" : `<span class="${v>=0?'pos':'neg'}">${sig(v)}${fmt(v,2)}%</span>`;
-  // Relative volume qualifies the day change: "-3.24% · 2.4x vol" says something
-  // "-3.24%" cannot. Returns "" when the field is absent, so the header still renders
-  // against a data.json written before this shipped — refresh_data.py fills it on the
-  // next cron run, and until then the line reads exactly as it did before.
+  // Relative volume is the last SETTLED session's (refresh_data.py leaves the running
+  // one out), so from the open until the evening refresh it describes the previous
+  // session while the change beside it is today's. The client doesn't know which
+  // session the preferreds' change describes, so today is the reference: name rvol's
+  // day whenever it isn't today, and drop it past 6 days, when a weekday name turns
+  // ambiguous and the feed has evidently stopped. "" also covers a data.json written
+  // before rvol shipped, so the line then reads exactly as it did before.
   const rvolToken = r => {
     const m = r && r.mult;
     if(typeof m !== "number" || !isFinite(m)) return "";
+    const age = (Date.parse(etDateStr()) - Date.parse(r.asOf)) / 864e5;
+    if(!(age >= 0 && age <= 6)) return "";            // also rejects a missing or future asOf
+    const day = age ? " " + ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][new Date(r.asOf).getUTCDay()] : "";
     // busy is neither good nor bad, so this borrows the page's emphasis colours
     // rather than the pos/neg vocabulary
     const c = m >= 2 ? "var(--btc)" : m >= 1.5 ? "#FFD9A0" : "var(--faint)";
-    return `<span class="defhint" data-def="Relative Volume" style="color:${c}">${fmt(m,1)}× vol</span>`;
+    return `<span class="defhint" data-def="Relative Volume" style="color:${c}">${fmt(m,1)}× vol${day}</span>`;
   };
   // After the bell the tile should carry the official 4:00pm consolidated print.
   // strategy.com can sit on a pre-close last trade for a while (on 2026-09-18 it
