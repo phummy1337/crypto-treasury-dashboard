@@ -251,22 +251,48 @@ def _stamp_price(co, price, chg_pct, date_et):
     co["dayChangePct"] = round((price / prev - 1) * 100, 2) if prev else 0.0
 
 
-def _rvol(series, window=30):
+# The tracker's closing print lags the 4:00pm auction and it rebuilds its snapshot
+# about every 15 minutes, so a session is not taken as final until well after the bell.
+SESSION_SETTLED_ET = datetime.time(16, 15)
+
+
+def _settled_sessions(rows, snap_et):
+    """The rows of [(iso, ...)] that are finished sessions as of snapshot time snap_et.
+
+    The tracker's tail can't be taken at face value. From the open it grows a row
+    for the running session, and from 8pm ET, when UTC rolls over, it adds a row
+    dated the NEXT day that repeats the session just closed plus after-hours prints
+    (on 2026-09-22 ASST's was an exact copy; MSTR's carried 30,568 more shares).
+    Neither is a session. A row counts once its date is past, or once the snapshot
+    was taken after that day's close. Weekend dates never count.
+
+    Judged by the snapshot's own timestamp, not the clock this runs on: a 4:09pm
+    cron can read a snapshot built before the closing auction printed.
+
+    Known gap: there is no holiday calendar here, so a weekday market holiday's
+    placeholder row counts once the snapshot passes the settle time that day. The
+    tracker's history holds none of the last ten holidays, so the row is transient,
+    but while it stands rvol and beta treat it as a session.
+    """
+    day = snap_et.date().isoformat()
+    closed = snap_et.time() >= SESSION_SETTLED_ET
+    return [r for r in rows
+            if datetime.date.fromisoformat(r[0]).weekday() < 5
+            and (r[0] < day or (r[0] == day and closed))]
+
+
+def _rvol(series, snap_et, window=30):
     """Relative volume: {mult, todayUsd, avg30Usd, asOf} from [(iso, $vol)] ascending.
 
-    Anchored to the last SETTLED session, never the running one. The tracker appends
-    today's row at the open and grows it all day, so dividing a part-session by full
-    ones reads backwards: at 11:23 ET on 2026-09-22 MSTR printed 0.55x ("quiet")
-    against 2.15x for the session that had actually closed. `asOf` names the session
-    used, so the number always says what it describes.
+    Anchored to the last SETTLED session (see _settled_sessions), never the running
+    one: dividing a part-session by full ones reads backwards — at 11:23 ET on
+    2026-09-22 MSTR printed 0.55x ("quiet") against 2.15x for the session that had
+    actually closed. `asOf` names the session used.
 
     Holding still between closes also keeps main()'s before/after no-op check
     meaningful — a figure that drifted every run would commit data.json every cron.
     """
-    rows = sorted((d, v) for d, v in series if v and v > 0)
-    now = datetime.datetime.now(ET)
-    if rows and rows[-1][0] == now.date().isoformat() and now.hour < 16:
-        rows = rows[:-1]                      # still trading; not comparable yet
+    rows = sorted((d, v) for d, v in _settled_sessions(series, snap_et) if v and v > 0)
     if len(rows) < window + 1:
         return None
     day = rows[-1]
@@ -294,7 +320,7 @@ def _beta(stock, btc):
             sr.append(sd[q] / sd[p] - 1)
             br.append(bd[q] / bd[p] - 1)
     n = len(br)
-    if n < 30:
+    if n <= 60:                       # under ~3 months of sessions the slope is noise
         return None
     mb, ms = sum(br) / n, sum(sr) / n
     var = sum((x - mb) ** 2 for x in br) / n
@@ -312,10 +338,12 @@ def fetch_strategytracker(data):
         return
     comps = full.get("companies", {})
     try:
-        tracker_date = _et_date(datetime.datetime.fromisoformat(
-            (full.get("timestamp") or idx["timestamp"]).replace("Z", "+00:00")))
+        snap = datetime.datetime.fromisoformat(
+            (full.get("timestamp") or idx["timestamp"]).replace("Z", "+00:00"))
     except Exception:
-        tracker_date = _et_date(datetime.datetime.now(datetime.timezone.utc))
+        snap = datetime.datetime.now(datetime.timezone.utc)
+    tracker_date = _et_date(snap)
+    snap_et = (snap if snap.tzinfo else snap.replace(tzinfo=datetime.timezone.utc)).astimezone(ET)
     try:    # live EURUSD (ECB) for the EUR-denominated STRE notional
         data["eurUsd"] = round(get_json("https://api.frankfurter.dev/v1/latest?base=EUR&symbols=USD")["rates"]["USD"], 4)
     except Exception:
@@ -326,6 +354,7 @@ def fetch_strategytracker(data):
         if not c:
             continue
         pm, hd = c["processedMetrics"], c["historicalData"]
+        liq = pm.get("historicalLiquidity") or {}     # session $vol + closes: rvol, beta
         co = data["companies"].get(tk)
         if not co:
             continue
@@ -364,9 +393,8 @@ def fetch_strategytracker(data):
         # equal to volumes x prices, trading-day shaped (no weekend rows) — so this
         # needs no join against stockHistory, which is calendar-shaped and would
         # misalign by a growing offset.
-        liq = pm.get("historicalLiquidity") or {}
         if liq.get("dates") and liq.get("daily_traded_values"):
-            rv = _rvol(list(zip(liq["dates"], liq["daily_traded_values"])))
+            rv = _rvol(list(zip(liq["dates"], liq["daily_traded_values"])), snap_et)
             if rv:
                 co["rvol"] = rv
         # the tracker zeroes cash/debt when it values a name on market-cap basis
@@ -441,7 +469,7 @@ def fetch_strategytracker(data):
                         no.append(round(n) if n is not None else None)
                     if px:
                         co["prefHistory"] = {"dates": dts, "iso": isod, "px": px, "notional": no}
-                        rv = _rvol(dvol)
+                        rv = _rvol(dvol, snap_et)
                         if rv:
                             co["prefRvol"] = rv
             # STRC is the only series with a live ATM and buyback programme, and the
@@ -509,11 +537,12 @@ def fetch_strategytracker(data):
         # day the stock ignored BTC — on 2026-09-23, 81 of the 252 stock returns were
         # exactly zero, and the window spanned Jan 14 -> Sep 23 rather than a year.
         # That read 1.40 for both names against MSTR 1.49 / ASST 1.70 on sessions
-        # alone. historicalLiquidity holds real sessions only, with identical
-        # closes, and _beta pairs each one with BTC's move over the same interval.
+        # alone. historicalLiquidity's history holds sessions only, with identical
+        # closes; its tail doesn't (see _settled_sessions), so that is trimmed first,
+        # and _beta pairs each session with BTC's move over the same interval.
         try:
-            liq = pm.get("historicalLiquidity") or {}
-            stock = [(d, p) for d, p in zip(liq.get("dates") or [], liq.get("prices") or []) if p]
+            stock = [(d, p) for d, p in _settled_sessions(
+                zip(liq.get("dates") or [], liq.get("prices") or []), snap_et) if p]
             btc = [(d, p) for d, p in zip(hd["dates"], hd["btc_prices"]) if p]
             beta = _beta(stock[-253:], btc)
             if beta is not None:
