@@ -424,10 +424,12 @@ def fetch_strategytracker(data):
         # equal to volumes x prices, trading-day shaped (no weekend rows) — so this
         # needs no join against stockHistory, which is calendar-shaped and would
         # misalign by a growing offset.
-        if liq.get("dates") and liq.get("daily_traded_values"):
-            rv = _rvol(list(zip(liq["dates"], liq["daily_traded_values"])), snap_et)
+        try:
+            rv = _rvol(list(zip(liq.get("dates") or [], liq.get("daily_traded_values") or [])), snap_et)
             if rv:
                 co["rvol"] = rv
+        except Exception as e:
+            log(f"[skip] {tk} rvol: {e} — keeping existing value")
         # the tracker zeroes cash/debt when it values a name on market-cap basis
         # (useEv False) — only trust it when useEv is True; else keep filing values.
         if pm.get("latestUseEv"):
@@ -485,12 +487,11 @@ def fetch_strategytracker(data):
                                for d, n in sorted(mg.items())]
                     _VOL_HIST[t] = [(q["date"], q.get("volume") or 0) for q in hp]
                     _ATM_CANDLES[t] = p.get("intradayCandles") or []
-                    dts, isod, px, no, dvol = [], [], [], [], []
+                    dts, isod, px, no = [], [], [], []
                     for q in hp:
                         dts.append(_iso_lbl(q["date"], "%b %-d"))
                         isod.append(q["date"])
                         px.append(round(q["close"], 2))
-                        dvol.append((q["date"], (q.get("volume") or 0) * (q.get("close") or 0)))
                         n = None
                         for e in chg:
                             if e["effective_date"] <= q["date"]:
@@ -500,9 +501,13 @@ def fetch_strategytracker(data):
                         no.append(round(n) if n is not None else None)
                     if px:
                         co["prefHistory"] = {"dates": dts, "iso": isod, "px": px, "notional": no}
-                        rv = _rvol(dvol, snap_et)
-                        if rv:
-                            co["prefRvol"] = rv
+                        try:    # close and volume sit on one record, so $vol needs no join
+                            rv = _rvol([(q["date"], (q.get("volume") or 0) * (q.get("close") or 0))
+                                        for q in hp], snap_et)
+                            if rv:
+                                co["prefRvol"] = rv
+                        except Exception as e:
+                            log(f"[skip] {t} rvol: {e} — keeping existing value")
             # STRC is the only series with a live ATM and buyback programme, and the
             # tracker's notional for it runs one filing behind — on 2026-09-18 it still
             # carried the 1,420,467 shares Strategy had already retired, putting our
