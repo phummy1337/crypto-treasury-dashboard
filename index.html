@@ -2298,12 +2298,25 @@ function initCalc(){
   document.getElementById("ci-fund").addEventListener("input", () => { runCalc(); queueCalcHash(); });
   document.getElementById("ci-share").addEventListener("click", shareCard);
   const linkBtn = document.getElementById("ci-link");
+  const linkLabel = linkBtn && linkBtn.innerHTML;   // read once: a second click mid-flash would save "Copied"
+  let linkFlash = null;
   if(linkBtn) linkBtn.addEventListener("click", async () => {
     writeCalcToHash();                       // flush the debounce before copying
-    try{ await navigator.clipboard.writeText(location.href); }catch(e){}
-    const t = linkBtn.innerHTML;
-    linkBtn.innerHTML = "Copied &#10003;";
-    setTimeout(()=>linkBtn.innerHTML = t, 2500);
+    // navigator.clipboard is undefined on plain http and can reject (permissions,
+    // webviews), so fall back to execCommand and only claim a copy that happened
+    let ok = false;
+    try{ await navigator.clipboard.writeText(location.href); ok = true; }
+    catch(e){
+      const ta = document.createElement("textarea");
+      ta.value = location.href; ta.readOnly = true;
+      ta.style.cssText = "position:fixed;top:0;left:0;opacity:0";
+      document.body.appendChild(ta); ta.select();
+      try{ ok = document.execCommand("copy"); }catch(e2){}
+      ta.remove(); linkBtn.focus();          // the textarea took focus; give it back
+    }
+    linkBtn.innerHTML = ok ? "Copied &#10003;" : "Copy failed — use address bar";
+    clearTimeout(linkFlash);
+    linkFlash = setTimeout(() => linkBtn.innerHTML = linkLabel, 2500);
   });
   // Order matters: the company decides the defaults, and the link overrides both.
   // A section anchor can carry its own ?query (#valuation?ref=x); only #calc is ours.
