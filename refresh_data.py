@@ -282,7 +282,7 @@ def _settled_sessions(rows, snap_et):
 
 
 def _rvol(series, snap_et, window=30):
-    """Relative volume: {mult, todayUsd, avg30Usd, asOf} from [(iso, $vol)] ascending.
+    """Relative volume: {mult, sessionUsd, avg30Usd, asOf} from [(iso, $vol)] ascending.
 
     Anchored to the last SETTLED session (see _settled_sessions), never the running
     one: dividing a part-session by full ones reads backwards — at 11:23 ET on
@@ -299,7 +299,7 @@ def _rvol(series, snap_et, window=30):
     avg = sum(v for _, v in rows[-1 - window:-1]) / window
     if avg <= 0:
         return None
-    return {"mult": round(day[1] / avg, 2), "todayUsd": round(day[1]),
+    return {"mult": round(day[1] / avg, 2), "sessionUsd": round(day[1]),
             "avg30Usd": round(avg), "asOf": day[0]}
 
 
