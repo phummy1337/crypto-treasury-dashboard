@@ -253,6 +253,7 @@ def _stamp_price(co, price, chg_pct, date_et):
 
 # The tracker's closing print lags the 4:00pm auction and it rebuilds its snapshot
 # about every 15 minutes, so a session is not taken as final until well after the bell.
+SESSION_OPEN_ET = datetime.time(9, 30)
 SESSION_SETTLED_ET = datetime.time(16, 15)
 
 
@@ -266,19 +267,35 @@ def _settled_sessions(rows, snap_et):
     Neither is a session. A row counts once its date is past, or once the snapshot
     was taken after that day's close. Weekend dates never count.
 
-    Judged by the snapshot's own timestamp, not the clock this runs on: a 4:09pm
-    cron can read a snapshot built before the closing auction printed.
+    Judged by the snapshot's own timestamp, not the clock this runs on: a run just
+    after the bell can read a snapshot built before the closing auction printed.
 
     Known gap: there is no holiday calendar here, so a weekday market holiday's
     placeholder row counts once the snapshot passes the settle time that day. The
     tracker's history holds none of the last ten holidays, so the row is transient,
-    but while it stands rvol and beta treat it as a session.
+    but while it stands rvol, beta and the day change treat it as a session.
     """
     day = snap_et.date().isoformat()
     closed = snap_et.time() >= SESSION_SETTLED_ET
     return [r for r in rows
             if datetime.date.fromisoformat(r[0]).weekday() < 5
             and (r[0] < day or (r[0] == day and closed))]
+
+
+def _quote_session(closes, price, snap_et):
+    """(session, previous close) for a quote taken at snap_et, given settled [(iso, close)].
+
+    While a session trades, the quote is its running price and the base is the last
+    settled close. Any other time — pre-market, after the settle, the weekend — the
+    quote should be the last settled session's close, based on the session before
+    it. When it isn't (a missing row, an after-hours print), the session it belongs
+    to is unknown, so None.
+    """
+    if snap_et.weekday() < 5 and SESSION_OPEN_ET <= snap_et.time() < SESSION_SETTLED_ET:
+        return snap_et.date().isoformat(), closes[-1][1]
+    if round(closes[-1][1], 2) != price:
+        return None
+    return closes[-1][0], closes[-2][1]
 
 
 def _rvol(series, snap_et, window=30):
@@ -354,15 +371,29 @@ def fetch_strategytracker(data):
         if not c:
             continue
         pm, hd = c["processedMetrics"], c["historicalData"]
-        liq = pm.get("historicalLiquidity") or {}     # session $vol + closes: rvol, beta
+        liq = pm.get("historicalLiquidity") or {}     # session $vol + closes: rvol, beta, day change
         co = data["companies"].get(tk)
         if not co:
             continue
+        try:
+            closes = [(d, float(p)) for d, p in _settled_sessions(
+                zip(liq.get("dates") or [], liq.get("prices") or []), snap_et) if p]
+        except Exception as e:
+            log(f"[skip] {tk} settled closes: {e}")
+            closes = []
         co["holdings"]      = int(round(pm["latestBtcBalance"]))
         co["avgCost"]       = round(pm["avgCostPerBtc"])
         co["stockPrice"]    = round(pm["stockPrice"], 2)
-        _stamp_price(co, co["stockPrice"],
-                     round(pm["stockPriceDelta"]["percent"], 2), tracker_date)
+        # The tracker's own delta compares its last two calendar rows, which hold the
+        # same close whenever no session is trading: ASST read +0.00% on Sat 2026-09-19
+        # against Friday's +6.40%. Base the move on the settled sessions instead.
+        quote = _quote_session(closes, co["stockPrice"], snap_et) if len(closes) >= 2 else None
+        if quote:
+            session, base = quote
+            _stamp_price(co, co["stockPrice"], (co["stockPrice"] / base - 1) * 100, session)
+        else:
+            _stamp_price(co, co["stockPrice"],
+                         round(pm["stockPriceDelta"]["percent"], 2), tracker_date)
         co["sharesOutstanding"] = round(pm["latestTotalShares"] / 1e6, 2)
         co["floatSharesM"] = round(co["sharesOutstanding"] - CLASS_B_SHARES_M.get(tk, 0), 2)
         # daily shares outstanding (split-adjusted, millions) for per-date float
@@ -538,13 +569,11 @@ def fetch_strategytracker(data):
         # exactly zero, and the window spanned Jan 14 -> Sep 23 rather than a year.
         # That read 1.40 for both names against MSTR 1.49 / ASST 1.70 on sessions
         # alone. historicalLiquidity's history holds sessions only, with identical
-        # closes; its tail doesn't (see _settled_sessions), so that is trimmed first,
+        # closes; its tail doesn't, so `closes` above keeps settled sessions only,
         # and _beta pairs each session with BTC's move over the same interval.
         try:
-            stock = [(d, p) for d, p in _settled_sessions(
-                zip(liq.get("dates") or [], liq.get("prices") or []), snap_et) if p]
             btc = [(d, p) for d, p in zip(hd["dates"], hd["btc_prices"]) if p]
-            beta = _beta(stock[-253:], btc)
+            beta = _beta(closes[-253:], btc)
             if beta is not None:
                 co["betaBtc"] = round(beta, 2)
         except Exception as e:
