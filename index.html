@@ -2303,7 +2303,8 @@ function initCalc(){
     setTimeout(()=>linkBtn.innerHTML = t, 2500);
   });
   // Order matters: the company decides the defaults, and the link overrides both.
-  const link = parseCalcHash();
+  // A section anchor can carry its own ?query (#valuation?ref=x); only #calc is ours.
+  const link = isCalcHash() ? parseCalcHash() : null;
   if(link && link.co) calcCo = link.co;
   setDefaults();
   if(link) applyCalcHash(link);
