@@ -2207,6 +2207,9 @@ function writeCalcToHash(){
   }
   p.set("basis", cfg.basis);
   lastCalcQuery = p.toString();
+  // The 400ms debounce can land after the user has left the tab: keep the scenario
+  // for the way back, but never put #calc on the dashboard's URL.
+  if(!document.body.classList.contains("tab-calc")) return;
   try{ history.replaceState(null, "", location.pathname + "#calc?" + lastCalcQuery); }catch(e){}
 }
 let calcHashTimer = null;
@@ -2309,10 +2312,11 @@ function initCalc(){
   setDefaults();
   if(link) applyCalcHash(link);
   runCalc();
+  if(isCalcHash()) setTab("calc");   // arrived via /calculator, /#calc or a permalink
   // Rewrite an incoming link from the values actually used, so a hand-edited or
   // out-of-range one shows its clamped form rather than the junk that was pasted.
+  // After setTab: the writer only touches the URL while the calculator is showing.
   if(link) writeCalcToHash();
-  if(isCalcHash()) setTab("calc");   // arrived via /calculator, /#calc or a permalink
 }
 
 // real-time equity layer: the tracker's light feed (CORS-open, ~140KB) carries live
