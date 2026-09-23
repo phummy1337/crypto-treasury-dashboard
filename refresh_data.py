@@ -279,6 +279,31 @@ def _rvol(series, window=30):
             "avg30Usd": round(avg), "asOf": day[0]}
 
 
+def _beta(stock, btc):
+    """Beta of stock daily returns vs BTC daily returns over shared dates.
+
+    Both are [(date, price)]. Returns run between consecutive dates the two have
+    in common, so a Friday-to-Monday stock move is paired with BTC's whole weekend.
+    That only holds if the stock series carries real sessions alone — a filled
+    weekend or holiday row would pair a 0% stock move with a real BTC one.
+    """
+    sd, bd = dict(stock), dict(btc)
+    days = sorted(set(sd) & set(bd))
+    sr, br = [], []
+    for i in range(1, len(days)):
+        p, q = days[i - 1], days[i]
+        if sd[p] and bd[p]:
+            sr.append(sd[q] / sd[p] - 1)
+            br.append(bd[q] / bd[p] - 1)
+    n = len(br)
+    if n < 30:
+        return None
+    mb, ms = sum(br) / n, sum(sr) / n
+    var = sum((x - mb) ** 2 for x in br) / n
+    cov = sum((sr[i] - ms) * (br[i] - mb) for i in range(n)) / n
+    return cov / var if var else None
+
+
 def fetch_strategytracker(data):
     """Refresh current metrics + real history for MSTR/ASST from strategytracker."""
     try:
@@ -480,23 +505,23 @@ def fetch_strategytracker(data):
         _pt(len(dts) - 1)
         co["bpsHistory"] = {"dates": od, "sats": ov, "basis": "basic"}
 
-        # beta to BTC: regression of trailing-1y daily stock returns on BTC returns
+        # beta to BTC over the trailing year of TRADING days. historicalData has a
+        # row for every calendar day, with weekends and market holidays repeating the
+        # prior close, so regressing on its last 253 rows treated each of those as a
+        # day the stock ignored BTC — on 2026-09-23, 81 of the 252 stock returns were
+        # exactly zero, and the window spanned Jan 14 -> Sep 23 rather than a year.
+        # That read 1.40 for both names against MSTR 1.49 / ASST 1.70 on sessions
+        # alone. historicalLiquidity holds real sessions only, with identical
+        # closes, and _beta pairs each one with BTC's move over the same interval.
         try:
-            sp = hd["stock_prices"][-253:]
-            bp = hd["btc_prices"][-253:]
-            rs, rb = [], []
-            for i in range(1, min(len(sp), len(bp))):
-                if sp[i] and sp[i-1] and bp[i] and bp[i-1]:
-                    rs.append(sp[i]/sp[i-1] - 1)
-                    rb.append(bp[i]/bp[i-1] - 1)
-            if len(rb) > 60:
-                mb = sum(rb)/len(rb); ms = sum(rs)/len(rs)
-                cov = sum((rb[i]-mb)*(rs[i]-ms) for i in range(len(rb)))/len(rb)
-                var = sum((x-mb)**2 for x in rb)/len(rb)
-                if var > 0:
-                    co["betaBtc"] = round(cov/var, 2)
-        except Exception:
-            pass
+            liq = pm.get("historicalLiquidity") or {}
+            stock = [(d, p) for d, p in zip(liq.get("dates") or [], liq.get("prices") or []) if p]
+            btc = [(d, p) for d, p in zip(hd["dates"], hd["btc_prices"]) if p]
+            beta = _beta(stock[-253:], btc)
+            if beta is not None:
+                co["betaBtc"] = round(beta, 2)
+        except Exception as e:
+            log(f"[skip] {tk} beta: {e} — keeping existing value")
 
         # ---- daily EV mNAV history: (mcap + debt + pref notional − cash) / BTC NAV ----
         try:
@@ -666,25 +691,6 @@ def _yahoo_daily(symbol):
               for t, c in zip(ts, closes) if c is not None]
     series.sort()
     return series, res.get("meta", {})
-
-
-def _beta(stock, btc):
-    """Beta of stock daily returns vs BTC daily returns over shared dates."""
-    sd, bd = dict(stock), dict(btc)
-    days = sorted(set(sd) & set(bd))
-    sr, br = [], []
-    for i in range(1, len(days)):
-        p, q = days[i - 1], days[i]
-        if sd[p] and bd[p]:
-            sr.append(sd[q] / sd[p] - 1)
-            br.append(bd[q] / bd[p] - 1)
-    n = len(br)
-    if n < 30:
-        return None
-    mb, ms = sum(br) / n, sum(sr) / n
-    var = sum((x - mb) ** 2 for x in br) / n
-    cov = sum((sr[i] - ms) * (br[i] - mb) for i in range(n)) / n
-    return cov / var if var else None
 
 
 def fetch_equity(data):
