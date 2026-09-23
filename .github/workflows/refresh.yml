@@ -15,20 +15,24 @@ on:
     #
     # MSTR and ASST both file their weekly 8-Ks on Monday morning ET, so Monday
     # gets deliberate redundancy across the filing window rather than one shot.
-    - cron: "12 11 * * 1"           # Mon 7:12 am ET — filing window
-    - cron: "22 12 * * 1"           # Mon 8:22 am ET
-    - cron: "32 13 * * 1"           # Mon 9:32 am ET
-    - cron: "42 15 * * 1"           # Mon 11:42 am ET — backstop if the above are dropped
-    - cron: "40 10 * * 2-5"         # ~6:40 am ET pre-market, Tue-Fri
-    - cron: "23 14,17 * * 1-5"      # twice during US market hours
-    # Daily close capture. Requested after 4:00pm ET, but the closing auction needs
-    # a few minutes to settle (a 16:03 run caught MSTR at 118.94 vs the official
-    # 119.25), so these fire at ~4:09pm ET. GitHub is UTC-only and delays crons off
-    # :00/:30, hence two entries — 20:09 UTC is EDT, 21:09 UTC is EST.
-    - cron: "9 20 * * 1-5"          # 4:09pm EDT (summer)
-    - cron: "9 21 * * 1-5"          # 4:09pm EST (winter)
-    - cron: "7 22 * * 5"            # Fri ~5-6pm ET — safety net if the close run drops
-    - cron: "17 14 * * 6"           # Sat — catch anything filed late Friday
+    #
+    # GitHub is UTC-only, so every ET time below moves an hour earlier when EDT
+    # (UTC-4) gives way to EST (UTC-5) each November.
+    - cron: "12 11 * * 1"           # Mon 7:12am EDT / 6:12am EST — filing window
+    - cron: "22 12 * * 1"           # Mon 8:22am EDT / 7:22am EST
+    - cron: "32 13 * * 1"           # Mon 9:32am EDT / 8:32am EST
+    - cron: "42 15 * * 1"           # Mon 11:42am EDT / 10:42am EST — backstop if the above are dropped
+    - cron: "40 10 * * 2-5"         # Tue-Fri 6:40am EDT / 5:40am EST — pre-market
+    - cron: "53 14,17 * * 1-5"      # 10:53am + 1:53pm EDT / 9:53am + 12:53pm EST — in session all year
+    # Daily close capture. refresh_data.py only takes a session as final once the
+    # tracker's snapshot is past 4:15pm ET (SESSION_SETTLED_ET): its closing print
+    # lags the auction (a 16:03 run caught MSTR at 118.94 vs the official 119.25)
+    # and the snapshot is rebuilt about every 15 minutes. So these fire at 4:39pm,
+    # when the snapshot is from 4:24pm or later. Two entries cover both offsets.
+    - cron: "39 20 * * 1-5"         # 4:39pm EDT (summer) / 3:39pm EST
+    - cron: "39 21 * * 1-5"         # 5:39pm EDT / 4:39pm EST (winter)
+    - cron: "7 22 * * 5"            # Fri 6:07pm EDT / 5:07pm EST — safety net if the close run drops
+    - cron: "17 14 * * 6"           # Sat 10:17am EDT / 9:17am EST — catch anything filed late Friday
   workflow_dispatch:               # manual "Run workflow" button
 
 permissions:
@@ -49,6 +53,13 @@ jobs:
           python-version: "3.12"
 
       - run: pip install certifi
+
+      # which cron entry fired (empty for a manual run): GitHub drops and delays
+      # scheduled runs, and without this a run can only be matched to a slot by timing
+      - name: Record trigger
+        run: echo "event=$GITHUB_EVENT_NAME schedule=$SCHEDULE"
+        env:
+          SCHEDULE: ${{ github.event.schedule }}
 
       - name: Run refresh
         run: python refresh_data.py
