@@ -11,10 +11,9 @@ schedule it) to refresh the numbers without editing the HTML.
 WHAT WORKS OUT OF THE BOX
   - Live BTC price + circulating supply  -> CoinGecko public API (no key)
 
-  - Stock price, day change, 52-week range, 1-year price history, beta-to-BTC
-    -> Yahoo Finance chart API (no key), server-side. See fetch_equity().
-    (Note: Stooq's CSV endpoint is now behind a JS proof-of-work wall and no
-    longer returns plain CSV, so Yahoo is used instead.)
+  - Stock price, day change, 52-week range, 1-year price history, beta-to-BTC,
+    relative volume -> strategytracker (no key). See fetch_strategytracker().
+    MSTR's price is then overlaid with strategy.com's official close.
 
   - BTC holdings + true weekly purchases  -> SEC EDGAR 8-Ks (no key). See
     fetch_holdings(): parses each issuer's weekly purchase 8-K (Strategy's
@@ -59,7 +58,6 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 DATA_PATH = Path(__file__).with_name("data.json")
-DAILY_POINTS = 260          # trailing daily closes kept for the price chart (~1 year)
 UA = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
                     "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"}
 
@@ -662,7 +660,7 @@ def fetch_strategytracker(data):
 
 
 # --------------------------------------------------------------------------- #
-# FALLBACK: equity stats & 1-year price  (Yahoo Finance chart API)
+# FALLBACK: daily volume when Nasdaq fails  (Yahoo Finance chart API) — see _yahoo_vol
 # --------------------------------------------------------------------------- #
 def _yahoo_chart(symbol, tries=6):
     """Fetch a Yahoo 1y daily chart, retrying across hosts on 429/5xx."""
@@ -680,77 +678,6 @@ def _yahoo_chart(symbol, tries=6):
                 continue
             raise
     raise last
-
-
-def _yahoo_daily(symbol):
-    """Return ([(date, close), ...] ascending, meta dict) for a 1y daily chart."""
-    res = _yahoo_chart(symbol)["chart"]["result"][0]
-    ts = res["timestamp"]
-    closes = res["indicators"]["quote"][0]["close"]
-    series = [(datetime.datetime.fromtimestamp(t, datetime.timezone.utc).date(), float(c))
-              for t, c in zip(ts, closes) if c is not None]
-    series.sort()
-    return series, res.get("meta", {})
-
-
-def fetch_equity(data):
-    """stockPrice, dayChangePct, week52High/Low, betaBtc, and stockHistory."""
-    try:
-        btc_series, _ = _yahoo_daily("BTC-USD")
-    except Exception as e:
-        log(f"[skip] equity: BTC history failed ({e}) — keeping existing values")
-        return
-
-    daily, ok = {}, []
-    for tk in data["companies"]:
-        try:
-            series, meta = _yahoo_daily(tk)
-            if len(series) < 2:
-                raise ValueError("insufficient data")
-            c = data["companies"][tk]
-            price = meta.get("regularMarketPrice") or series[-1][1]
-            c["stockPrice"] = round(price, 2)
-            c["dayChangePct"] = round((series[-1][1] / series[-2][1] - 1) * 100, 2)
-            if meta.get("fiftyTwoWeekHigh"):
-                c["week52High"] = round(meta["fiftyTwoWeekHigh"], 2)
-            if meta.get("fiftyTwoWeekLow"):
-                c["week52Low"] = round(meta["fiftyTwoWeekLow"], 2)
-            beta = _beta(series, btc_series)
-            if beta is not None:
-                c["betaBtc"] = round(beta, 2)
-            daily[tk] = dict(series)                 # {date: close}
-            daily[tk][series[-1][0]] = round(price, 2)  # last point = current price
-            ok.append(tk)
-            log(f"{tk}: ${c['stockPrice']:,.2f}  ({c['dayChangePct']:+.2f}%)  "
-                f"52w {c['week52Low']}-{c['week52High']}  betaBTC {c.get('betaBtc')}")
-        except Exception as e:
-            log(f"[skip] equity {tk} failed: {e} — keeping existing values")
-
-        # preferred (STRC / SATA) latest price + day change for the header boxes
-        pref = data["companies"][tk].get("prefTicker")
-        if pref:
-            try:
-                ps, pm = _yahoo_daily(pref)
-                pprice = pm.get("regularMarketPrice") or ps[-1][1]
-                data["companies"][tk]["prefPrice"] = round(pprice, 2)
-                if len(ps) >= 2:
-                    data["companies"][tk]["prefChangePct"] = round((ps[-1][1] / ps[-2][1] - 1) * 100, 2)
-                log(f"  {pref}: ${pprice:,.2f} ({data['companies'][tk].get('prefChangePct')}%)")
-            except Exception as e:
-                log(f"  [skip] {pref} pref price failed: {e}")
-
-    # rebuild the shared DAILY stockHistory from dates common to all companies
-    if len(daily) == len(data["companies"]) and daily:
-        common = sorted(set.intersection(*(set(m) for m in daily.values())))[-DAILY_POINTS:]
-        if common:
-            sh = data.setdefault("stockHistory", {})
-            sh["illustrative"] = False
-            sh["daily"] = True
-            sh["dates"] = [d.strftime("%b %-d") for d in common]
-            for tk, mp in daily.items():
-                sh[tk] = [round(mp[d], 2) for d in common]
-            log(f"stockHistory rebuilt: {len(common)} daily points for {', '.join(ok)}")
-            log(f"stockHistory rebuilt: {len(common)} months for {', '.join(ok)}")
 
 
 # --------------------------------------------------------------------------- #
