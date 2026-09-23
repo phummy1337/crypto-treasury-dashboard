@@ -1849,7 +1849,7 @@ function simulate(s, cfg){
 // Every calculator input, read once. runCalc() and shareCard() need the same field
 // list and the same coercions, so a new input is added here and works in both.
 function readCalcCfg(){
-  const gv = id => parseFloat(document.getElementById(id).value)||0;
+  const gv = id => calcInputValue(document.getElementById(id))||0;
   return { btcTarget:gv("ci-btc"), months:Math.max(1,Math.round(gv("ci-months"))),
     prefMo:gv("ci-pref"), commonMo:gv("ci-common"), rate:gv("ci-rate"),
     fundMix:gv("ci-fund")/100, endMnav:gv("ci-mnav"), runway:Math.max(0,gv("ci-runway")),
@@ -2157,6 +2157,9 @@ function clampCalcInput(el, raw){
             : (CALC_HASH_MAX[el.id] !== undefined ? CALC_HASH_MAX[el.id] : Infinity);
   return Math.min(max, Math.max(min, v));
 }
+// The calculator runs on this and the permalink carries it, so a link reopens exactly
+// what was on screen. An empty box is 0 here; dropping it would reopen the default.
+function calcInputValue(el){ return clampCalcInput(el, el.value === "" ? 0 : el.value); }
 
 // Everything in the hash is untrusted: numbers are clamped, the company and the
 // mNAV basis are whitelists. Returns null when the link carries no query at all.
@@ -2198,14 +2201,14 @@ function applyCalcHash(link){
 // history entry per keystroke. replaceState also fires no hashchange, so the
 // writer cannot loop back into the reader.
 function writeCalcToHash(){
-  const cfg = readCalcCfg();      // same read the calculator and share card use
   const p = new URLSearchParams();
   p.set("co", calcCo);
   for(const key in CALC_HASH_KEYS){
     const el = document.getElementById(CALC_HASH_KEYS[key]);
-    if(el) p.set(key, el.value);
+    const v = el ? calcInputValue(el) : null;
+    if(v != null) p.set(key, v);
   }
-  p.set("basis", cfg.basis);
+  p.set("basis", readCalcCfg().basis);
   lastCalcQuery = p.toString();
   // The 400ms debounce can land after the user has left the tab: keep the scenario
   // for the way back, but never put #calc on the dashboard's URL.
