@@ -2632,8 +2632,6 @@ async function repollData(){
   }catch(e){ /* keep current data */ }
 }
 
-// cadence: every minute during market hours -> live stock px + BTC (all derived
-// metrics re-render with them); every 15 minutes -> full data.json repoll
 // ---------- section nav: active highlighting + chart range chips ----------
 (function initSecNav(){
   const nav = document.getElementById("secnav"); if(!nav) return;
@@ -2661,8 +2659,11 @@ async function repollData(){
   });
 })();
 
-// one chain, not three racing timers: the tracker feed and strategy.com both carry
-// an MSTR quote, and strategy.com (the official consolidated print) has to land last
+// cadence: in market hours, live stock and preferred quotes every minute (every
+// derived metric re-renders with them) and a data.json repoll every 5 minutes;
+// BTC every minute, always. One chain, not three racing timers: the tracker feed
+// and strategy.com both carry an MSTR quote, and strategy.com (the official
+// consolidated print) has to land last
 setInterval(() => {
   (marketOpenET() ? fetchLiveEquity().then(fetchLivePrefs) : Promise.resolve())
     .then(fetchStrategyLive);
