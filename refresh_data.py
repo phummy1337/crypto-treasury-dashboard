@@ -703,7 +703,8 @@ def _yahoo_chart(symbol, tries=6):
         except urllib.error.HTTPError as e:
             last = e
             if e.code in (429, 500, 502, 503):
-                time.sleep(2 ** i)                    # 1,2,4,8,16,32s — ~63s over tries=6
+                if i < tries - 1:                     # no try follows the last one
+                    time.sleep(2 ** i)                # 1,2,4,8,16s between tries — ~31s total
                 continue
             raise
     raise last
