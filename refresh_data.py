@@ -785,6 +785,40 @@ def _pdate(s):
     return None
 
 
+_MSTR_SECTION_HEAD = re.compile(r"ATM (?:and BTC )?Updates?|Repurchase Program Update|BTC Updates?"
+                                r"|USD Reserve Update|Financial Update|Item \d\.\d\d")
+
+
+def _period_texts(text):
+    """An MSTR 8-K once per reporting period, oldest first, each keeping only that
+    period's tables.
+
+    A quarter end splits a week in two, each half with its own ATM and BTC table
+    (2026-04-06: Mar 30-31 and Apr 1-5), and every parser here reads the first table
+    it finds. The second half went unread: its 4,871 BTC landed in the next week's
+    bar, and its $174.6M raise never reached the cash roll-forward or the log. A
+    period's block runs from its "During Period" to the next one or the next section
+    heading; only periods in the ATM or BTC section count, so a quarter summary under
+    "Financial Update" (2025-10-06) doesn't split a filing.
+    """
+    heads = list(_MSTR_SECTION_HEAD.finditer(text))
+    marks = list(_MSTR_PERIOD.finditer(text))
+    section = lambda m: next((h.group(0) for h in reversed(heads) if h.start() < m.start()), "")
+    periods = list(dict.fromkeys(m.groups() for m in marks if section(m).startswith(("ATM", "BTC"))))
+    if len(periods) < 2:
+        return [text]
+    def block_end(m):
+        return min((x.start() for x in marks + heads if x.start() > m.start()), default=len(text))
+    def only(period):
+        kept, pos = [], 0
+        for m in marks:
+            if m.groups() in periods and m.groups() != period:
+                kept.append(text[pos:m.start()])
+                pos = block_end(m)
+        return "".join(kept) + text[pos:]
+    return [only(p) for p in periods]
+
+
 def _parse_flows(text):
     """Weekly cash flows from an MSTR 8-K: ATM net proceeds in, BTC spend out,
     BTC sale proceeds in (all $mm). BTC dollar amounts are derived as
@@ -1052,8 +1086,10 @@ def _atm_allocation(text, raised):
     return parts
 
 
-def _mstr_actions(text, rec, fl):
-    """Readable weekly actions from an MSTR 8-K."""
+def _mstr_actions(text, rec, fl, whole_filing=True):
+    """Readable weekly actions from an MSTR 8-K period. Only the newest period of a
+    split filing (see _period_texts) carries the items that describe the filing as a
+    whole — dividend rate, buybacks, balances — so they aren't listed twice."""
     items = []
     if rec[2] > 0:
         avg = round(fl["btcSpent"] * 1e6 / rec[2]) if fl["btcSpent"] else None
@@ -1074,6 +1110,8 @@ def _mstr_actions(text, rec, fl):
         alloc = _atm_allocation(text, fl["raised"])
         if alloc:
             items.append("Proceeds to " + " · ".join(alloc))
+    if not whole_filing:
+        return items
     rm = re.search(r"dividend rate[^.]{0,200}?from ([\d.]+)% to ([\d.]+)%", text)
     if rm and "STRC" in text:
         items.append(f"{'Raised' if float(rm.group(2)) > float(rm.group(1)) else 'Cut'} STRC dividend rate "
@@ -1286,7 +1324,7 @@ def fetch_holdings(data, max_points=60):
                     base = f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{acc}/"
                     _FILINGS.setdefault(tk, []).append((r["filingDate"][i],
                                                         base + r["primaryDocument"][i]))
-                    yield (base + r["primaryDocument"][i], base)
+                    yield (base + r["primaryDocument"][i], base, r["filingDate"][i])
 
         if tk == "MSTR":
             t3 = {"pref": 0.0, "common": 0.0}
@@ -1296,33 +1334,39 @@ def fetch_holdings(data, max_points=60):
             flow_asof = anchor
             pts, seen, fetched = [], set(), 0
             newest_txt = ""          # EDGAR lists newest first, so the first hit is it
-            for url, base in docs():
+            for url, base, filed in docs():
                 try:
                     t8 = _edgar_text(url)
-                    rec = _parse_mstr(t8)
+                    # newest period first, as EDGAR lists filings; one unless a quarter
+                    # end split the week (see _period_texts)
+                    periods = [(t, _parse_mstr(t)) for t in reversed(_period_texts(t8))]
                 except Exception:
-                    rec = None; t8 = ""
+                    periods = []
                 fetched += 1
-                if rec and rec[1] and rec[3] and rec[1] not in seen:
+                for k, (t, rec) in enumerate(periods):
+                    if not (rec and rec[1] and rec[3] and rec[1] not in seen):
+                        continue
                     seen.add(rec[1]); pts.append(rec)
                     if not newest_txt:
-                        newest_txt = t8
-                    fl = _parse_flows(t8) if t8 else {"raised": 0, "btcSpent": 0, "btcSold": 0}
+                        newest_txt = t
+                    fl = _parse_flows(t)
                     if rec[1] > anchor:                    # roll cash forward from filed anchor
-                        for k in flows: flows[k] += fl[k]
+                        for key in flows: flows[key] += fl[key]
                         flow_asof = max(flow_asof, rec[1])
-                    ai = _mstr_actions(t8, rec, fl) if t8 else []
+                    ai = _mstr_actions(t, rec, fl, whole_filing=(k == 0))
                     if ai:
-                        acts.append({"d": rec[1].isoformat(), "co": "MSTR", "items": ai})
-                    if t8 and rec[1] > datetime.date.today() - datetime.timedelta(days=92):
-                        bd = _atm_netM(t8)
+                        acts.append({"d": rec[1].isoformat(), "co": "MSTR", "items": ai,
+                                     "filed": filed, "url": url})
+                    if rec[1] > datetime.date.today() - datetime.timedelta(days=92):
+                        bd = _atm_netM(t)
                         t3["pref"] += bd["pref"]; t3["common"] += bd["common"]
-                    if strc_rate is None and t8:
+                    if strc_rate is None:
                         rm = (re.search(r"dividend rate per annum on[^.]{0,140}?STRC[^.]{0,200}?to ([\d.]+)%", t8)
                               or re.search(r"maintained[^.]{0,140}?STRC[^.]{0,140}?at ([\d.]+)%", t8))
                         if rm:
                             strc_rate = float(rm.group(1))
                     if len(pts) >= max_points: break
+                if len(pts) >= max_points: break
                 if fetched >= max_points * 3: break
                 time.sleep(0.12)
             if not pts:
@@ -1392,7 +1436,7 @@ def fetch_holdings(data, max_points=60):
             cutoff92 = datetime.date.today() - datetime.timedelta(days=92)
             _sh = data.get("stockHistory") or {}
             pxmap = dict(zip(_sh.get("dates") or [], _sh.get("ASST") or []))
-            for url, base in docs():
+            for url, base, _filed in docs():
                 try:
                     t8 = _edgar_text(url)
                     obs_dates = []
@@ -1526,10 +1570,12 @@ def fetch_holdings(data, max_points=60):
         data["weekly"] = weekly
     if acts:    # merge with previously stored actions so old weeks never drop off
         # link each action to its source filing: the earliest 8-K filed on or after
-        # the period it covers is the one that disclosed it
+        # the period it covers is the one that disclosed it. MSTR's already carry
+        # theirs: a split week's first half ends mid-week, and another 8-K (a STRC
+        # dividend notice, say) can land before the weekly one that reports it
         for a in acts:
             cand = sorted(x for x in _FILINGS.get(a["co"], []) if x[0] >= a["d"])
-            if cand:
+            if cand and not a.get("url"):
                 a["filed"], a["url"] = cand[0]
         old = {(a["d"], a["co"]): a for a in (data.get("actions") or [])}
         for a in acts:
@@ -1889,7 +1935,7 @@ _DASH = "[-–—]"
 _MSTR_ATM_NIL = re.compile(
     r"[Pp]eriod (?:between|from) " + _DATE + r" (?:and|to|through) " + _DATE +
     r",?[^.]{0,60}?did not sell any shares under (?:its|the) at.the.market offering program")
-_MSTR_ATM_PER = re.compile(r"During Period " + _DATE + r" to " + _DATE)   # within _atm_table only
+_MSTR_PERIOD = re.compile(r"During Period " + _DATE + r" to " + _DATE)    # one period's table
 # Tolerant on purpose: an optional footnote "(1)", an optional description ending
 # "Preferred Stock" between the name and the numbers, and blank or dashed cells. The
 # 2026-03-09 filing wrote "STRC Stock Variable Rate Series A Perpetual Stretch Preferred
@@ -1929,7 +1975,7 @@ def _mstr_strc_atm(text):
     for m in _MSTR_ATM_NIL.finditer(text):
         found[(iso(m.group(1)), iso(m.group(2)))] = {"shares": 0, "proceedsM": 0.0, "capacityM": None}
     tbl = _atm_table(text)
-    periods = list(_MSTR_ATM_PER.finditer(tbl))
+    periods = list(_MSTR_PERIOD.finditer(tbl))
     for k, per in enumerate(periods):
         block = tbl[per.end():periods[k + 1].start() if k + 1 < len(periods) else len(tbl)]
         row = _MSTR_STRC_ROW.search(block)
