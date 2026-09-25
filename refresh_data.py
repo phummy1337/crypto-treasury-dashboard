@@ -430,7 +430,9 @@ def fetch_strategytracker(data):
             log(f"[skip] {tk} rvol: {e} — keeping existing value")
         # the tracker zeroes cash/debt when it values a name on market-cap basis
         # (useEv False) — only trust it when useEv is True; else keep filing values.
-        if pm.get("latestUseEv"):
+        # Not for MSTR: its balance leaves out USD Cash ($5.04B vs strategy.com's $6.09B
+        # on 2026-09-25); fetch_holdings and strategy.com set MSTR's cash.
+        if pm.get("latestUseEv") and tk != "MSTR":
             co["cash"] = round(pm["latestCashBalance"] / 1e6)
         # preferred: live per-series notionals, prices, and the implied annual dividend
         ps = pm.get("preferredStocks") or []
@@ -612,13 +614,12 @@ def fetch_strategytracker(data):
                         live.setdefault(t, []).append([today, round(cur, 1)])
                     series[t] = st
                 cash_st = sorted(set(map(tuple, MSTR_CASH_STEPS + [tuple(x) for x in live.get("cash", [])])))
-                # anchor the newest step on strategy.com's USD reserve, not co["cash"]:
-                # a few lines up the tracker's latestCashBalance overwrote it (it reads
-                # ~$1.6B light today) and kpi #2 only restores the live field afterwards.
-                # Without this the mNAV *series* is built on a different balance sheet
-                # than the live headline and the chart's last point sits ~3% above it.
-                cash_now = (_KPI.get(tk) or {}).get("cash") or co["cash"]
-                if abs(cash_st[-1][1] - cash_now) > 1.5:
+                # anchor the newest step on strategy.com's USD Reserve + USD Cash, the
+                # balance sheet the live headline uses; otherwise the chart's last point
+                # drifts from it. With strategy.com down there is no step at all, rather
+                # than one from co["cash"], which then holds the previous run's figure.
+                cash_now = (_KPI.get(tk) or {}).get("cash") or 0
+                if cash_now > 0 and abs(cash_st[-1][1] - cash_now) > 1.5:
                     cash_st.append((today, cash_now)); live.setdefault("cash", []).append([today, cash_now])
                 debt_st = sorted(set(map(tuple, MSTR_DEBT_STEPS + [tuple(x) for x in live.get("debt", [])])))
                 if abs(debt_st[-1][1] - co["seniorDebt"]) > 1.5:
@@ -950,33 +951,28 @@ def _asst_obs(text):
     return obs
 
 
-# MSTR cash roll-forward: anchor at the last filed balance-sheet cash, then add
-# weekly 8-K flows (ATM net proceeds + BTC sale proceeds − BTC purchases) and
-# subtract scheduled preferred dividends / convert coupons.
-MSTR_CASH_FILED = ("2026-03-31", 2207.2)      # Q1-26 10-Q — bump when the next 10-Q lands
-STRC_DIV_RATE = 0.115                          # current per-annum rate (monthly payer)
-QTRLY_PREF_DIV = (1402 * .08 + 1284 * .10 + 1402 * .10) / 4   # STRK/STRF/STRD, $mm per quarter
-CONVERT_COUPONS = {"06-15": 800 * .0225 / 2, "12-15": 800 * .0225 / 2,     # 2032s
-                   "03-15": (1010 * .00625 + 800 * .00625 + 603.66 * .00875) / 2,
-                   "09-15": (1010 * .00625 + 800 * .00625 + 603.66 * .00875) / 2}
+def _mstr_usd_balances(text):
+    """{"reserve": $M, "usdCash": $M or None} as a weekly MSTR 8-K states them, else None.
 
-
-def _mstr_dividends_paid(data, start, end):
-    """Scheduled MSTR dividend/coupon cash out between (start, end], $mm (approx)."""
-    steps = [tuple(x) for x in (data["companies"]["MSTR"].get("strcNotionalSteps") or [])]
-    stre = next((x[2] for x in data["companies"]["MSTR"].get("prefBreakdown", []) if x[0] == "STRE"), 886)
-    total = 0.0
-    d = start
-    while d < end:
-        d += datetime.timedelta(days=1)
-        nxt = d + datetime.timedelta(days=1)
-        if nxt.day == 1:                                   # d is a month end
-            rate = (data["companies"]["MSTR"].get("strcRate") or STRC_DIV_RATE * 100) / 100
-            total += (_step(steps, d.isoformat()) or 0) * rate / 12   # STRC monthly
-            if d.month in (3, 6, 9, 12):                   # quarter-end payers
-                total += QTRLY_PREF_DIV + stre * .10 / 4
-        total += CONVERT_COUPONS.get(d.strftime("%m-%d"), 0)
-    return total
+    Every weekly 8-K since 2026-05-26 gives the balances, in three phrasings:
+    "the balance of the USD Reserve is $871 million" ("was", 2026-07-06); the
+    2026-08-24 bullets "USD Reserve: $5.10 billion" / "USD Cash: $1.59 billion";
+    and from 2026-08-31 one sentence, "the balances of the USD Reserve and USD
+    Cash were $5.10 billion and $1.61 billion". The unit's case varies too
+    ("$1.0 Billion", 2026-06-08).
+    """
+    amt = r"\$\s?([\d,.]+)\s*(billion|million)"
+    mm = lambda m, i: round(float(m.group(i).replace(",", ""))
+                            * (1000 if m.group(i + 1).lower() == "billion" else 1), 1)
+    both = re.search(rf"balances of the USD Reserve and USD Cash were {amt}\s*and\s*{amt}", text, re.I)
+    if both:
+        return {"reserve": mm(both, 1), "usdCash": mm(both, 3)}
+    reserve = (re.search(rf"USD Reserve: {amt}", text, re.I)
+               or re.search(rf"balance of the USD Reserve (?:is|was) {amt}", text, re.I))
+    if not reserve:
+        return None
+    cash = re.search(rf"USD Cash: {amt}", text, re.I)
+    return {"reserve": mm(reserve, 1), "usdCash": mm(cash, 1) if cash else None}
 
 
 _ATM_LABEL = {"STRC": "STRC", "STRF": "STRF", "STRK": "STRK", "STRD": "STRD", "MSTR": "common stock"}
@@ -1138,25 +1134,10 @@ def _mstr_actions(text, rec, fl, whole_filing=True):
         auth.append(f"${v:,.0f}M {'MSTR' if 'MSTR' in m.group(3) else 'preferred'}")
     if auth:
         items.append("Buyback capacity left: " + " · ".join(auth))
-    # Weekly balances. The Jun-2026 framework filings wrote one prose sentence;
-    # from 2026-08-24 it became a bulleted pair once USD Cash was introduced.
-    mm = lambda v, u: float(v.replace(",", "")) * (1000 if u == "billion" else 1)
-    bal = [f"{k} ${mm(v, u):,.0f}M"
-           for k, v, u in re.findall(r"USD (Reserve|Cash): \$\s?([\d,.]+)\s*(billion|million)", text)]
-    if not bal:
-        # 2026-08-31 folded the bullets back into one sentence: "the balances of the
-        # USD Reserve and USD Cash were $5.10 billion and $1.61 billion, respectively"
-        pm = re.search(r"balances of the USD Reserve and USD Cash were \$\s?([\d,.]+)\s*(billion|million)"
-                       r"\s*and\s*\$\s?([\d,.]+)\s*(billion|million)", text)
-        if pm:
-            bal = [f"Reserve ${mm(pm.group(1), pm.group(2)):,.0f}M",
-                   f"Cash ${mm(pm.group(3), pm.group(4)):,.0f}M"]
-    if not bal:
-        um = re.search(r"balance of the USD Reserve is \$([\d,.]+)\s*(billion|million)", text)
-        if um:
-            bal = [f"Reserve ${mm(um.group(1), um.group(2)):,.0f}M"]
+    bal = _mstr_usd_balances(text)
     if bal:
-        items.append("USD " + " · ".join(bal))
+        items.append(f"USD Reserve ${bal['reserve']:,.0f}M"
+                     + (f" · Cash ${bal['usdCash']:,.0f}M" if bal["usdCash"] is not None else ""))
     if re.search(r"establishment of\s*[\"“]USD Cash[\"”]", text):
         items.append("Established USD Cash — a flexible liquidity pool alongside the USD Reserve")
     return items
@@ -1329,11 +1310,9 @@ def fetch_holdings(data, max_points=60):
         if tk == "MSTR":
             t3 = {"pref": 0.0, "common": 0.0}
             strc_rate = None
-            anchor = datetime.date.fromisoformat(MSTR_CASH_FILED[0])
-            flows = {"raised": 0.0, "btcSpent": 0.0, "btcSold": 0.0}
-            flow_asof = anchor
             pts, seen, fetched = [], set(), 0
             newest_txt = ""          # EDGAR lists newest first, so the first hit is it
+            balances = None          # likewise the newest filing that states them
             for url, base, filed in docs():
                 try:
                     t8 = _edgar_text(url)
@@ -1349,10 +1328,11 @@ def fetch_holdings(data, max_points=60):
                     seen.add(rec[1]); pts.append(rec)
                     if not newest_txt:
                         newest_txt = t
+                    if k == 0 and not balances:    # a whole-filing statement, dated to its period end
+                        bal = _mstr_usd_balances(t)
+                        if bal:
+                            balances = dict(bal, asOf=rec[1].isoformat())
                     fl = _parse_flows(t)
-                    if rec[1] > anchor:                    # roll cash forward from filed anchor
-                        for key in flows: flows[key] += fl[key]
-                        flow_asof = max(flow_asof, rec[1])
                     ai = _mstr_actions(t, rec, fl, whole_filing=(k == 0))
                     if ai:
                         acts.append({"d": rec[1].isoformat(), "co": "MSTR", "items": ai,
@@ -1401,16 +1381,22 @@ def fetch_holdings(data, max_points=60):
                 else:
                     log(f"[cost basis] {tk}: {cur:,} BTC @ ${avg_filed:,} = ${implied/1000:,.2f}B "
                         f"(filed ${agg_filed/1000:,.2f}B)")
-            # estimated current cash: filed anchor + weekly flows − scheduled dividends
-            divs = _mstr_dividends_paid(data, anchor, flow_asof)
-            est = MSTR_CASH_FILED[1] + flows["raised"] + flows["btcSold"] - flows["btcSpent"] - divs
             co = data["companies"][tk]
-            co["cashFlows"] = {"anchor": MSTR_CASH_FILED[1], "anchorDate": MSTR_CASH_FILED[0],
-                               "raised": round(flows["raised"]), "btcSold": round(flows["btcSold"]),
-                               "btcSpent": round(flows["btcSpent"]), "divs": round(divs),
-                               "asOf": flow_asof.isoformat()}
-            co["cashFiled"] = MSTR_CASH_FILED[1]
-            co["cash"] = round(est)
+            co.pop("cashFlows", None)    # the retired cash roll-forward; cashFiled carries the filed balances
+            # cash = USD Reserve + USD Cash per the newest 8-K; strategy.com's live figure
+            # (same balances) replaces it in main() when it answers
+            if balances:
+                co["cashFiled"] = balances
+            else:
+                log(f"[drift] {tk} USD balances: no parsed 8-K states them — keeping the prior cashFiled")
+            stated = co.get("cashFiled")
+            if isinstance(stated, dict):
+                total = round(stated["reserve"] + (stated["usdCash"] or 0))
+                co["cash"] = total
+                live = (_KPI.get(tk) or {}).get("cash") or 0
+                if live > 0 and abs(live - total) > 25:   # the 8-K rounds each balance to $10M
+                    log(f"[drift] {tk} cash: the 8-K balances total ${total:,}M (as of "
+                        f"{stated['asOf']}) but strategy.com shows ${live:,}M")
             co["trail3m"] = {"prefMo": round(t3["pref"] / 3), "commonMo": round(t3["common"] / 3)}
             # the tracker's STRC dividendRate lags rate-change 8-Ks; the filings win
             if strc_rate:
@@ -1425,9 +1411,6 @@ def fetch_holdings(data, max_points=60):
                 coup = sum(x["principal"] * x["coupon"] / 100 for x in (co.get("debtSchedule") or []))
                 co["annualObligations"] = round(pref_div + coup)
                 log(f"MSTR STRC rate from 8-K: {strc_rate}% -> annualObligations {co['annualObligations']}")
-            log(f"MSTR cash est: {MSTR_CASH_FILED[1]} filed + {flows['raised']:,.0f} raised "
-                f"+ {flows['btcSold']:,.0f} BTC sold - {flows['btcSpent']:,.0f} BTC bought "
-                f"- {divs:,.0f} divs = ${est:,.0f}M (as of {flow_asof})")
         else:  # ASST — observation-based
             allobs, fetched = {}, 0
             cash_usd = strc_sh = None
@@ -1781,8 +1764,8 @@ def fetch_strategy_kpi(data):
     (open, no auth): market cap -> current basic shares, convertible debt, and
     USD reserve derived via the EV identity (cash = mcap + debt + pref - EV).
     Called before fetch_strategytracker (so the history builder and step series
-    see fresh values) and again after fetch_holdings (which recomputes its own
-    cash estimate and must be overridden)."""
+    see fresh values) and again after fetch_holdings (which sets cash from the
+    8-K balances, and the live figure wins)."""
     try:
         k = _KPI.get("_raw") or get_json("https://api.strategy.com/btc/mstrKpiData")[0]
         _KPI["_raw"] = k
@@ -2291,7 +2274,7 @@ def main():
     fetch_sata_notional(data)         # SEC EDGAR: filed SATA count (the tracker's stalls)
     fetch_strategytracker(data)       # PRIMARY: current metrics + real history (both names)
     fetch_holdings(data)             # SEC EDGAR: weekly accumulation (8-K period ranges)
-    fetch_strategy_kpi(data)          # re-apply: holdings clobbers cash with its own estimate
+    fetch_strategy_kpi(data)          # re-apply: holdings sets cash from the 8-K balances; live wins
     fetch_short_interest(data)        # Nasdaq: days to cover (semi-monthly)
     fetch_borrow_fees(data)           # ChartExchange/IBKR: annualized cost to short
     fetch_atm(data)                   # preferred ATM issuance estimate + filing calibration
