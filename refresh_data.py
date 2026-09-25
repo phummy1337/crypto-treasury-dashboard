@@ -46,6 +46,7 @@ Dependencies: requests  (pip3 install requests)
   Optional for HTML scraping: beautifulsoup4  (pip3 install beautifulsoup4)
 """
 
+import bisect
 import json
 import re
 import sys
@@ -194,6 +195,9 @@ _SHARES_HIST = {}
 _VOL_HIST = {}
 # intraday 15-min candles per preferred ticker, for the ATM tracker
 _ATM_CANDLES = {}
+# settled daily dollar volume (close x volume) per preferred ticker, [(iso, $)] ascending:
+# one series behind both the preferred's rvol and the ATM's absorption denominator
+_PREF_DVOL = {}
 # 8-K filing index per company: [(filing date, primary doc url)] — lets each
 # action in the log link back to the filing that disclosed it
 _FILINGS = {}
@@ -269,7 +273,8 @@ def _settled_sessions(rows, snap_et):
     Known gap: there is no holiday calendar here, so a weekday market holiday's
     placeholder row counts once the snapshot passes the settle time that day. The
     tracker's history holds none of the last ten holidays, so the row is transient,
-    but while it stands rvol, beta and the day change treat it as a session.
+    but while it stands rvol, beta, the day change and ATM absorption treat it as a
+    session (absorption can count the newest filed window a day early).
     """
     day = snap_et.date().isoformat()
     closed = snap_et.time() >= SESSION_SETTLED_ET
@@ -494,9 +499,13 @@ def fetch_strategytracker(data):
                         no.append(round(n) if n is not None else None)
                     if px:
                         co["prefHistory"] = {"dates": dts, "iso": isod, "px": px, "notional": no}
-                        try:    # close and volume sit on one record, so $vol needs no join
-                            rv = _rvol([(q["date"], (q.get("volume") or 0) * (q.get("close") or 0))
-                                        for q in hp], snap_et)
+                        # close and volume sit on one record, so $vol needs no join. Settled
+                        # here once: intraday, hp carries the running session's row too
+                        try:
+                            _PREF_DVOL[t] = sorted(_settled_sessions(
+                                [(q["date"], (q.get("volume") or 0) * (q.get("close") or 0)) for q in hp],
+                                snap_et))
+                            rv = _rvol(_PREF_DVOL[t], snap_et)
                             if rv:
                                 co["prefRvol"] = rv
                         except Exception as e:
@@ -1844,6 +1853,11 @@ ATM_PAR = 100.0
 ATM_THRESHOLD = 99.95          # a nickel below par — see note above
 ATM_DEFAULT_CAPTURE = 0.75     # prior when we have no confirmed week yet
                                # (bitcointreasuries.net publishes 74.4%)
+ATM_SPAN_DAYS = 182            # absorption covers the newest 26 weeks of filed windows...
+ATM_LOOKBACK_DAYS = 200        # ...so read a little further back, to find the one that closes them
+ATM_MAX_FILINGS = 60           # 8-Ks per company; 200 days of MSTR's come to about 40
+ATM_MAX_WINDOW_DAYS = 15       # longest window filed: MSTR Nov 17-30 2025 (13 days); longest
+                               # a filing trails a window's end: 6 days (MSTR 2026-04-06)
 
 
 def _atm_daily(candles):
@@ -1864,36 +1878,253 @@ def _atm_daily(candles):
     return sorted((d, r[0], r[1]) for d, r in by.items())
 
 
+_DATE = r"([A-Z][a-z]+ \d{1,2}, \d{4})"
+_DASH = "[-–—]"
+# A week with no sales often gets no table at all, just a sentence, and under at least
+# three headings ("ATM Update", "ATM Updates", "ATM and BTC Update for the Period ..."),
+# so this one searches the whole filing. 8-K of 2026-09-21: "...during the period between
+# September 14, 2026 and September 20, 2026, Strategy did not sell any shares under its
+# at-the-market offering program." Six of the 27 weeks filed from Mar 23 to Sep 20 2026
+# read this way.
+_MSTR_ATM_NIL = re.compile(
+    r"[Pp]eriod (?:between|from) " + _DATE + r" (?:and|to|through) " + _DATE +
+    r",?[^.]{0,60}?did not sell any shares under (?:its|the) at.the.market offering program")
+_MSTR_ATM_PER = re.compile(r"During Period " + _DATE + r" to " + _DATE)   # within _atm_table only
+# Tolerant on purpose: an optional footnote "(1)", an optional description ending
+# "Preferred Stock" between the name and the numbers, and blank or dashed cells. The
+# 2026-03-09 filing wrote "STRC Stock Variable Rate Series A Perpetual Stretch Preferred
+# Stock 3,776,205 $ 377.6 $ 377.1 $ 3,158.0" and left zero cells blank.
+_MSTR_STRC_ROW = re.compile(
+    r"STRC Stock(?:\s*\(\d\))?\s+(?:[A-Za-z%.\d ]{0,80}?Preferred Stock\s+)?"
+    rf"([\d,]+|{_DASH})?\s*\$\s*([\d,.]+|{_DASH})?\s*\$\s*([\d,.]+|{_DASH})?\s*\$\s*([\d,.]+)")
+# A zero week can also print the capacity cell alone. 8-K of 2025-12-01: "STRC Stock
+# $ 4,042.4 Variable Rate Series A Perpetual Stretch Preferred Stock STRK Stock ...".
+# The lookahead keeps it off a normal row with its shares cell left blank.
+_MSTR_STRC_CAPACITY_ONLY = re.compile(r"STRC Stock(?:\s*\(\d\))?\s+\$\s*([\d,.]+)(?![\d,.]|\s*\$)")
+# "This filing reports on the ATM", whether or not a window could be read from it —
+# a hit with no window is format drift, not a filing about something else. Each looks
+# for two independent marks, so rewording one is a loud miss rather than a quiet fall
+# back to the week before. Strategy's heading has read four ways since Aug 2025 ("ATM
+# Update", "ATM Updates", "ATM and BTC Update", "... for the Period"), so its second mark
+# is the "During Period" line every weekly table carries; Strive's are the table's header
+# pair and its SATA row ("SATA Stock (1) ...", "As of Sept. 4" would each slip one). In
+# the 80 newest 8-Ks of either company, none fires on a filing that isn't an ATM report.
+_MSTR_ATM_SECTION = re.compile(r"ATM (?:and BTC )?Updates?|did not sell any shares under"
+                               r"|During Period [A-Z][a-z]+ \d{1,2}, \d{4} to")
+_ASST_ATM_SECTION = re.compile(r"As of [A-Z][a-z]+ \d{1,2}, \d{4} As of [A-Z][a-z]+ \d{1,2}, \d{4}"
+                               r"|SATA Stock\s+[\d,]{6,}")
+
+
 def _mstr_strc_atm(text):
-    """STRC row of the MSTR 8-K ATM table: shares, net proceeds ($M), capacity ($M)."""
-    per = re.search(r"During Period ([A-Z][a-z]+ \d+, \d{4}) to ([A-Z][a-z]+ \d+, \d{4})", text)
-    m = re.search(r"STRC Stock\s+([\d,]+|-|\u2014)\s+\$\s*([\d,.]+|-|\u2014)\s+"
-                  r"\$\s*([\d,.]+|-|\u2014)\s+\$\s*([\d,.]+)", text)
-    if not m:
-        return None
-    num = lambda x: 0.0 if x in ("-", "\u2014") else float(x.replace(",", ""))
-    return {"from": _pdate(per.group(1)).isoformat() if per else None,
-            "to": _pdate(per.group(2)).isoformat() if per else None,
-            "shares": int(num(m.group(1))), "proceedsM": num(m.group(3)),
-            "capacityM": num(m.group(4))}
+    """Every STRC window an MSTR 8-K reports: [{from, to, shares, proceedsM, capacityM}].
+
+    Each "During Period" block of the ATM table is one window, and a quarter end splits
+    a week into two (2026-04-06: Mar 30-31 and Apr 1-5). Zero weeks may be prose only;
+    where a week appears both ways the table wins, since it states capacity. A table
+    period with no readable STRC row raises: that filing is unparsed, not a zero week.
+    """
+    iso = lambda s: _pdate(s).isoformat()
+    num = lambda x: 0.0 if not x or re.fullmatch(_DASH, x) else float(x.replace(",", ""))
+    found = {}
+    for m in _MSTR_ATM_NIL.finditer(text):
+        found[(iso(m.group(1)), iso(m.group(2)))] = {"shares": 0, "proceedsM": 0.0, "capacityM": None}
+    tbl = _atm_table(text)
+    periods = list(_MSTR_ATM_PER.finditer(tbl))
+    for k, per in enumerate(periods):
+        block = tbl[per.end():periods[k + 1].start() if k + 1 < len(periods) else len(tbl)]
+        row = _MSTR_STRC_ROW.search(block)
+        if row:
+            shares, _notional, net, available = row.groups()
+        elif capacity_only := _MSTR_STRC_CAPACITY_ONLY.search(block):
+            shares, net, available = None, None, capacity_only.group(1)
+        else:
+            raise ValueError(f"no STRC row for {per.group(1)} to {per.group(2)}")
+        found[(iso(per.group(1)), iso(per.group(2)))] = {
+            "shares": int(num(shares)), "proceedsM": num(net), "capacityM": num(available)}
+    return [{"from": start, "to": end, **sale} for (start, end), sale in found.items()]
 
 
 def _asst_sata_atm(text):
-    """SATA share count delta from the Strive 8-K weekly holdings table."""
+    """The SATA window of a Strive 8-K's weekly holdings table, as a list of at most one.
+
+    Proceeds are the share-count change x $100 par; the filing states no dollars.
+    """
     per = re.search(r"As of ([A-Z][a-z]+ \d+, \d{4}) As of ([A-Z][a-z]+ \d+, \d{4})", text)
     m = re.search(r"SATA Stock ([\d,]+) ([\d,]+)", text)
     if not (per and m):
-        return None
+        return []
     a, b = (int(x.replace(",", "")) for x in m.groups())
-    return {"from": _pdate(per.group(1)).isoformat(), "to": _pdate(per.group(2)).isoformat(),
-            "shares": b - a, "proceedsM": round((b - a) * ATM_PAR / 1e6, 1), "capacityM": None}
+    start, end = _pdate(per.group(1)).isoformat(), _pdate(per.group(2)).isoformat()
+    if b < a:       # a buyback or conversion, not an ATM sale — book it as no issuance
+        log(f"[drift] SATA count fell {a:,} -> {b:,} between {start} and {end} — "
+            f"counting 0 ATM proceeds for that window")
+    sold = max(b - a, 0)
+    return [{"from": start, "to": end, "shares": sold,
+             "proceedsM": round(sold * ATM_PAR / 1e6, 1), "capacityM": None}]
+
+
+def _iso_plus(iso, days):
+    return (datetime.date.fromisoformat(iso) + datetime.timedelta(days=days)).isoformat()
+
+
+def _plausible_window(w, filing_date):
+    """Whether a filed window runs forwards for at most ATM_MAX_WINDOW_DAYS and ends within
+    ATM_MAX_WINDOW_DAYS before its filing, so a typo'd year can't become `confirmed`."""
+    span = datetime.date.fromisoformat(w["to"]) - datetime.date.fromisoformat(w["from"])
+    return (0 <= span.days <= ATM_MAX_WINDOW_DAYS
+            and _iso_plus(filing_date, -ATM_MAX_WINDOW_DAYS) <= w["to"] <= filing_date)
+
+
+def _filed_atm_windows(pref, cik, parser, reports_atm, first_day_offset):
+    """Every ATM window in the 8-Ks back to ATM_LOOKBACK_DAYS before the newest one, newest
+    first, each with the firstDay its sales can fall on; None when the newest ATM filing
+    can't be read.
+
+    Calibration and absorption both lean on the newest week, and falling back to the week
+    before without a word is how STRC's confirmed week sat on Aug 24-30 2026 through three
+    newer 8-Ks. A network error raises, so the caller keeps the last values rather than
+    publishing a span that one failed fetch cut short.
+    """
+    rec = get_json(f"https://data.sec.gov/submissions/CIK{cik}.json")["filings"]["recent"]
+    found, examined, oldest_filing_date = {}, 0, ""
+    for i in range(len(rec["form"])):          # EDGAR lists newest first
+        if rec["form"][i] != "8-K":
+            continue
+        filing_date = rec["filingDate"][i]
+        if filing_date < oldest_filing_date:
+            break
+        if examined >= ATM_MAX_FILINGS:
+            log(f"[drift] ATM {pref}: read {ATM_MAX_FILINGS} 8-Ks without getting back to "
+                f"{oldest_filing_date or 'a filed window'} — the span may end early")
+            break
+        examined += 1
+        url = (f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/"
+               f"{rec['accessionNumber'][i].replace('-', '')}/{rec['primaryDocument'][i]}")
+        memoised = url in _EDGAR_TXT            # fetch_holdings has read nearly all of them
+        text = _edgar_text(url)
+        if not memoised:
+            time.sleep(0.12)
+        try:                                    # [] for an 8-K about something else
+            windows = parser(text)
+            if not windows and reports_atm.search(text):
+                raise ValueError("an ATM section, but no window could be read from it")
+            for w in windows:
+                if not _plausible_window(w, filing_date):
+                    raise ValueError(f"implausible window {w['from']} -> {w['to']}")
+        except Exception as e:
+            log(f"[drift] ATM {pref} 8-K filed {filing_date}: {e}" + ("" if found else
+                " — it is the newest ATM filing, so keeping the last filed week and absorption"))
+            if not found:
+                return None
+            continue
+        for w in windows:
+            w["firstDay"] = _iso_plus(w["from"], first_day_offset)
+            kept = found.setdefault((w["from"], w["to"]), w)
+            if kept is not w and (kept["shares"], kept["proceedsM"]) != (w["shares"], w["proceedsM"]):
+                log(f"[drift] ATM {pref}: {w['from']} -> {w['to']} was filed on {filing_date} as "
+                    f"${w['proceedsM']:,.1f}M ({w['shares']:,} sh) and later as ${kept['proceedsM']:,.1f}M "
+                    f"({kept['shares']:,} sh) — the later filing stands")
+        if windows and not oldest_filing_date:
+            oldest_filing_date = _iso_plus(max(w["to"] for w in windows), -ATM_LOOKBACK_DAYS)
+    if not found:
+        raise ValueError(f"no ATM window in the newest {examined} 8-Ks")
+    return sorted(found.values(), key=lambda w: w["to"], reverse=True)
+
+
+def _absorption(pref, windows, dvol):
+    """Σ filed proceeds ÷ Σ session dollar volume over the newest filed windows the tape
+    covers, with a ±1-session band and the newest run of windows that sold nothing; None
+    when no window counts.
+
+    A window counts once a session AFTER its `to` has settled: Strategy files on Monday
+    morning with Friday settled, and counting that week at once would leave the band's +1
+    side missing until Monday's close, then move absorption a second time (a quarter-end
+    split still does: on 2026-04-06, Mar 30-31 counted that morning and Apr 1-5 after the
+    close). The span runs back ATM_SPAN_DAYS from the newest window counted, or to where
+    the price history starts, and ends sooner, with a [drift], at a window that doesn't
+    tile with the one after it or whose proceeds exceed its tape. So the counted sessions
+    are one slice of the tape, and the band slides it a session either way, leaving out a
+    side that would run off the series. The zero run is a filing fact and reads every
+    window, counted or not: on the Monday a paused ATM sells again, "none since May 17"
+    would otherwise sit beside a Confirmed tile showing the new week.
+    """
+    days = [d for d, _ in dvol]
+    covered = [w for w in windows if w["to"] < days[-1]]
+    if not covered:
+        return None
+    start = max(_iso_plus(covered[0]["to"], -ATM_SPAN_DAYS), days[0])
+    counted, stop = [], "start"                 # "start": the filings read run out first
+    for w in covered:
+        if counted and _iso_plus(w["to"], 1) != counted[-1]["firstDay"]:
+            stop = "gap"
+            log(f"[drift] ATM {pref}: the filed window {w['firstDay']} -> {w['to']} doesn't end the day "
+                f"before {counted[-1]['firstDay']} — absorption leaves it and everything older out")
+            break
+        if w["firstDay"] < start:
+            stop = "span" if start > days[0] else "history"
+            break
+        tape = sum(v for d, v in dvol if w["firstDay"] <= d <= w["to"])
+        if w["proceedsM"] * 1e6 > tape:
+            stop = "tape"
+            log(f"[drift] ATM {pref}: ${w['proceedsM']:,.1f}M filed for {w['firstDay']} -> {w['to']} against "
+                f"${tape / 1e6:,.1f}M traded — absorption leaves it and everything older out")
+            break
+        counted.append({"firstDay": w["firstDay"], "to": w["to"], "proceedsM": round(w["proceedsM"], 1),
+                        "dollarVolM": round(tape / 1e6, 1)})
+    if not counted:
+        return None
+    first, end = bisect.bisect_left(days, counted[-1]["firstDay"]), bisect.bisect_right(days, counted[0]["to"])
+    tapes = [sum(v for _, v in dvol[first + s:end + s])
+             for s in (0, -1, 1) if first + s >= 0 and end + s <= len(dvol)]
+    if not all(tapes):                          # a feed without volume: nothing to divide by
+        return None
+    proceeds = sum(w["proceedsM"] for w in counted) * 1e6
+    ratios = [proceeds / t for t in tapes]
+    zero_run = next((k for k, w in enumerate(windows) if w["proceedsM"] > 0), len(windows))
+    log(f"[ATM] {pref} absorption {ratios[0]:.2%} (±1 session {min(ratios):.2%}-{max(ratios):.2%}) over "
+        f"{len(counted)} filed windows {counted[-1]['firstDay']} -> {counted[0]['to']}, ended by {stop}")
+    return {"agg": round(ratios[0], 4), "lo": round(min(ratios), 4), "hi": round(max(ratios), 4),
+            "n": len(counted), "fromDate": counted[-1]["firstDay"], "toDate": counted[0]["to"],
+            "zeroRun": zero_run, "lastSaleTo": windows[zero_run]["to"] if zero_run < len(windows) else None,
+            "windows": counted}
+
+
+def _confirmed_and_absorption(prior, pref, cik, parser, reports_atm, first_day_offset, proceeds_basis):
+    """(confirmed, absorption) for one preferred from its filed ATM windows, each kept whole
+    from the previous run wherever the filings or the tape can't replace it."""
+    try:
+        windows = _filed_atm_windows(pref, cik, parser, reports_atm, first_day_offset)
+    except Exception as e:                      # a network error, or no ATM window at all
+        log(f"[skip] ATM {pref} filings: {e} — keeping the last filed week and absorption")
+        return prior.get("confirmed"), prior.get("absorption")
+    if windows is None:                         # the newest ATM filing is unreadable, as logged
+        return prior.get("confirmed"), prior.get("absorption")
+    # prose weeks state no capacity, and a new programme was once announced inside one
+    # (Mar 23-29 2026: $1,975.8M available before it, $22,748.2M after)
+    newest, stated = windows[0], next((w for w in windows if w["capacityM"] is not None), None)
+    confirmed = {"from": newest["from"], "to": newest["to"], "shares": newest["shares"],
+                 "proceedsM": newest["proceedsM"], "capacityM": stated and stated["capacityM"],
+                 "capacityAsOf": stated and stated["to"]}
+    absorption = _PREF_DVOL.get(pref) and _absorption(pref, windows, _PREF_DVOL[pref])
+    if not absorption:
+        log(f"[skip] ATM {pref} absorption: no settled tape to count a filed window against — "
+            f"keeping the last value")
+        return confirmed, prior.get("absorption")
+    return confirmed, {**absorption, "basis": proceeds_basis}
 
 
 def fetch_atm(data):
     """Live ATM issuance estimate per preferred, calibrated against the filings."""
     btc = _BTC_PX.get("usd") or data.get("btcPriceUsd") or 0
-    for tk, doc_cik, parser in (("MSTR", "0001050446", _mstr_strc_atm),
-                                ("ASST", "0001920406", _asst_sata_atm)):
+    # The session rule, per filer, in one place: the day offset from a filed window's
+    # `from` to the first day its sales can fall on. Strategy's "During Period Mon to Sun"
+    # is inclusive on a trade-date basis, so its Monday counts; Strive's "As of A / As of
+    # B" are share counts at A's and B's close, so the sales between them fall in (A, B].
+    # proceeds_basis names what the proceeds are: STRC's net proceeds as filed, SATA's
+    # share delta x $100 par.
+    for tk, doc_cik, parser, reports_atm, first_day_offset, proceeds_basis in (
+            ("MSTR", "0001050446", _mstr_strc_atm, _MSTR_ATM_SECTION, 0, "net"),
+            ("ASST", "0001920406", _asst_sata_atm, _ASST_ATM_SECTION, 1, "par")):
         co = data["companies"].get(tk)
         if not co:
             continue
@@ -1902,26 +2133,14 @@ def fetch_atm(data):
         if not daily:
             log(f"[skip] ATM {pref}: no intraday candles")
             continue
-        # newest 8-K row for this security -> confirmed issuance to calibrate against
-        confirmed = None
-        try:
-            sub = get_json(f"https://data.sec.gov/submissions/CIK{doc_cik}.json")
-            rec = sub["filings"]["recent"]
-            for i in range(len(rec["form"])):
-                if rec["form"][i] != "8-K":
-                    continue
-                url = (f"https://www.sec.gov/Archives/edgar/data/{int(doc_cik)}/"
-                       f"{rec['accessionNumber'][i].replace('-', '')}/{rec['primaryDocument'][i]}")
-                got = parser(_edgar_text(url))
-                if got and got.get("to"):
-                    confirmed = got
-                    break
-        except Exception as e:
-            log(f"[skip] ATM {pref} filing: {e}")
+        # newest filed window -> confirmed issuance to calibrate against
+        confirmed, absorption = _confirmed_and_absorption(
+            co.get("atm") or {}, pref, doc_cik, parser, reports_atm, first_day_offset, proceeds_basis)
         # calibrate: actual proceeds over eligible volume across the confirmed window
         cap, basis = ATM_DEFAULT_CAPTURE, "default (no confirmed week yet)"
         if confirmed and confirmed["from"]:
-            elig = sum(e for d, _t, e in daily if confirmed["from"] < d <= confirmed["to"])
+            first_day = _iso_plus(confirmed["from"], first_day_offset)
+            elig = sum(e for d, _t, e in daily if first_day <= d <= confirmed["to"])
             if elig > 1e5 and confirmed["proceedsM"] > 0:
                 raw = confirmed["proceedsM"] * 1e6 / elig
                 cap = max(0.2, min(1.5, raw))
@@ -1930,7 +2149,9 @@ def fetch_atm(data):
             elif confirmed["proceedsM"] == 0:
                 basis = f"no issuance in the week to {confirmed['to']}"
         today = daily[-1]
-        wk = [r for r in daily if r[0] > (confirmed or {}).get("to", "")] or [today]
+        # sessions since the confirmed window: none yet on a Monday morning, rather than
+        # Friday again (it sits inside the window the 8-K just confirmed)
+        wk = [r for r in daily if r[0] > ((confirmed or {}).get("to") or "")]
         est = lambda e: (e * cap, (e * cap / btc) if btc else None)   # 0 is a real value, not "unknown"
         t_usd, t_btc = est(today[2])
         w_usd, w_btc = est(sum(r[2] for r in wk))
@@ -1946,6 +2167,7 @@ def fetch_atm(data):
             "weekEligUsd": round(sum(r[2] for r in wk)),
             "weekEstUsd": round(w_usd), "weekEstBtc": round(w_btc, 2) if w_btc is not None else None,
             "confirmed": confirmed,
+            "absorption": absorption,
             "daily": [{"d": d, "tot": round(t), "elig": round(e)} for d, t, e in daily[-30:]],
         }
         log(f"[ATM] {pref}: {co['atm']['status']} | capture {cap:.0%} ({basis}) | "
