@@ -170,10 +170,6 @@ def _step(steps, iso):
     return v
 
 
-# STRE is EUR-denominated: 7,750,000 shares × €100 stated amount (Nov 13, 2025
-# offering, per 8-K) = €775mm, converted at the live ECB EURUSD rate each refresh.
-# The tracker carries a stale fixed conversion ($899mm), so we override it.
-STRE_EUR_NOTIONAL = 775.0
 # The USD stated amount Strategy carries STRE at in its own preferred total: the
 # issue-date conversion of the €775M, fixed since Nov 2025. Kept as a constant
 # rather than EUR x spot so our five-series sum ties to strategy.com's figure.
@@ -361,10 +357,7 @@ def fetch_strategytracker(data):
         snap = datetime.datetime.now(datetime.timezone.utc)
     tracker_date = _et_date(snap)
     snap_et = (snap if snap.tzinfo else snap.replace(tzinfo=datetime.timezone.utc)).astimezone(ET)
-    try:    # live EURUSD (ECB) for the EUR-denominated STRE notional
-        data["eurUsd"] = round(get_json("https://api.frankfurter.dev/v1/latest?base=EUR&symbols=USD")["rates"]["USD"], 4)
-    except Exception:
-        log("[skip] EURUSD fetch failed — keeping previous rate")
+    data.pop("eurUsd", None)    # STRE is carried at STRE_USD_STATED; nothing reads the rate
     hist = {}
     for tk in ("MSTR", "ASST"):
         c = comps.get(tk)
