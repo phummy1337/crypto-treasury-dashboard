@@ -470,7 +470,7 @@
   <section id="atm">
     <div class="sec-head"><h2>Preferred ATM Tracker</h2><span class="tag stub" id="tag-atm">seed data</span></div>
     <p class="sec-note">An estimate of how much bitcoin each company is buying through its preferred ATM today, inferred from live trading and calibrated to the filings.
-      <span class="evhint hint-icon" aria-label="Methodology" data-title="How this estimate is built" data-rows="Eligible volume~15-min bars printed at/above $99.95, prorated when a bar straddles it|Capture rate~the share of that volume that was really ATM issuance|Calibration~capture solved from the last 8-K that disclosed actual shares issued|To bitcoin~estimated proceeds ÷ live BTC price|Why $99.95, not $100~SATA hugs par to the cent; a strict cutoff undercounted a confirmed $44.1M week roughly 4x|Assumption~issuance tracks at-par volume evenly through the session|Confirmed vs estimate~the 8-K figure is fact; the intraday number is an estimate between filings">&#9432;</span></p>
+      <span class="evhint hint-icon" aria-label="Methodology" data-title="How this estimate is built" data-rows="At-par volume~15-min bars printed at/above $99.95, prorated when a bar straddles it|Capture rate~the share of that volume that was really ATM issuance|Calibration~capture solved from the newest filed week, else a default rate|To bitcoin~estimated proceeds ÷ live BTC price|Why $99.95, not $100~SATA hugs par to the cent; a strict cutoff undercounted a confirmed $44.1M week roughly 4x|Assumption~issuance tracks at-par volume evenly through the session|Confirmed vs estimate~the 8-K figure is fact; the intraday number is an estimate between filings">&#9432;</span></p>
     <div class="charts" id="atm-cards"></div>
   </section>
 
@@ -765,6 +765,8 @@ const sUsdM = (v) => (v<0?"-":"")+"$"+fmt(Math.abs(v)/1e6,0)+"M";
 const capFmt = (mm) => { if(mm==null||isNaN(mm)) return "—"; const s=mm<0?"-":"", a=Math.abs(mm);
   return a>=1000 ? s+"$"+fmt(a/1000,2)+"B" : s+"$"+fmt(a,0)+"M"; };
 const pct = (n, d=1) => n==null||isNaN(n) ? "—" : fmt(n,d)+"%";
+// "May 17" from an ISO date, read as a calendar day wherever the viewer is
+const shortDate = iso => new Date(iso+"T00:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric"});
 const sig = (n) => n>0?"+":"";
 
 // mNAV = EV / BTC reserve.  EV = (price × basic shares) + debt + preferred notional − USD reserve(cash)
@@ -1249,13 +1251,12 @@ function renderPriceHeader(){
   const rvolToken = r => {
     const m = r && r.mult;
     if(typeof m !== "number" || !isFinite(m)) return "";
-    const age = (Date.parse(etDateStr()) - Date.parse(r.asOf)) / 864e5;
-    if(!(age >= 0 && age <= 6)) return "";            // also rejects a missing or future asOf
-    const day = age ? " " + ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][new Date(r.asOf).getUTCDay()] : "";
+    const day = sessionDayName(r.asOf);
+    if(day == null) return "";                        // also rejects a missing or future asOf
     // busy is neither good nor bad, so this borrows the page's emphasis colours
     // rather than the pos/neg vocabulary
     const c = m >= 2 ? "var(--btc)" : m >= 1.5 ? "#FFD9A0" : "var(--faint)";
-    return `<span class="defhint" data-def="Relative Volume" style="color:${c}">${fmt(m,1)}× vol${day}</span>`;
+    return `<span class="defhint" data-def="Relative Volume" style="color:${c}">${fmt(m,1)}× vol${day ? " "+day : ""}</span>`;
   };
   // After the bell the tile should carry the official 4:00pm consolidated print.
   // strategy.com can sit on a pre-close last trade for a while (on 2026-09-18 it
@@ -1275,6 +1276,42 @@ function renderPriceHeader(){
   set("hdr-strc-sub",    sub(M, M.prefChangePct, M.prefRvol, "_prefPreClose", "preferred"));
   set("hdr-sata-sub",    sub(A, A.prefChangePct, A.prefRvol, "_prefPreClose", "preferred"));
 }
+// One ATM stat tile; its tooltip rides in data-rows, which tipHTML splits on | then ~.
+function atmCell(k, v, sub, tip, color){
+  return `<div class="evhint" data-title="${k}" data-rows="${tip}">
+         <div class="k">${k}</div>
+         <div class="v"${color?` style="color:${color}"`:""}>${v}</div>
+         <div class="s">${sub}</div></div>`;
+}
+// The Absorption tile: what the 8-Ks say was sold ÷ all dollar volume across the filed
+// weeks. It replaced "Eligible volume", which read as the company absorbing the whole
+// tape when it only meant the ATM was allowed to sell; that reading survives as atParRow.
+function absorptionTile(ab, atParRow){
+  const wholePct = Math.round(ab.agg*100);
+  const [lo, agg, hi] = [ab.lo, ab.agg, ab.hi].map(v => fmt(v*100,2));
+  const sumOf = key => ab.windows.reduce((s, w) => s + w[key], 0);
+  // data-rows sits in a "-quoted attribute and splits on | then ~, so no value may hold
+  // any of the three; the last row is styled as a total, so end on the figure
+  const tip = [
+    `Span~${shortDate(ab.fromDate)} → ${shortDate(ab.toDate)}`,
+    atParRow,
+    ab.basis === "par" ? "Proceeds~share count × $100 par" : "Proceeds~net, as filed",
+    "Periods~8-K dates, trade-date basis",
+    ab.agg > 0 && `±1 session~${lo === agg && agg === hi ? "unchanged" : lo+"–"+hi+"%"}`,
+    `Issuance~${bil(sumOf("proceedsM"))}`,
+    `Traded~${bil(sumOf("dollarVolM"))} (close × volume)`,
+    `Absorption~${agg}%`,
+  ].filter(Boolean).join("|");
+  // the newest filed weeks sold nothing: say since when, so a faint value carries its reason
+  const quiet = ab.zeroRun > 0 && ab.lastSaleTo && ab.agg > 0;
+  return atmCell("Absorption",
+    ab.agg > 0 ? (wholePct < 1 ? "&lt;1%" : "~"+wholePct+"%") : "No sales",
+    quiet ? "none since "+shortDate(ab.lastSaleTo) : "8-Ks since "+shortDate(ab.fromDate),
+    tip,
+    // four filed windows in a row without a sale (about a month; a split week counts
+    // twice): the rate describes the past, not what the ATM is doing
+    ab.zeroRun >= 4 ? "var(--faint)" : "");
+}
 function renderATM(){
   const el = document.getElementById("atm-cards"); if(!el) return;
   const specs = [["MSTR", DATA.companies.MSTR, "#ed1946"], ["ASST", DATA.companies.ASST, "#4c9fff"]];
@@ -1284,32 +1321,42 @@ function renderATM(){
     any = true;
     const live = a.status === "active";
     const c = a.confirmed || {};
-    const usd = v => !v ? "$0" : v >= 1e6 ? "$"+fmt(v/1e6,1)+"M" : "$"+fmt(Math.round(v/1e3))+"k";
+    // named apart from the global usd(), which would print $19,622,173 here
+    const usdCompact = v => !v ? "$0" : v >= 1e6 ? "$"+fmt(v/1e6,1)+"M" : "$"+fmt(Math.round(v/1e3))+"k";
     const btc = v => v==null ? "—" : "₿"+fmt(v,2);
+    // The "today" figures describe a.asOf's session, a previous one until the first
+    // refresh after the open. Name it as the header's rvol does; past a week give the
+    // date instead, and read a missing or future asOf as today.
+    const sessionDay = sessionDayName(a.asOf)
+      ?? (Date.parse(a.asOf) < Date.parse(etDateStr()) ? shortDate(a.asOf) : "");
+    // share of the session's dollar volume that printed at/above the threshold
+    const parPct = a.todayTotalUsd > 0 ? Math.round(a.todayEligUsd / a.todayTotalUsd * 100) : null;
+    // kept from the tile Absorption replaced: how much of the session the ATM could sell into
+    const atParRow = "At-par volume~" + (parPct == null ? "no volume yet"
+      : `${parPct}% of ${usdCompact(a.todayTotalUsd)} ${sessionDay ? "on "+sessionDay : "today"}`);
     // detail that used to sit in chips and a footnote now rides on the numbers it explains
     const capTip = `Capture rate ${fmt(a.captureRate*100,0)}% — ${a.captureBasis}. `
       + `Applied to volume printed at/above $${fmt(a.threshold,2)}, then divided by the BTC price.`;
+    // capacity is stated only in table weeks, so it can be older than the confirmed week
+    const capAsOf = c.capacityAsOf && c.capacityAsOf !== c.to ? ` (as of ${shortDate(c.capacityAsOf)})` : "";
     const confTip = c.proceedsM!=null
       ? `Actual issuance disclosed in the 8-K for ${c.from} → ${c.to}.`
-        + (c.capacityM!=null ? ` ATM capacity remaining: $${fmt(c.capacityM/1000,1)}B.` : "")
+        + (c.capacityM!=null ? ` ATM capacity remaining: $${fmt(c.capacityM/1000,1)}B${capAsOf}.` : "")
       : "Awaiting the next 8-K.";
-    const cell = (k, v, sub, tip, color) =>
-      `<div class="evhint" data-title="${k}" data-rows="${tip}">
-         <div class="k">${k}</div>
-         <div class="v"${color?` style="color:${color}"`:""}>${v}</div>
-         <div class="s">${sub}</div></div>`;
     h += `<div class="chartcard">
       <h3><span class="dot" style="background:${ac}"></span>${a.ticker} — ATM
         <span class="atm-pill ${live?"on":"off"}">${live ? "ACTIVE" : "STANDBY"}</span></h3>
       <div class="atm-grid">
-        ${cell("Est. BTC today", btc(a.todayEstBtc), usd(a.todayEstUsd)+" est. proceeds",
+        ${atmCell("Est. BTC "+(sessionDay||"today"), btc(a.todayEstBtc), usdCompact(a.todayEstUsd)+" est. proceeds",
                "Estimate~"+capTip, ac)}
-        ${cell("Eligible volume", usd(a.todayEligUsd),
-               a.todayTotalUsd>0 ? fmt(a.todayEligUsd/a.todayTotalUsd*100,0)+"% of "+usd(a.todayTotalUsd)+" traded" : "no volume yet",
+        ${a.absorption ? absorptionTile(a.absorption, atParRow)
+          // no absorption yet, as in a data.json from before it shipped: the old tile
+          : atmCell("Eligible volume", usdCompact(a.todayEligUsd),
+               a.todayTotalUsd>0 ? fmt(a.todayEligUsd/a.todayTotalUsd*100,0)+"% of "+usdCompact(a.todayTotalUsd)+" traded" : "no volume yet",
                "At-par volume~Dollar volume printed at or above $"+fmt(a.threshold,2)+" today — the pool the ATM could have sold into.")}
-        ${cell("Since last filing", btc(a.weekEstBtc), usd(a.weekEstUsd)+" est. proceeds",
+        ${atmCell("Since last filing", btc(a.weekEstBtc), usdCompact(a.weekEstUsd)+" est. proceeds",
                "Running estimate~Accumulated since the last confirmed 8-K. "+capTip)}
-        ${cell("Confirmed (8-K)", c.shares ? fmt(Math.round(c.shares/1e3))+"k sh" : "none",
+        ${atmCell("Confirmed (8-K)", c.shares ? fmt(Math.round(c.shares/1e3))+"k sh" : "none",
                c.proceedsM ? "$"+fmt(c.proceedsM,1)+"M · "+(c.to||"") : (c.to||"—"),
                "Filed~"+confTip)}
       </div>
@@ -2588,6 +2635,15 @@ function etDateStr(d){
     return new Intl.DateTimeFormat("en-CA",{timeZone:"America/New_York",
       year:"numeric",month:"2-digit",day:"2-digit"}).format(d || new Date());
   }catch(e){ return (d||new Date()).toISOString().slice(0,10); }
+}
+// How to name a past session beside figures that otherwise read as today's: "" when it
+// is today, its weekday within 6 days, and null when a weekday would mislead (a week or
+// more old, in the future, or no date). Both dates parse as UTC midnights, so DST
+// can't skew the age.
+function sessionDayName(iso){
+  const age = (Date.parse(etDateStr()) - Date.parse(iso)) / 864e5;
+  if(!(age >= 0 && age <= 6)) return null;
+  return age ? ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][new Date(iso).getUTCDay()] : "";
 }
 
 // The base for "today's change". GitHub throttles the refresh cron to a handful of
