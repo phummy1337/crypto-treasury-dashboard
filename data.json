@@ -1,7 +1,7 @@
 {
   "asOf": "2026-09-25",
   "priceAsOf": "2026-09-25",
-  "btcPriceUsd": 84084,
+  "btcPriceUsd": 84065,
   "btcSupply": 21000000,
   "btcCirculating": 20089287,
   "companies": {
@@ -4236,7 +4236,7 @@
       "borrowFee": {
         "pct": 0.41,
         "avail": 10000000,
-        "asOf": "2026-09-25 19:04:18"
+        "asOf": "2026-09-25 19:51:10"
       },
       "borrowFeeHist": {
         "iso": [
@@ -4343,9 +4343,9 @@
         ]
       },
       "prefBorrowFee": {
-        "pct": 1.14,
+        "pct": 1.16,
         "avail": 3200000,
-        "asOf": "2026-09-25 19:04:18"
+        "asOf": "2026-09-25 19:51:10"
       },
       "prefBorrowFeeHist": {
         "iso": [
@@ -4448,17 +4448,17 @@
           1.23,
           1.23,
           1.22,
-          1.14
+          1.16
         ]
       },
       "assumedDilutedShares": 450.11,
       "_dilOverlayM": 29.6011,
-      "netSatsPerShare": 157755,
+      "netSatsPerShare": 157744,
       "netMnavPub": 1.1971,
-      "amplificationPub": 1.2476,
-      "breakevenArrPub": 2.281,
-      "hurdleArrPub": 10.6649,
-      "floorArrPub": -17.1277,
+      "amplificationPub": 1.2477,
+      "breakevenArrPub": 2.2816,
+      "hurdleArrPub": 10.6607,
+      "floorArrPub": -17.1236,
       "creditDurationPub": 6.3626,
       "netDilutedShares": 429.84,
       "atm": {
@@ -4643,7 +4643,7 @@
         "latestOnEdgar": "2026-09-25",
         "ingested": "2026-09-21"
       },
-      "netLeveragePub": 0.8746,
+      "netLeveragePub": 0.8748,
       "costBasisFiledM": 63800
     },
     "ASST": {
@@ -6784,7 +6784,7 @@
           1.623,
           1.642,
           1.683,
-          1.668
+          1.667
         ],
         "net": [
           1.299,
@@ -7054,7 +7054,7 @@
           2.052,
           2.097,
           2.165,
-          2.142
+          2.141
         ]
       },
       "cashUsd": 229.6,
@@ -7208,7 +7208,7 @@
       "borrowFee": {
         "pct": 0.84,
         "avail": 900000,
-        "asOf": "2026-09-25 19:04:18"
+        "asOf": "2026-09-25 19:51:10"
       },
       "borrowFeeHist": {
         "iso": [
@@ -7317,7 +7317,7 @@
       "prefBorrowFee": {
         "pct": 26.52,
         "avail": 400000,
-        "asOf": "2026-09-25 19:04:18"
+        "asOf": "2026-09-25 19:51:10"
       },
       "prefBorrowFeeHist": {
         "iso": [
@@ -7425,7 +7425,7 @@
       },
       "_dilOverlayM": 3.1421,
       "assumedDilutedShares": 100.14,
-      "netSatsPerShare": 16354,
+      "netSatsPerShare": 16352,
       "netDilutedShares": 100.14,
       "atm": {
         "ticker": "SATA",
@@ -7439,10 +7439,10 @@
         "todayTotalUsd": 43061517,
         "todayEligUsd": 43061517,
         "todayEstUsd": 16238959,
-        "todayEstBtc": 193.13,
+        "todayEstBtc": 193.17,
         "weekEligUsd": 241141781,
         "weekEstUsd": 90937145,
-        "weekEstBtc": 1081.5,
+        "weekEstBtc": 1081.75,
         "confirmed": {
           "from": "2026-09-11",
           "to": "2026-09-18",
@@ -9346,7 +9346,9 @@
         "Jan 1",
         "Jan 13",
         "Jan 16",
+        "Jan 28",
         "Mar 9",
+        "Mar 17",
         "Apr 2",
         "Apr 13",
         "Apr 24",
@@ -9376,8 +9378,10 @@
         "Jan 1",
         "Jan 1 \u2013 Jan 13",
         "Jan 13 \u2013 Jan 16",
-        "Jan 16 \u2013 Mar 9",
-        "Mar 9 \u2013 Apr 2",
+        "Jan 16 \u2013 Jan 28",
+        "Jan 28 \u2013 Mar 9",
+        "Mar 9 \u2013 Mar 17",
+        "Mar 17 \u2013 Apr 2",
         "Apr 2 \u2013 Apr 13",
         "Apr 13 \u2013 Apr 24",
         "Apr 24 \u2013 May 1",
@@ -9406,7 +9410,9 @@
         null,
         122,
         5048,
+        334,
         null,
+        317,
         null,
         27,
         789,
@@ -9436,7 +9442,9 @@
         7627,
         7749,
         12797,
+        13131,
         13311,
+        13628,
         13741,
         13768,
         14557,
@@ -10201,7 +10209,7 @@
       "d": "2026-03-09",
       "co": "ASST",
       "items": [
-        "Bought 514 BTC"
+        "Bought 180 BTC"
       ],
       "filed": "2026-03-11",
       "url": "https://www.sec.gov/Archives/edgar/data/1920406/000162828026016664/asst-20260311.htm"
