@@ -820,6 +820,12 @@ def _period_texts(text):
     return [only(p) for p in periods]
 
 
+# one sale row: "<BTC sold> $<proceeds> $<avg price>". The header before it runs past
+# 200 chars in 2026-08-03/08-10, and the count can be 2 digits (32 BTC, 2026-06-01);
+# stopping at "As of" keeps a dash-only row from reading the holdings row as a sale.
+_BTC_SOLD_ROW = re.compile(r"BTC Sold(?:(?!As of ).){0,220}?([\d,]+)\s*(?:\(\d\))?\s*\$\s*[\d,.]+\s+\$\s*([\d,]+)")
+
+
 def _parse_flows(text):
     """Weekly cash flows from an MSTR 8-K: ATM net proceeds in, BTC spend out,
     BTC sale proceeds in (all $mm). BTC dollar amounts are derived as
@@ -834,7 +840,7 @@ def _parse_flows(text):
                    r"\s+[\d,]{5,}\s+\$\s*[\d,.]+\s+\$\s*[\d,]+", text)
     if tm:
         spent = int(tm.group(1).replace(",", "")) * int(tm.group(2).replace(",", "")) / 1e6
-    for m in re.finditer(r"BTC Sold.{0,140}?([\d,]{3,})\s*(?:\(\d\))?\s*\$\s*[\d,.]+\s+\$\s*([\d,]+)", text):
+    for m in _BTC_SOLD_ROW.finditer(text):
         sold += int(m.group(1).replace(",", "")) * int(m.group(2).replace(",", "")) / 1e6
     return {"raised": raised, "btcSpent": spent, "btcSold": sold}
 
@@ -852,13 +858,13 @@ def _parse_mstr(text):
         return None
     # sale weeks (first seen 2026-07-06): use the LAST period block + the final
     # "As of" holdings figure; column headers carry footnote digits like "(2)",
-    # so gaps are bounded non-greedy scans rather than [^0-9]*
+    # so gaps are bounded non-greedy scans rather than [^0-9]*. 2026-08-03/08-10 put
+    # sale and holdings columns under one header.
     if "BTC Sold" in text:
         periods = list(re.finditer(r"During Period\s+(.+?)\s+to\s+([A-Z][a-z]+ \d{1,2}, \d{4})", text))
-        asofs = list(re.finditer(r"As of [A-Z][a-z]+ \d{1,2}, \d{4}\*?\s*Aggregate BTC Holdings"
+        asofs = list(re.finditer(r"As of [A-Z][a-z]+ \d{1,2}, \d{4}\*?\s*(?:BTC Sold.{0,120}?)?Aggregate BTC Holdings"
                                  r".{0,120}?([\d,]{7,})\s+\$\s*[\d,.]+\s+\$\s*([\d,]+)", text))
-        sold = [int(m.group(1).replace(",", "")) for m in
-                re.finditer(r"BTC Sold.{0,140}?([\d,]{3,})\s*(?:\(\d\))?\s*\$\s*[\d,.]+\s+\$\s*[\d,]+", text)]
+        sold = [int(m.group(1).replace(",", "")) for m in _BTC_SOLD_ROW.finditer(text)]
         if periods and asofs:
             p = periods[-1]
             h = int(asofs[-1].group(1).replace(",", ""))
@@ -1131,7 +1137,7 @@ def _mstr_actions(text, rec, fl, whole_filing=True):
     for m in re.finditer(r"\$\s?([\d,.]+)\s*(billion|million) aggregate purchase price of"
                          r"([^.]{0,60}?)remains available", text):
         v = float(m.group(1).replace(",", "")) * (1000 if m.group(2) == "billion" else 1)
-        auth.append(f"${v:,.0f}M {'MSTR' if 'MSTR' in m.group(3) else 'preferred'}")
+        auth.append(f"${v:,.0f}M {'MSTR' if re.search(r'MSTR|class A common', m.group(3), re.I) else 'preferred'}")
     if auth:
         items.append("Buyback capacity left: " + " · ".join(auth))
     bal = _mstr_usd_balances(text)
