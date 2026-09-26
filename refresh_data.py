@@ -1413,6 +1413,7 @@ def fetch_holdings(data, max_points=60):
                         f"(filed ${agg_filed/1000:,.2f}B)")
             co = data["companies"][tk]
             co.pop("cashFlows", None)    # the retired cash roll-forward; cashFiled carries the filed balances
+            co.pop("strcRate", None)     # only that roll-forward read it
             # cash = USD Reserve + USD Cash per the newest 8-K; strategy.com's live figure
             # (same balances) replaces it in main() when it answers
             if balances:
@@ -1430,7 +1431,6 @@ def fetch_holdings(data, max_points=60):
             co["trail3m"] = {"prefMo": round(t3["pref"] / 3), "commonMo": round(t3["common"] / 3)}
             # the tracker's STRC dividendRate lags rate-change 8-Ks; the filings win
             if strc_rate:
-                co["strcRate"] = strc_rate
                 fixed = {"STRK": 8.0, "STRF": 10.0, "STRD": 10.0, "STRE": 10.0, "STRC": strc_rate}
                 bd = co.get("prefBreakdown") or []
                 pref_div = 0.0
