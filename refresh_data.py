@@ -152,11 +152,26 @@ MSTR_PREF_STEPS = {
     ],
     "STRE": [("2025-11-17", 899.0)],   # EUR IPO mid-Nov 2025, no ATM — constant since issue
 }
-# MSTR quarterly cash (SEC XBRL CashAndCashEquivalentsAtCarryingValue) and convert
-# principal (all six outstanding notes were issued by 2025-02-21; none redeemed since).
+# MSTR cash ($mm) as the filings state it, dated to each balance's as-of date, a step only
+# where it changed: 10-Q cash until the USD Reserve began on 2025-12-01, then the USD
+# Reserve (weekly 8-Ks, the 10-K and 10-Qs) plus USD Cash from 2026-08-23, the balances
+# strategy.com's live figure counts. 03-31 and 06-30 are dividend days the 10-Qs catch
+# mid-dip. 05-19 is derived: 2,250 less the $1,378.6M the reserve paid for the 2029s,
+# which the filed 05-25 balance confirms after a week with no ATM sales, BTC buys or
+# dividends. Filings never change; live steps in histStepsLive extend past the last one.
 MSTR_CASH_STEPS = [("2025-06-30", 50.1), ("2025-09-30", 54.3),
-                   ("2025-12-31", 2301.5), ("2026-03-31", 2207.2)]
-MSTR_DEBT_STEPS = [("2025-02-21", 8213.75)]
+                   ("2025-12-01", 1440.0), ("2025-12-21", 2190.0), ("2025-12-31", 2250.0),
+                   ("2026-03-31", 2140.0), ("2026-04-26", 2250.0), ("2026-05-19", 871.0),
+                   ("2026-05-31", 900.0), ("2026-06-07", 1000.0), ("2026-06-14", 1100.0),
+                   ("2026-06-21", 1400.0), ("2026-06-28", 2550.0), ("2026-06-30", 2400.0),
+                   ("2026-07-05", 2550.0), ("2026-07-12", 3000.0), ("2026-07-19", 3225.0),
+                   ("2026-07-24", 3750.0), ("2026-08-02", 4000.0), ("2026-08-09", 4650.0),
+                   ("2026-08-16", 4800.0), ("2026-08-23", 6690.0), ("2026-08-30", 6710.0),
+                   ("2026-09-07", 6540.0), ("2026-09-13", 6400.0), ("2026-09-20", 6090.0)]
+# Convert principal ($mm): all six notes were issued by 2025-02-21; $1.5B of the 2029s
+# were repurchased and cancelled 2026-05-19 (Q2 10-Q). Live steps take strategy.com's
+# figure after that.
+MSTR_DEBT_STEPS = [("2025-02-21", 8213.75), ("2026-05-19", 6713.75)]
 MNAV_START = {"MSTR": "2025-10-01", "ASST": "2026-01-01"}   # chart windows
 
 
@@ -613,7 +628,11 @@ def fetch_strategytracker(data):
                         st.append((today, round(cur, 1)))
                         live.setdefault(t, []).append([today, round(cur, 1)])
                     series[t] = st
-                cash_st = sorted(set(map(tuple, MSTR_CASH_STEPS + [tuple(x) for x in live.get("cash", [])])))
+                # live steps only extend the filed constants; those dated before the last
+                # include the retired roll-forward's and the tracker's (Jul 9–Aug 24 2026,
+                # $1.1–1.6B off). live is co["histStepsLive"], so data.json drops them too
+                live["cash"] = [x for x in live.get("cash", []) if x[0] > MSTR_CASH_STEPS[-1][0]]
+                cash_st = sorted(set(map(tuple, MSTR_CASH_STEPS + [tuple(x) for x in live["cash"]])))
                 # anchor the newest step on strategy.com's USD Reserve + USD Cash, the
                 # balance sheet the live headline uses; otherwise the chart's last point
                 # drifts from it. With strategy.com down there is no step at all, rather
