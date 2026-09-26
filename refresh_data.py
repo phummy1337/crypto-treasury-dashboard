@@ -669,9 +669,10 @@ def fetch_strategytracker(data):
             # Net framework (Strategy, Jul-2026): net mNAV = fully-diluted mcap /
             # (BTC NAV + cash - OTM converts - preferred). Only out-of-the-money
             # converts are debt-like claims; in-the-money converts dilute the share
-            # count instead. Uses today's tranche set for the whole window (all six
-            # MSTR tranches were outstanding across it). ASST: all debt is a claim.
+            # count instead. Uses today's tranche set for the whole window, plus any
+            # debt the steps carry beyond it. ASST: all debt is a claim.
             sched = co.get("debtSchedule") or []
+            sched_total = sum(t["principal"] for t in sched)
             rows = [(i, d, hd["market_cap_basic"][i], hd["btc_balance"][i],
                      hd["btc_prices"][i], hd["stock_prices"][i])
                     for i, d in enumerate(hd["dates"])
@@ -714,7 +715,11 @@ def fetch_strategytracker(data):
                 px_m.append(round(sp, 2))
                 mnv.append(round(ev / nav, 3))
                 if sched:
-                    otm = sum(t["principal"] for t in sched if sp < t["convPrice"])
+                    # debt the steps carry beyond today's schedule is a claim too: the
+                    # 2029s repurchased 2026-05-19 (they convert at $672, far out of the
+                    # money), and $40M of secured loans in strategy.com's Jul 25–Aug 30 debt
+                    otm = (sum(t["principal"] for t in sched if sp < t["convPrice"])
+                           + max(0.0, debt_at(d, i) - sched_total))
                     itm_sh = sum(t["principal"] * t["convRate"] / 1000
                                  for t in sched if sp >= t["convPrice"])   # M shares
                 else:
