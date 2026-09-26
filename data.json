@@ -1,7 +1,7 @@
 {
-  "asOf": "2026-09-25",
-  "priceAsOf": "2026-09-25",
-  "btcPriceUsd": 84065,
+  "asOf": "2026-09-26",
+  "priceAsOf": "2026-09-26",
+  "btcPriceUsd": 83862,
   "btcSupply": 21000000,
   "btcCirculating": 20089287,
   "companies": {
@@ -2759,7 +2759,8 @@
           "Sep 22",
           "Sep 23",
           "Sep 24",
-          "Sep 25"
+          "Sep 25",
+          "Sep 26"
         ],
         "px": [
           338.41,
@@ -3121,6 +3122,7 @@
           167.33,
           162.2,
           161.61,
+          158.61,
           158.61
         ],
         "mnav": [
@@ -3483,6 +3485,7 @@
           1.172,
           1.167,
           1.163,
+          1.15,
           1.15
         ],
         "net": [
@@ -3845,6 +3848,7 @@
           1.227,
           1.221,
           1.217,
+          1.2,
           1.2
         ]
       },
@@ -4453,12 +4457,12 @@
       },
       "assumedDilutedShares": 450.11,
       "_dilOverlayM": 29.6011,
-      "netSatsPerShare": 157744,
+      "netSatsPerShare": 157647,
       "netMnavPub": 1.1971,
-      "amplificationPub": 1.2477,
-      "breakevenArrPub": 2.2816,
+      "amplificationPub": 1.2485,
+      "breakevenArrPub": 2.2873,
       "hurdleArrPub": 10.6607,
-      "floorArrPub": -17.1236,
+      "floorArrPub": -17.0879,
       "creditDurationPub": 6.3626,
       "netDilutedShares": 429.84,
       "atm": {
@@ -4470,7 +4474,7 @@
         "captureRate": 0.75,
         "captureBasis": "no issuance in the week to 2026-08-30",
         "asOf": "2026-09-25",
-        "todayTotalUsd": 147282626,
+        "todayTotalUsd": 143191897,
         "todayEligUsd": 0,
         "todayEstUsd": 0,
         "todayEstBtc": 0.0,
@@ -4632,7 +4636,7 @@
           },
           {
             "d": "2026-09-25",
-            "tot": 147282626,
+            "tot": 143191897,
             "elig": 0
           }
         ]
@@ -4643,7 +4647,7 @@
         "latestOnEdgar": "2026-09-25",
         "ingested": "2026-09-21"
       },
-      "netLeveragePub": 0.8748,
+      "netLeveragePub": 0.877,
       "costBasisFiledM": 63800
     },
     "ASST": {
@@ -6244,7 +6248,8 @@
           "Sep 22",
           "Sep 23",
           "Sep 24",
-          "Sep 25"
+          "Sep 25",
+          "Sep 26"
         ],
         "px": [
           14.76,
@@ -6514,6 +6519,7 @@
           29.35,
           28.99,
           29.94,
+          29.44,
           29.44
         ],
         "mnav": [
@@ -6784,7 +6790,8 @@
           1.623,
           1.642,
           1.683,
-          1.667
+          1.668,
+          1.668
         ],
         "net": [
           1.299,
@@ -7054,14 +7061,15 @@
           2.052,
           2.097,
           2.165,
-          2.141
+          2.142,
+          2.142
         ]
       },
       "cashUsd": 229.6,
       "strcShares": 505000,
       "trail3m": {
         "prefMo": 112,
-        "commonMo": 108
+        "commonMo": 107
       },
       "floatSharesM": 87.13,
       "prefShortInterest": {
@@ -7425,7 +7433,7 @@
       },
       "_dilOverlayM": 3.1421,
       "assumedDilutedShares": 100.14,
-      "netSatsPerShare": 16352,
+      "netSatsPerShare": 16328,
       "netDilutedShares": 100.14,
       "atm": {
         "ticker": "SATA",
@@ -7439,10 +7447,10 @@
         "todayTotalUsd": 43061517,
         "todayEligUsd": 43061517,
         "todayEstUsd": 16238959,
-        "todayEstBtc": 193.17,
+        "todayEstBtc": 193.64,
         "weekEligUsd": 241141781,
         "weekEstUsd": 90937145,
-        "weekEstBtc": 1081.75,
+        "weekEstBtc": 1084.37,
         "confirmed": {
           "from": "2026-09-11",
           "to": "2026-09-18",
@@ -7713,7 +7721,6 @@
     "illustrative": false,
     "daily": true,
     "iso": [
-      "2025-09-26",
       "2025-09-27",
       "2025-09-28",
       "2025-09-29",
@@ -8077,10 +8084,10 @@
       "2026-09-22",
       "2026-09-23",
       "2026-09-24",
-      "2026-09-25"
+      "2026-09-25",
+      "2026-09-26"
     ],
     "dates": [
-      "Sep 26",
       "Sep 27",
       "Sep 28",
       "Sep 29",
@@ -8444,10 +8451,10 @@
       "Sep 22",
       "Sep 23",
       "Sep 24",
-      "Sep 25"
+      "Sep 25",
+      "Sep 26"
     ],
     "MSTR": [
-      309.06,
       309.06,
       309.06,
       326.42,
@@ -8811,10 +8818,10 @@
       167.33,
       162.2,
       161.61,
+      158.61,
       158.61
     ],
     "ASST": [
-      48.8,
       48.8,
       48.8,
       46.0,
@@ -9178,6 +9185,7 @@
       29.35,
       28.99,
       29.94,
+      29.44,
       29.44
     ]
   },
