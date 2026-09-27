@@ -1084,7 +1084,7 @@ function renderPerShare(){
   // hover reconciles to strategy.com, whose headline figure is per assumed-diluted share
   const bpsRows = o => [["Bitcoin held", fmt(o.holdings)+" BTC"],
       ["Basic shares", fmt(o.sharesOutstanding,2)+"M"],
-      ["+ in-the-money dilution", fmt((o.assumedDilutedShares||0)-o.sharesOutstanding,2)+"M"],
+      ["+ assumed dilution", fmt((o.assumedDilutedShares||0)-o.sharesOutstanding,2)+"M"],
       ["= Effective diluted", fmt(o.assumedDilutedShares,2)+"M"],
       ["Sats / diluted share", fmt(o.satsPerShareDiluted)],
       ["Sats / basic share", fmt(o.satsPerShareBasic)],

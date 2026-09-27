@@ -1765,7 +1765,7 @@ def _apply_per_share(co, tk):
       diluted   — basic + effective dilution overlay; this is "BTC Per Share" on
                   strategy.com and "Sats Per Diluted Share" on treasury.strive.com
       net       — bitcoin left for common AFTER senior claims, per diluted share;
-                  strategy.com's "Net BTC Per Share". Uses the same diluted count.
+                  strategy.com's "Net BTC Per Share". Uses a narrower count (below).
     For MSTR the first two are overwritten with strategy.com's own published
     figures in fetch_strategy_kpi, so we never drift from the source.
     """
@@ -1777,14 +1777,25 @@ def _apply_per_share(co, tk):
     co["satsPerShareBasic"] = round(sats / (live * 1e6))
     co["assumedDilutedShares"] = round(live + overlay, 2)
     co["satsPerShareDiluted"] = round(sats / ((live + overlay) * 1e6))
-    # Net BTC per share uses a NARROWER denominator than the gross figure:
-    # fully diluted (out-of-the-money converts excluded) rather than assumed
-    # diluted. For MSTR that is 388.65M vs 414.26M; for ASST the effective count
-    # already excludes its out-of-the-money warrants, so the two coincide.
-    co["netDilutedShares"] = round(live + overlay, 2)
+    # Net BTC per share uses a NARROWER denominator than the gross figure: fully
+    # diluted rather than assumed diluted. Converts in the money at today's price count
+    # as shares and the rest as debt, as netParts on the page does; STRK's conversion
+    # shares (0.1 MSTR share per $100-par STRK, a $1,000 strike, so notional $M / 1000)
+    # drop out, since STRK is counted in the preferred. For MSTR that is ~429.8M vs
+    # 450.1M, the count strategy.com divides by; ASST has neither, so the two coincide.
+    # With no price every convert counts as shares.
+    px = co.get("stockPrice")
+    itm, otm = [], []
+    for t in co.get("debtSchedule") or []:
+        if t.get("convPrice"):
+            (otm if px and px < t["convPrice"] else itm).append(t)
+    otm_sh = sum(t["principal"] * t["convRate"] / 1000 for t in otm)
+    strk_sh = sum(row[2] for row in co.get("prefBreakdown") or [] if row[0] == "STRK") / 1000
+    co["netDilutedShares"] = round(live + overlay - otm_sh - strk_sh, 2)
     btc = _BTC_PX.get("usd") or 0
+    debt_claims = (co.get("seniorDebt") or 0) - sum(t["principal"] for t in itm)
     net_res = (co["holdings"] * btc / 1e6) + (co.get("cash") or 0) \
-        - (co.get("seniorDebt") or 0) - (co.get("prefNotional") or 0)
+        - debt_claims - (co.get("prefNotional") or 0)
     if btc and net_res > 0:
         co["netSatsPerShare"] = round((net_res * 1e6 / btc) * 1e8 / (co["netDilutedShares"] * 1e6))
 
@@ -1842,9 +1853,9 @@ def fetch_strategy_kpi(data):
                 # can keep the figure live as BTC moves instead of freezing it
                 net_btc = float(r["netBtcReserve"]) / float(r["ufPrice"])
                 co["netDilutedShares"] = round(net_btc * 1e8 / float(r["netSatsPerShare"]) / 1e6, 2)
-                # stash it: fetch_strategytracker calls _apply_per_share, which
-                # transiently resets the field to the ASSUMED-diluted count, and the
-                # mNAV history builder runs while that stand-in is in place
+                # stash it: fetch_strategytracker calls _apply_per_share, which resets
+                # the field to our own estimate of this count (on the tracker's price
+                # and overlay), and the mNAV history builder should use theirs
                 _KPI.setdefault("MSTR", {})["netSharesM"] = co["netDilutedShares"]
             # debtByBN is convertible debt as a % of BTC NAV *after* the USD assets
             # offset it — the figure Strategy markets as "Net Leverage" (it printed
