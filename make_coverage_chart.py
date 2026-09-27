@@ -2,31 +2,27 @@
 """APYX share card: USD Assets coverage (months) vs. the STRC market price.
 
 Coverage = total USD assets / (annual preferred dividends + cash interest / 12),
-using the balances Strategy discloses in its weekly 8-Ks and holding them flat
-between disclosures.
+using the balances Strategy discloses in its filings and holding them flat
+between disclosures. The balances are refresh_data.py's MSTR_CASH_STEPS (the filed
+record), extended by the live cash steps in data.json dated after its last entry.
 
 "USD assets" is the USD Reserve plus USD Cash. USD Cash is a second pool created
 by the 2026-08-24 Digital Credit Capital Framework update; before that date it
-did not exist, so it backfills as zero and the line is the Reserve alone. That
-makes one continuous definition — total dollars on hand — across the whole window.
+did not exist, so the line is the Reserve alone. That makes one continuous
+definition — total dollars on hand — across the whole window.
 
 Regenerate weekly:  python3 make_coverage_chart.py
 Needs rsvg-convert (brew install librsvg); qlmanage mangles the aspect ratio.
 """
 import base64, json, os, re, subprocess, sys
 
+from refresh_data import MSTR_CASH_STEPS, _step
+
 DATA = os.path.expanduser('~/crypto-treasury-dashboard/data.json')
 LOGO = os.path.expanduser('~/crypto-treasury-dashboard/apyx-logo.svg')
 OUT = os.path.expanduser('~/Downloads')
 START = '2026-05-24'
-
-# USD balances exactly as disclosed in the weekly 8-Ks ($mm), by disclosure date.
-# Pull new rows from the dashboard's own actions log:
-#   jq -r '.actions[]|select(.co=="MSTR")|.d+" "+(.items[]|select(contains("USD")))' data.json
-RESERVE = [('2026-05-25', 871), ('2026-05-31', 900), ('2026-06-21', 1400), ('2026-06-28', 2550),
-           ('2026-07-12', 3000), ('2026-07-19', 3225), ('2026-07-26', 3750), ('2026-08-02', 4000),
-           ('2026-08-09', 4650), ('2026-08-16', 4800), ('2026-08-23', 5100), ('2026-08-30', 5100)]
-USDCASH = [('2026-08-23', 1590), ('2026-08-30', 1610)]     # zero before the Aug 24 framework
+USD_CASH_FROM = '2026-08-23'   # as-of date of the first balance that includes USD Cash
 
 W, H = 1200, 675
 L, R, T, B = 104, 116, 156, 132
@@ -36,35 +32,26 @@ MON = {'05': 'May', '06': 'Jun', '07': 'Jul', '08': 'Aug', '09': 'Sep', '10': 'O
        '11': 'Nov', '12': 'Dec', '01': 'Jan', '02': 'Feb', '03': 'Mar', '04': 'Apr'}
 
 
-def step_at(steps, iso, default=0.0):
-    v = default
-    for d, x in steps:
-        if d <= iso:
-            v = x
-        else:
-            break
-    return v
-
-
 def build_rows():
     m = json.load(open(DATA))['companies']['MSTR']
+    live = (m.get('histStepsLive') or {}).get('cash', [])
+    steps = MSTR_CASH_STEPS + sorted(tuple(x) for x in live if x[0] > MSTR_CASH_STEPS[-1][0])
     strc = sorted((d, v) for d, v in m['strcNotionalSteps'])
     fixed = {r[0]: r[2] for r in m['prefBreakdown'] if r[0] != 'STRC'}
     RATE = {'STRK': .08, 'STRD': .10, 'STRF': .10, 'STRE': .10}
     debt_int = sum(t['principal'] * t['coupon'] / 100 for t in m['debtSchedule'])
 
     def obligations(iso):
-        return (step_at(strc, iso, strc[0][1]) * 0.12
+        return ((_step(strc, iso) or strc[0][1]) * 0.12
                 + sum(n * RATE.get(k, .10) for k, n in fixed.items()) + debt_int)
 
     ph, rows = m['prefHistory'], []
     for iso, px in zip(ph['iso'], ph['px']):
         if iso < START:
             continue
-        res, cash = step_at(RESERVE, iso), step_at(USDCASH, iso)   # cash backfills to 0
-        ob = obligations(iso)
-        rows.append({'d': iso, 'px': px, 'usd': res + cash, 'res': res,
-                     'cash': cash, 'ob': ob, 'cov': (res + cash) / (ob / 12)})
+        usd, ob = _step(steps, iso) or 0, obligations(iso)
+        rows.append({'d': iso, 'px': px, 'usd': usd, 'ob': ob, 'cov': usd / (ob / 12),
+                     'asof': max(d for d, _ in steps if d <= iso)})   # balance's as-of date
     return rows
 
 
@@ -86,7 +73,7 @@ def render(rows):
                  for i, r in enumerate(rows) if i % 10 == 0 or i == len(rows) - 1)
     # mark where USD Cash was introduced — the line steps there for a structural
     # reason, not a market one, and an unexplained jump invites the wrong read
-    i0 = next((i for i, r in enumerate(rows) if r['cash']), None)
+    i0 = next((i for i, r in enumerate(rows) if r['d'] >= USD_CASH_FROM), None)
     mark = ''
     if i0 is not None:
         # sit the label low in the plot: the top-right corner belongs to the callout
@@ -122,6 +109,7 @@ def render(rows):
                 + callout(f'{last["cov"]:.1f} mo', f'(${last["usd"]/1000:.2f}B)', 41.0,
                           '#ffffff', 21, yc(last['cov']),
                           xr=(x(i0) - 16) if i0 is not None else None))
+    asof = f"{MON[last['asof'][5:7]]} {int(last['asof'][8:])}".upper()
     logo = base64.b64encode(open(LOGO, 'rb').read()).decode()
     return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" height="{H}">
 <defs><style>
@@ -158,8 +146,8 @@ def render(rows):
   <text x="506" y="0" class="lbl">STRC price</text>
 </g>
 <line x1="{L-46}" y1="{H-58}" x2="{W-58}" y2="{H-58}" stroke="rgba(255,255,255,.10)"/>
-<text x="{L-46}" y="{H-36}" class="foot">USD RESERVE + USD CASH FROM OFFICIAL STRATEGY 8-K DISCLOSURES, HELD FLAT BETWEEN DISCLOSURES</text>
-<text x="{L-46}" y="{H-19}" class="foot">USD CASH CREATED BY THE AUG 24 FRAMEWORK UPDATE, NIL BEFORE IT &#183; ${last['usd']/1000:.2f}B AS OF AUG 30 ON ${last['ob']/1000:.2f}B ANNUAL OBLIGATIONS</text>
+<text x="{L-46}" y="{H-36}" class="foot">USD RESERVE + USD CASH FROM STRATEGY'S DISCLOSURES, HELD FLAT BETWEEN THEM</text>
+<text x="{L-46}" y="{H-19}" class="foot">USD CASH CREATED BY THE AUG 24 FRAMEWORK UPDATE, NIL BEFORE IT &#183; ${last['usd']/1000:.2f}B AS OF {asof} ON ${last['ob']/1000:.2f}B ANNUAL OBLIGATIONS</text>
 <text x="{W-58}" y="{H-19}" class="foot" text-anchor="end">APYX.FI</text>
 </svg>'''
 
@@ -191,6 +179,6 @@ if __name__ == '__main__':
                        '/tmp/_cov_embed.svg', '-o', stem + '.png']).returncode:
         sys.exit('rsvg-convert failed — brew install librsvg')
     print(f'{len(rows)} pts  {rows[0]["d"]} -> {last["d"]}')
-    print(f'  {last["cov"]:.1f} mo  (${last["usd"]:,}M = ${last["res"]:,}M reserve + '
-          f'${last["cash"]:,}M cash) / ${last["ob"]:,.0f}M obligations   STRC ${last["px"]}')
+    print(f'  {last["cov"]:.1f} mo  (${last["usd"]:,.0f}M USD assets) / '
+          f'${last["ob"]:,.0f}M obligations   STRC ${last["px"]}')
     print('  ' + stem + '.png')
