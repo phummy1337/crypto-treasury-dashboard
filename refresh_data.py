@@ -186,6 +186,11 @@ def _step(steps, iso):
     return v
 
 
+def _save_live_step(live, key, day, value):
+    """Persist a live history step, keeping one per day (the latest)."""
+    live[key] = [x for x in live.get(key, []) if x[0] != day] + [[day, value]]
+
+
 # The USD stated amount Strategy carries STRE at in its own preferred total: the
 # issue-date conversion of the €775M, fixed since Nov 2025. Kept as a constant
 # rather than EUR x spot so our five-series sum ties to strategy.com's figure.
@@ -623,26 +628,28 @@ def fetch_strategytracker(data):
                         series[t] = [x for x in STRC_BACKFILL if x[0] < first] + lg
                         continue
                     cur = p.get("notionalMillions") or (p.get("notionalUSD") or 0) / 1e6
-                    st = sorted(set(map(tuple, MSTR_PREF_STEPS.get(t, []) + [tuple(x) for x in live.get(t, [])] + lg)))
+                    # one step per date, the later source winning (as for cash and debt
+                    # below); a set would keep both of a day's values, and _step the larger
+                    st = sorted(dict(MSTR_PREF_STEPS.get(t, []) + [tuple(x) for x in live.get(t, [])] + lg).items())
                     if st and cur and abs(st[-1][1] - cur) > 0.6:
                         st.append((today, round(cur, 1)))
-                        live.setdefault(t, []).append([today, round(cur, 1)])
+                        _save_live_step(live, t, today, round(cur, 1))
                     series[t] = st
                 # live steps only extend the filed constants; those dated before the last
                 # include the retired roll-forward's and the tracker's (Jul 9–Aug 24 2026,
                 # $1.1–1.6B off). live is co["histStepsLive"], so data.json drops them too
                 live["cash"] = [x for x in live.get("cash", []) if x[0] > MSTR_CASH_STEPS[-1][0]]
-                cash_st = sorted(set(map(tuple, MSTR_CASH_STEPS + [tuple(x) for x in live["cash"]])))
+                cash_st = sorted(dict(MSTR_CASH_STEPS + [tuple(x) for x in live["cash"]]).items())
                 # anchor the newest step on strategy.com's USD Reserve + USD Cash, the
                 # balance sheet the live headline uses; otherwise the chart's last point
                 # drifts from it. With strategy.com down there is no step at all, rather
                 # than one from co["cash"], which then holds the previous run's figure.
                 cash_now = (_KPI.get(tk) or {}).get("cash") or 0
                 if cash_now > 0 and abs(cash_st[-1][1] - cash_now) > 1.5:
-                    cash_st.append((today, cash_now)); live.setdefault("cash", []).append([today, cash_now])
-                debt_st = sorted(set(map(tuple, MSTR_DEBT_STEPS + [tuple(x) for x in live.get("debt", [])])))
+                    cash_st.append((today, cash_now)); _save_live_step(live, "cash", today, cash_now)
+                debt_st = sorted(dict(MSTR_DEBT_STEPS + [tuple(x) for x in live.get("debt", [])]).items())
                 if abs(debt_st[-1][1] - co["seniorDebt"]) > 1.5:
-                    debt_st.append((today, co["seniorDebt"])); live.setdefault("debt", []).append([today, co["seniorDebt"]])
+                    debt_st.append((today, co["seniorDebt"])); _save_live_step(live, "debt", today, co["seniorDebt"])
                 if live:
                     co["histStepsLive"] = live
                 pref_at = lambda d: sum(_step(s, d) or 0 for s in series.values())
