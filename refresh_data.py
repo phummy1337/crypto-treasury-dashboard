@@ -1119,6 +1119,26 @@ def _atm_allocation(text, raised):
     return parts
 
 
+# a convertible note repurchase in prose: "agreed to repurchase approximately $1.50 billion
+# aggregate principal amount of the 2029 Notes" (2026-05-15), or "... Convertible Senior
+# Notes due March 15, 2030". The note is named by year (2030A) or by maturity; the gap
+# before it may cross a coupon's decimal point ("0.875%").
+_CONVERT_REPURCHASE = re.compile(
+    r"(?:[Rr]epurchased|agreed to repurchase)\b[^.]{0,80}?\$\s?([\d,.]+)\s*(million|billion)[^.]{0,60}?"
+    r"principal amount(?:[^.]|\.(?=\d)){0,80}?(?:(20\d\d[AB]?)\s+(?:[Cc]onvertible\s+)?(?:[Ss]enior\s+)?[Nn]otes"
+    r"|[Cc]onvertible\s+(?:[Ss]enior\s+)?[Nn]otes\s+due\s+(?:[A-Z][a-z]+\s+\d{1,2},\s+)?(20\d\d))")
+
+
+def _convert_retirement(text):
+    """The activity item for a convertible note repurchase the text states, or None."""
+    m = _CONVERT_REPURCHASE.search(text)
+    if not m:
+        return None
+    v = float(m.group(1).replace(",", "")) * (1000 if m.group(2) == "billion" else 1)
+    verb = "Agreed to repurchase" if m.group(0).startswith("agreed") else "Repurchased"
+    return f"{verb} ~${v:,.0f}M principal of {m.group(3) or m.group(4)} convertible notes"
+
+
 def _mstr_actions(text, rec, fl, whole_filing=True):
     """Readable weekly actions from an MSTR 8-K period. Only the newest period of a
     split filing (see _period_texts) carries the items that describe the filing as a
@@ -1158,11 +1178,8 @@ def _mstr_actions(text, rec, fl, whole_filing=True):
                 sh, amt = int(m.group(1).replace(",", "")), float(m.group(2).replace(",", ""))
                 items.append(f"Repurchased {sh:,} {s} shares (~${amt:,.0f}M)")
     # convertible note retirements (no dedicated table yet — prose disclosure)
-    cm2 = re.search(r"repurchased[^.]{0,80}\$\s?([\d,.]+)\s*(million|billion)[^.]{0,60}principal amount"
-                    r"[^.]{0,80}[Cc]onvertible[^.]{0,40}(20\d\d)", text)
-    if cm2:
-        v = float(cm2.group(1).replace(",", "")) * (1000 if cm2.group(2) == "billion" else 1)
-        items.append(f"Repurchased ~${v:,.0f}M principal of {cm2.group(3)} convertible notes")
+    if (retired := _convert_retirement(text)):
+        items.append(retired)
     # remaining repurchase headroom — sizes what the program can still do
     auth = []
     for m in re.finditer(r"\$\s?([\d,.]+)\s*(billion|million) aggregate purchase price of"
@@ -1351,6 +1368,7 @@ def fetch_holdings(data, max_points=60):
             newest_txt = ""          # EDGAR lists newest first, so the first hit is it
             balances = None          # likewise the newest filing that states them
             for url, base, filed in docs():
+                t8 = ""
                 try:
                     t8 = _edgar_text(url)
                     # newest period first, as EDGAR lists filings; one unless a quarter
@@ -1359,6 +1377,9 @@ def fetch_holdings(data, max_points=60):
                 except Exception:
                     periods = []
                 fetched += 1
+                # a standalone convert repurchase 8-K (2026-05-15) has no holdings table
+                if not any(rec for _, rec in periods) and (retired := _convert_retirement(t8)):
+                    acts.append({"d": filed, "co": "MSTR", "items": [retired], "filed": filed, "url": url})
                 for k, (t, rec) in enumerate(periods):
                     if not (rec and rec[1] and rec[3] and rec[1] not in seen):
                         continue
