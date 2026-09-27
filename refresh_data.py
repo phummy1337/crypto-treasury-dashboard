@@ -581,7 +581,7 @@ def fetch_strategytracker(data):
         def _pt(i):
             if shs[i] and bal[i]:
                 od.append(_iso_lbl(dts[i], "%b '%y")); ov.append(round(bal[i]*1e8/(shs[i]*1e6)))
-        for i in range(0, len(dts), 5):
+        for i in range(0, len(dts), 7):
             _pt(i)
         _pt(len(dts) - 1)
         co["bpsHistory"] = {"dates": od, "sats": ov, "basis": "basic"}

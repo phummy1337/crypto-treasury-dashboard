@@ -947,7 +947,8 @@ function renderCompany(){
   const perfYtd = arr => { const ds=SH.dates||[]; const i=ds.findIndex(d=>d.includes(yrSfx)); const b=i>0?i-1:0;
     return (arr && arr[b]!=null) ? (arr.at(-1)/arr[b]-1)*100 : null; };
   const pctC = v => v==null ? "—" : `<span class='${v>=0?'pos':'neg'}'>${sig(v)}${fmt(v,1)}%</span>`;
-  const perfRows = arr => [["1 Week",pctC(perfN(arr,5))],["1 Month",pctC(perfN(arr,21))],["YTD",pctC(perfYtd(arr))]].map(r=>r.join("~")).join("|");
+  // stockHistory has a row per calendar day
+  const perfRows = arr => [["1 Week",pctC(perfN(arr,7))],["1 Month",pctC(perfN(arr,30))],["YTD",pctC(perfYtd(arr))]].map(r=>r.join("~")).join("|");
   const priceCell = (o,arr) => `<span class="evhint" data-title="Performance" data-rows="${perfRows(arr)}">${usd(o.stockPrice,2)}</span>`;
 
   // preferred-by-series breakdown hover (MSTR has STRC, STRF, STRK, STRD)
@@ -1448,7 +1449,7 @@ function clip(ppm, ...arrs){
   const n = Math.max(3, Math.round(mo*ppm));
   return arrs.map(a => Array.isArray(a) && a.length > n ? a.slice(-n) : a);
 }
-const PPM_DAY = 21, PPM_WEEK = 4.33, PPM_SEMI = 2;   // trading days / weeks / settlements per month
+const PPM_CAL = 30.44, PPM_DAY = 21, PPM_WEEK = 4.33, PPM_SEMI = 2;   // calendar days / trading days / weeks / settlements per month
 if(typeof Chart !== "undefined") Chart.defaults.font.family = "'Google Sans Flex','Google Sans',-apple-system,'Segoe UI',Roboto,sans-serif";
 const baseOpts = (extra={}) => Object.assign({
   responsive:true, maintainAspectRatio:false, interaction:{mode:"index",intersect:false},
@@ -1522,7 +1523,7 @@ function renderCharts(){
       x:{ ticks:{color:AX,font:{size:11},autoSkip:true,maxTicksLimit:MTL,maxRotation:0}, grid:{color:GRID} },
       y:axis("sats / share","left") } });
     bpsOpts.plugins.legend.display = false;
-    const [bhd_, bhs_] = clip(PPM_DAY, bh.dates, bh.sats);
+    const [bhd_, bhs_] = clip(PPM_WEEK, bh.dates, bh.sats);
     mkChart("ch-bps-"+co, { type:"line", data:{ labels: bhd_, datasets:[
       {label:"sats / share", data:bhs_, borderColor:c, backgroundColor:c+"22",
         borderWidth:2, tension:.25, pointRadius:0, fill:true} ]},
@@ -1533,7 +1534,7 @@ function renderCharts(){
     if(mhs){
       // MSTR from Oct 2025; ASST from Jan 1, 2026
       const _start = co==="ASST" ? Math.max(0, mhs.dates.findIndex(d=>d.startsWith("Jan"))) : 0;
-      const [labels, px, mn] = clip(PPM_DAY, mhs.dates.slice(_start), mhs.px.slice(_start),
+      const [labels, px, mn] = clip(PPM_CAL, mhs.dates.slice(_start), mhs.px.slice(_start),
             (mhs.net || mhs.mnav).slice(_start));
       const siOpts = baseOpts({ scales:{
         x:{ ticks:{color:AX,font:{size:11},autoSkip:true,maxTicksLimit:MTL,maxRotation:0}, grid:{color:GRID} },
@@ -1557,13 +1558,13 @@ function renderCharts(){
       if(ctx){
         const full = (mhs.net || mhs.mnav).filter(v=>v!=null);
         const live = netMnav(DATA.companies[co]);
-        // only report a window the history actually covers — ASST's treasury began
-        // Sep 2025, so a "1Y" average would be a 10-month average wearing the wrong label
-        const avg = n => { const need = Math.round(n*PPM_DAY);
+        // only report a window the history actually covers — it starts Oct 2025 (MSTR)
+        // and Jan 2026 (ASST), so a shorter average would wear the wrong label
+        const avg = n => { const need = Math.round(n*PPM_CAL);
           if(full.length < need) return null;
           const w = full.slice(-need); return w.reduce((a,b)=>a+b,0)/w.length; };
         const cell = (lbl, v) => v==null
-          ? `<span class="si-chip" title="Not enough history — the ${lbl} window predates this treasury strategy">${lbl} <b style="color:var(--faint)">—</b></span>`
+          ? `<span class="si-chip" title="Not enough history — this chart's data starts less than ${lbl} ago">${lbl} <b style="color:var(--faint)">—</b></span>`
           : `<span class="si-chip" title="Average net mNAV over the trailing ${lbl}${
               live!=null ? ` — today is ${Math.abs((live/v-1)*100).toFixed(0)}% ${live>=v?"above":"below"} it` : ""}">`+
             `${lbl} <b class="${live!=null && live<v ? "" : "warn"}">${fmt(v,2)}x</b></span>`;
@@ -1611,7 +1612,7 @@ function renderCharts(){
         return ctx.dataset.yAxisID==="yM" ? "EV mNAV: "+(+ctx.parsed.y).toFixed(2)+"x"
                                           : co+": $"+(+ctx.parsed.y).toFixed(2);
       }};
-      const [mhd_, mhpx_, mhev_] = clip(PPM_DAY, mh.dates, mh.px, mh.mnav);
+      const [mhd_, mhpx_, mhev_] = clip(PPM_CAL, mh.dates, mh.px, mh.mnav);
       mkChart("ch-mnav-"+co, { type:"line", data:{ labels: mhd_, datasets:[
         {label:"Price", data:mhpx_, yAxisID:"yP", borderColor:c, backgroundColor:c+"18",
           borderWidth:2, tension:.2, pointRadius:0, fill:false, order:1},
@@ -1766,7 +1767,7 @@ function debtTipHTML(co){
   return `<div class="et-title">Convertible Notes · ${o.capStructAsOf||""}</div>
     <div class="dt-sum"><b>$${fmt(tot/1000,2)}B</b> total · Wtd coupon <b>${fmt(wac,2)}%</b> · Wtd maturity <b>${fmt(wam,1)} yr</b> · BTC par <b>$${fmt(btcPar,0)}</b></div>
     <table class="dt"><tr><th>Note</th><th>Coupon</th><th>Maturity</th><th>Put</th><th>Principal</th><th>Conv $</th><th>Parity</th></tr>${rows}</table>
-    <div class="dt-note">BTC par = BTC price at which reserves cover the bonds. Parity = conversion value ÷ par at live stock ($${fmt(px,2)}); stock 7d ${cc(chg(5))}, 1mo ${cc(chg(21))}. Actual bond prices trade above parity (bond floor) and need a TRACE/dealer feed.</div>`;
+    <div class="dt-note">BTC par = BTC price at which reserves cover the bonds. Parity = conversion value ÷ par at live stock ($${fmt(px,2)}); stock 7d ${cc(chg(7))}, 1mo ${cc(chg(30))}. Actual bond prices trade above parity (bond floor) and need a TRACE/dealer feed.</div>`;
 }
 const debttip=document.createElement("div"); debttip.id="debttip"; document.body.appendChild(debttip);
 document.addEventListener("mouseover", e => {
