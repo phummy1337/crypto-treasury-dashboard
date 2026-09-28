@@ -33,7 +33,12 @@ on:
     - cron: "39 21 * * 1-5"         # 5:39pm EDT / 4:39pm EST (winter)
     - cron: "7 22 * * 5"            # Fri 6:07pm EDT / 5:07pm EST — safety net if the close run drops
     - cron: "17 14 * * 6"           # Sat 10:17am EDT / 9:17am EST — catch anything filed late Friday
-  workflow_dispatch:               # manual "Run workflow" button
+  workflow_dispatch:               # manual button, and Cloud Scheduler's entry point
+    inputs:
+      force:
+        description: "Refresh even if no new 8-K has been filed"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -48,11 +53,36 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # An external scheduler (Cloud Scheduler) pokes this every few minutes on a
+      # Monday, because GitHub's own cron sheds runs. Most of those pokes have
+      # nothing to do, so bail out in ~2 seconds rather than spending a minute
+      # walking EDGAR and the quote APIs for no reason. Two cheap reads decide it:
+      # the newest 8-K per issuer vs the watermark refresh_data.py already stamps
+      # into data.json. Manual runs and the scheduled fallbacks always proceed.
+      - name: Skip if no new filing
+        id: gate
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.force != 'true'
+        run: |
+          UA="crypto-treasury-dashboard pete@defidevcorp.com"
+          skip=true
+          for pair in "MSTR:0001050446" "ASST:0001920406"; do
+            tk="${pair%%:*}"; cik="${pair##*:}"
+            edgar=$(curl -sS -A "$UA" "https://data.sec.gov/submissions/CIK$cik.json" \
+              | python3 -c "import json,sys;r=json.load(sys.stdin)['filings']['recent'];print(max((r['filingDate'][i] for i in range(len(r['form'])) if r['form'][i]=='8-K'), default=''))")
+            have=$(python3 -c "import json;print((json.load(open('data.json'))['companies']['$tk'].get('filingWatch') or {}).get('ingested') or '')")
+            echo "$tk: edgar=$edgar ingested=$have"
+            if [ -n "$edgar" ] && [ -n "$have" ] && [[ "$edgar" > "$have" ]]; then skip=false; fi
+          done
+          echo "skip=$skip" >> "$GITHUB_OUTPUT"
+          $skip && echo "No new filing — skipping refresh." || echo "New filing found — refreshing."
+
       - uses: actions/setup-python@v5
+        if: steps.gate.outputs.skip != 'true'
         with:
           python-version: "3.12"
 
       - run: pip install certifi
+        if: steps.gate.outputs.skip != 'true'
 
       # which cron entry fired (empty for a manual run): GitHub drops and delays
       # scheduled runs, and without this a run can only be matched to a slot by timing
@@ -62,9 +92,11 @@ jobs:
           SCHEDULE: ${{ github.event.schedule }}
 
       - name: Run refresh
+        if: steps.gate.outputs.skip != 'true'
         run: python refresh_data.py
 
       - name: Commit updated data (if changed)
+        if: steps.gate.outputs.skip != 'true'
         run: |
           git config user.name "data-refresh-bot"
           git config user.email "actions@users.noreply.github.com"
