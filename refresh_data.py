@@ -949,10 +949,19 @@ def _mstr_cost_basis(text):
     if pm:
         agg = float(pm.group(1).replace(",", "")) * (1000 if pm.group(2).lower() == "billion" else 1)
         return agg, int(pm.group(3).replace(",", ""))
-    # table shape: "<holdings> $ <aggregate in billions> $ <average>"
-    tm = re.search(r"Aggregate BTC Holdings.*?[\d,]{5,}\s+\$\s*([\d,.]+)\s+\$\s*([\d,]+)", text, re.S)
-    if tm:
-        return float(tm.group(1).replace(",", "")) * 1000, int(tm.group(2).replace(",", ""))
+    # Table shape. On a purchase week the row carries the period columns FIRST and
+    # the lifetime ones after:
+    #   <bought> $<period agg $M> $<period avg>  <holdings> $<lifetime agg $B> $<lifetime avg>
+    # Matching the first pair reads the week's own average as the cost basis — on
+    # 2026-09-28 that meant $85,681 against a true $75,437. It only stayed hidden
+    # because the preceding weeks were no-purchase weeks whose period columns are
+    # "-". Anchor on the holdings figure instead: 6+ digits, with an aggregate
+    # that is plausibly in billions.
+    for m in re.finditer(r"([\d,]{6,})\s+\$\s*([\d,.]+)\s+\$\s*([\d,]{5,})", text):
+        holdings = int(m.group(1).replace(",", ""))
+        agg_b = float(m.group(2).replace(",", ""))
+        if holdings > 100_000 and agg_b < 1000:
+            return agg_b * 1000, int(m.group(3).replace(",", ""))
     return None, None
 
 
