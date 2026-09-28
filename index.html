@@ -108,6 +108,10 @@
      separate glyph, so it must not pick up the glyph's spacing or size. nowrap: on
      phones a wrapped "Mon · last trade" reads as Monday's last trade */
   .sg-item .sub .defhint { margin-left:0; font-size:inherit; vertical-align:0; white-space:nowrap; }
+  /* Above 1100px the stat cards sit three across and a column is ~124px at most: two
+     clauses fit, three don't, so the word wrapped onto a line of its own. As on phones,
+     the multiple wins; a line without one keeps its word ("-1.86% · common"). */
+  @media (min-width: 1101px) { .sg-item .sub .defhint ~ .secword { display: none; } }
   .statbox {
     background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
     padding: 13px 15px; position: relative; overflow: hidden;
@@ -1322,8 +1326,8 @@ function renderPriceHeader(){
     const sep = head ? " · " : "";
     return (o && o[k])
       ? `${head}${sep}<span class="lasttrade">last trade</span>`
-      // the separator sits inside .secword so the <=640px rule drops the word and
-      // its separator together, rather than stranding a dangling "·"
+      // the separator sits inside .secword so wherever CSS hides the word, its
+      // separator goes with it, rather than stranding a dangling "·"
       : `${head}<span class="secword">${sep}${base}</span>`;
   };
   set("hdr-px-MSTR-sub", sub(M, M.dayChangePct,  M.rvol,     "_preClose",     "common"));
