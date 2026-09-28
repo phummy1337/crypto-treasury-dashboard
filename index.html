@@ -124,6 +124,43 @@
   .statbox .refresh { margin-top: 8px; display:inline-block; }
   @media (max-width: 1100px) { .statbar { grid-template-columns: 1fr; } .btchero { max-width: none; } }
 
+  /* apxUSD lending banner: Apyx's "Slim lending banner", dark variant, at the design's
+     geometry (104px tall on desktop, 194px stacked on phones; the 1px border is part of
+     both). It sits in the header, outside every tab pane, so the calculator shows it too.
+     The streak is drawn in CSS because the design's texture is a 6 MB raster. */
+  .lendbar { display:flex; flex-wrap:wrap; align-items:center; gap:16px 24px; padding:23px;
+    border:1px solid transparent; border-radius:8px;
+    background:
+      linear-gradient(109deg, transparent 71%, rgba(247,245,245,0.07) 71.4%, transparent 71.8%) padding-box,
+      linear-gradient(135deg, transparent 61%, rgba(220,20,60,0.13) 75%, rgba(220,20,60,0.05) 87%, transparent) padding-box,
+      linear-gradient(90deg, transparent, rgba(220,20,60,0.03)) padding-box,
+      linear-gradient(#100c0d, #100c0d) padding-box,
+      /* the border: faint all round, lit at the top-left and bottom-right corners */
+      radial-gradient(300px 26px at 0 0, rgba(247,245,245,0.32), transparent) border-box,
+      radial-gradient(300px 26px at 100% 100%, rgba(247,245,245,0.26), transparent) border-box,
+      linear-gradient(rgba(247,245,245,0.25), rgba(247,245,245,0.25)) border-box; }
+  .lb-copy { flex: 1 1 auto; }
+  .lb-head { font-size:24px; line-height:32px; font-weight:600; color:#fff; }
+  .lb-sub, .lb-stat .s { color:#949494; white-space:nowrap; }
+  .lb-sub { font-size:14px; line-height:20px; margin-top:4px; }
+  .lb-right { display:flex; align-items:center; gap:24px; margin-left:auto; }
+  .lb-stats { display:flex; gap:24px; }
+  .lb-stat .v { font-size:24px; line-height:32px; font-weight:600; color:#fff; white-space:nowrap; }
+  .lb-stat .s { font-size:12px; line-height:18px; }
+  .lb-stat .lb-pips { color:#FFE788; }
+  .lb-cta { flex:0 0 auto; padding:0 16px; line-height:48px; border-radius:8px; background:#F7F5F5;
+    color:#131111; font-size:14px; font-weight:500; white-space:nowrap; }
+  .lb-cta:hover { background:#fff; text-decoration:none; }
+  @media (max-width: 760px) {
+    .lendbar { flex-direction:column; align-items:stretch; gap:12px; padding:15px; }
+    .lb-head { font-size:20px; line-height:26px; }
+    .lb-sub { margin-top:0; }
+    .lb-right { flex-direction:column; align-items:stretch; gap:12px; margin-left:0; }
+    .lb-stats { justify-content:space-between; flex-wrap:wrap; row-gap:12px; }   /* 320px phones */
+    .lb-stat .v { font-size:20px; line-height:26px; }
+    .lb-cta { text-align:center; }
+  }
+
   /* ---------- Sections ---------- */
   section { margin-bottom: 40px; }
   .sec-head { display:flex; align-items:center; gap:11px; margin: 0 0 12px; }
@@ -446,6 +483,22 @@
         </div>
       </div>
     </div>
+    <aside class="lendbar" aria-label="apxUSD lending">
+      <div class="lb-copy">
+        <div class="lb-head">Make more of your apxUSD</div>
+        <div class="lb-sub">No lockup · No staking fee</div>
+      </div>
+      <div class="lb-right">
+        <div class="lb-stats">
+          <!-- hidden until renderLendingBanner() has a live figure -->
+          <div class="lb-stat" id="lb-apy" style="display:none"><div class="v" id="lb-apy-v"></div>
+            <div class="s">lending APY · variable</div></div>
+          <div class="lb-stat"><div class="v lb-pips">100× Pips</div>
+            <div class="s">on <span id="lb-count">4</span> lending options</div></div>
+        </div>
+        <a class="lb-cta" href="https://app.apyx.fi/discover?tab=lending&amp;campaign=boosted-pips" target="_blank" rel="noopener">Explore lending</a>
+      </div>
+    </aside>
   </header>
 
   <nav class="tabs">
@@ -1415,7 +1468,19 @@ function renderActions(){
   }).join("");
 }
 
-function renderAll(){ renderPriceHeader(); renderCompany(); renderHoldings(); renderCost(); renderPerShare(); renderValuation(); renderCapital(); renderATM(); renderActions(); if(typeof runCalc==="function") runCalc();
+// The lending banner quotes the best APY among the options refresh_data.py reads
+// (fetch_lending) and counts them. A data.json from before the banner has no lending
+// block, so the figure stays hidden rather than falling back to a typed-in number.
+function renderLendingBanner(){
+  const stat = document.getElementById("lb-apy"); if(!stat) return;
+  const opts = (DATA.lending && DATA.lending.options) || [];
+  const apys = opts.map(o => o.apy).filter(v => typeof v === "number" && isFinite(v));
+  stat.style.display = apys.length ? "" : "none";
+  if(apys.length) document.getElementById("lb-apy-v").textContent = "Up to " + fmt(Math.max(...apys), 2) + "%";
+  if(opts.length) document.getElementById("lb-count").textContent = opts.length;
+}
+
+function renderAll(){ renderPriceHeader(); renderLendingBanner(); renderCompany(); renderHoldings(); renderCost(); renderPerShare(); renderValuation(); renderCapital(); renderATM(); renderActions(); if(typeof runCalc==="function") runCalc();
   // keep every hint reachable by keyboard (re-rendered markup loses the attribute)
   document.querySelectorAll(".evhint, .defhint").forEach(el => {
     if(!el.hasAttribute("tabindex")){ el.setAttribute("tabindex","0"); el.setAttribute("role","button"); } });
