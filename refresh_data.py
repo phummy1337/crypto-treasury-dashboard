@@ -1296,6 +1296,37 @@ def _asst_sata_counts(text):
     return out
 
 
+# Strive's PIPE Traditional Warrants, from the 2025-05-26 subscription agreements.
+# The FY2025 10-K rollforward is pre-reverse-split (20 warrants = 1 share after the
+# 1-for-20 of 2026-02-06), so it converts to shares underlying for comparison with
+# the weekly 8-K line. Strike is "$1.35 per share ($27 split-adjusted)" per the Q2
+# 10-Q. Expiry is the first anniversary of the effectiveness of the resale
+# registration — the 424B7 of 2025-10-10 off the S-3ASR shelf (Reg. 333-290252),
+# which auto-effected on filing, so there is no EFFECT notice to find.
+WARRANTS_ISSUED_SHARES = 555_259_256 / 20      # 27,762,963 shares underlying
+WARRANT_STRIKE = 27.0
+WARRANT_EXPIRY = "2026-10-10"
+
+
+def _asst_warrants(text, filed):
+    """Traditional-warrant overhang from a Strive 8-K position table."""
+    m = re.search(r"Traditional Warrants \(\d\)\s*([\d,]+)\s+([\d,]+)", text)
+    if not m:
+        return None
+    outstanding = int(m.group(2).replace(",", ""))
+    exercised = max(0.0, WARRANTS_ISSUED_SHARES - outstanding)
+    return {
+        "outstanding": outstanding,
+        "issued": round(WARRANTS_ISSUED_SHARES),
+        "exercised": round(exercised),
+        "pctExercised": round(exercised / WARRANTS_ISSUED_SHARES * 100, 1),
+        "weekExercised": int(m.group(1).replace(",", "")) - outstanding,
+        "strike": WARRANT_STRIKE,
+        "expiry": WARRANT_EXPIRY,
+        "asOf": filed,
+    }
+
+
 def fetch_sata_notional(data):
     """Rebuild Strive's preferred notional from its own 8-Ks.
 
@@ -1324,7 +1355,7 @@ def fetch_sata_notional(data):
         return
     r = sub["filings"]["recent"]
     docpat = re.compile(r"^(?:asst-\d{8}\.htm|.*8k.*\.htm)$", re.I)
-    scanned = 0
+    scanned, warrants = 0, None
     for i in range(len(r["form"])):          # EDGAR lists newest first
         if r["form"][i] != "8-K" or not docpat.match(r["primaryDocument"][i] or ""):
             continue
@@ -1332,7 +1363,10 @@ def fetch_sata_notional(data):
         url = (f"https://www.sec.gov/Archives/edgar/data/{int(CIK['ASST'])}/"
                f"{acc}/{r['primaryDocument'][i]}")
         try:
-            got = _asst_sata_counts(_edgar_text(url))
+            txt = _edgar_text(url)
+            got = _asst_sata_counts(txt)
+            if not warrants:                 # newest filing wins
+                warrants = _asst_warrants(txt, r["filingDate"][i])
         except Exception:
             got = []
         scanned += 1
@@ -1343,6 +1377,10 @@ def fetch_sata_notional(data):
         if scanned >= 40:
             break
         time.sleep(0.12)
+    if warrants:
+        co["warrants"] = warrants
+        log(f"[warrants] ASST {warrants['outstanding']:,} shares underlying, "
+            f"{warrants['pctExercised']}% exercised, expires {warrants['expiry']}")
     if steps:
         co["sataNotionalSteps"] = [[d, n] for d, n in sorted(steps.items())]
         _SATA["steps"] = co["sataNotionalSteps"]

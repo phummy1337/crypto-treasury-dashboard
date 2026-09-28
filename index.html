@@ -349,6 +349,18 @@
   .si-chip b { font-size:14.5px; font-weight:700; font-style:italic; color:#fff; }
   .si-chip b.warn { color:var(--btc); }
   .si-chip b.hot { color:#ff7a7a; }
+  /* TEMPORARY — ASST warrant countdown, remove after 2026-10-10 */
+  .warrbox { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 26px;
+    margin: 14px 0 0; padding: 12px 16px; border-radius: 12px;
+    background: rgba(76,159,255,0.07); border: 1px solid rgba(76,159,255,0.28); }
+  .warrbox .wb-title { font-weight: 800; color: var(--asst); font-size: 14px; }
+  .warrbox .wb-title small { display: block; color: var(--faint); font-weight: 600;
+    font-size: 11.5px; letter-spacing: .2px; margin-top: 2px; }
+  .warrbox .wb-bar { flex: 1 1 190px; min-width: 150px; height: 8px; border-radius: 6px;
+    background: rgba(255,255,255,0.09); overflow: hidden; }
+  .warrbox .wb-fill { height: 100%; background: var(--asst); border-radius: 6px; }
+  .warrbox .wb-stat { font-size: 12px; color: var(--faint); font-weight: 600; white-space: nowrap; }
+  .warrbox .wb-stat b { display: block; font-size: 15px; color: var(--ink); font-weight: 800; }
   .lasttrade { color: #FFD9A0; font-weight: 700; }
   .stale-note { margin: 0 0 12px; padding: 10px 14px; border-radius: 10px; font-size: 13px;
     color: #FFD9A0; background: rgba(237,25,70,0.10); border: 1px solid rgba(237,25,70,0.35); }
@@ -487,6 +499,9 @@
         </div>
       </div>
     </div>
+    <!-- TEMPORARY: Strive's PIPE warrants expire 2026-10-10. Remove this block,
+         its CSS (.warrbox) and renderWarrantBox() once the date has passed. -->
+    <aside class="warrbox" id="warrbox" hidden aria-label="ASST warrant exercise"></aside>
     <aside class="lendbar" aria-label="apxUSD lending">
       <div class="lb-copy">
         <div class="lb-head">Make more of your apxUSD</div>
@@ -1454,6 +1469,35 @@ async function checkFilingFreshness(){
     ).join(' · ')} — balance-sheet figures are a filing behind until the next refresh.</div>` : '';
 }
 
+/* TEMPORARY — Strive's PIPE Traditional Warrants expire 2026-10-10 (first
+   anniversary of the 424B7 resale prospectus off the S-3ASR shelf). They sat
+   untouched for months and only began converting once ASST crossed the $27
+   strike, so the exercised share is the live read on how much of the ~$684M /
+   +26% dilution has already landed. Strive's published "Assumed Fully Diluted"
+   count excludes these entirely. Delete this, .warrbox and the markup after
+   the date passes. */
+function renderWarrantBox(){
+  const el = document.getElementById("warrbox");
+  const w = DATA.companies?.ASST?.warrants;
+  if(!el || !w || !w.outstanding){ if(el) el.hidden = true; return; }
+  const px = DATA.companies.ASST.stockPrice || 0;
+  const days = Math.ceil((new Date(w.expiry + "T21:00:00Z") - Date.now()) / 86400000);
+  const cash = w.outstanding * w.strike / 1e6;
+  const dil  = DATA.companies.ASST.sharesOutstanding
+             ? w.outstanding / 1e6 / DATA.companies.ASST.sharesOutstanding * 100 : null;
+  const money = px > w.strike ? `${fmt((px/w.strike-1)*100,1)}% in the money`
+              : px ? `${fmt((1-px/w.strike)*100,1)}% out of the money` : "";
+  el.hidden = false;
+  el.innerHTML =
+    `<div class="wb-title">ASST warrants exercised<small>$${w.strike} strike · ${money} · expire ${
+      new Date(w.expiry+"T12:00:00Z").toLocaleDateString("en-US",{month:"short",day:"numeric"})}</small></div>
+     <div class="wb-stat"><b>${fmt(w.pctExercised,1)}%</b>${fmt(w.exercised/1e6,2)}M of ${fmt(w.issued/1e6,1)}M</div>
+     <div class="wb-bar"><div class="wb-fill" style="width:${Math.min(100,w.pctExercised)}%"></div></div>
+     <div class="wb-stat"><b>${fmt(w.outstanding/1e6,1)}M</b>left${dil?` · +${fmt(dil,0)}% dilution`:""}</div>
+     <div class="wb-stat"><b>$${fmt(cash,0)}M</b>cash if exercised</div>
+     <div class="wb-stat"><b>${days > 0 ? days : 0}</b>${days === 1 ? "day" : "days"} to expiry</div>`;
+}
+
 function renderActions(){
   const el = document.getElementById("grid-actions"); if(!el) return;
   const acts = DATA.actions || [];
@@ -1484,7 +1528,7 @@ function renderLendingBanner(){
   if(opts.length) document.getElementById("lb-count").textContent = opts.length;
 }
 
-function renderAll(){ renderPriceHeader(); renderLendingBanner(); renderCompany(); renderHoldings(); renderCost(); renderPerShare(); renderValuation(); renderCapital(); renderATM(); renderActions(); if(typeof runCalc==="function") runCalc();
+function renderAll(){ renderPriceHeader(); renderWarrantBox(); renderLendingBanner(); renderCompany(); renderHoldings(); renderCost(); renderPerShare(); renderValuation(); renderCapital(); renderATM(); renderActions(); if(typeof runCalc==="function") runCalc();
   // keep every hint reachable by keyboard (re-rendered markup loses the attribute)
   document.querySelectorAll(".evhint, .defhint").forEach(el => {
     if(!el.hasAttribute("tabindex")){ el.setAttribute("tabindex","0"); el.setAttribute("role","button"); } });
