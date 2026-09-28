@@ -11,15 +11,17 @@ schedule it) to refresh the numbers without editing the HTML.
 WHAT WORKS OUT OF THE BOX
   - Live BTC price + circulating supply  -> CoinGecko public API (no key)
 
-  - Stock price, day change, 52-week range, 1-year price history, beta-to-BTC
-    -> Yahoo Finance chart API (no key), server-side. See fetch_equity().
-    (Note: Stooq's CSV endpoint is now behind a JS proof-of-work wall and no
-    longer returns plain CSV, so Yahoo is used instead.)
+  - Stock price, day change, 52-week range, 1-year price history, beta-to-BTC,
+    relative volume -> strategytracker (no key). See fetch_strategytracker().
+    MSTR's price is then overlaid with strategy.com's official close.
 
   - BTC holdings + true weekly purchases  -> SEC EDGAR 8-Ks (no key). See
     fetch_holdings(): parses each issuer's weekly purchase 8-K (Strategy's
     "BTC Update" table, Strive's "Bitcoin held" table), rebuilds data["weekly"]
     and refreshes current holdings / % of supply.
+
+  - apxUSD lending APYs for the lending banner -> Morpho API (open GraphQL, no
+    key). See fetch_lending().
 
 WHAT NEEDS WIRING (per-source TODOs below)
   per-share / yield (strategy.com, treasury.strive.com) and CEBE / claims% /
@@ -47,6 +49,7 @@ Dependencies: requests  (pip3 install requests)
   Optional for HTML scraping: beautifulsoup4  (pip3 install beautifulsoup4)
 """
 
+import bisect
 import json
 import re
 import sys
@@ -59,7 +62,6 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 DATA_PATH = Path(__file__).with_name("data.json")
-DAILY_POINTS = 260          # trailing daily closes kept for the price chart (~1 year)
 UA = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
                     "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"}
 
@@ -78,6 +80,13 @@ except Exception:
 # --------------------------------------------------------------------------- #
 def get_json(url, timeout=15):
     req = urllib.request.Request(url, headers=UA)
+    with urllib.request.urlopen(req, timeout=timeout, context=_SSL_CTX) as r:
+        return json.loads(r.read().decode())
+
+
+def post_json(url, payload, timeout=15):
+    req = urllib.request.Request(url, data=json.dumps(payload).encode(),
+                                 headers={**UA, "Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=timeout, context=_SSL_CTX) as r:
         return json.loads(r.read().decode())
 
@@ -153,11 +162,26 @@ MSTR_PREF_STEPS = {
     ],
     "STRE": [("2025-11-17", 899.0)],   # EUR IPO mid-Nov 2025, no ATM — constant since issue
 }
-# MSTR quarterly cash (SEC XBRL CashAndCashEquivalentsAtCarryingValue) and convert
-# principal (all six outstanding notes were issued by 2025-02-21; none redeemed since).
+# MSTR cash ($mm) as the filings state it, dated to each balance's as-of date, a step only
+# where it changed: 10-Q cash until the USD Reserve began on 2025-12-01, then the USD
+# Reserve (weekly 8-Ks, the 10-K and 10-Qs) plus USD Cash from 2026-08-23, the balances
+# strategy.com's live figure counts. 03-31 and 06-30 are dividend days the 10-Qs catch
+# mid-dip. 05-19 is derived: 2,250 less the $1,378.6M the reserve paid for the 2029s,
+# which the filed 05-25 balance confirms after a week with no ATM sales, BTC buys or
+# dividends. Filings never change; live steps in histStepsLive extend past the last one.
 MSTR_CASH_STEPS = [("2025-06-30", 50.1), ("2025-09-30", 54.3),
-                   ("2025-12-31", 2301.5), ("2026-03-31", 2207.2)]
-MSTR_DEBT_STEPS = [("2025-02-21", 8213.75)]
+                   ("2025-12-01", 1440.0), ("2025-12-21", 2190.0), ("2025-12-31", 2250.0),
+                   ("2026-03-31", 2140.0), ("2026-04-26", 2250.0), ("2026-05-19", 871.0),
+                   ("2026-05-31", 900.0), ("2026-06-07", 1000.0), ("2026-06-14", 1100.0),
+                   ("2026-06-21", 1400.0), ("2026-06-28", 2550.0), ("2026-06-30", 2400.0),
+                   ("2026-07-05", 2550.0), ("2026-07-12", 3000.0), ("2026-07-19", 3225.0),
+                   ("2026-07-24", 3750.0), ("2026-08-02", 4000.0), ("2026-08-09", 4650.0),
+                   ("2026-08-16", 4800.0), ("2026-08-23", 6690.0), ("2026-08-30", 6710.0),
+                   ("2026-09-07", 6540.0), ("2026-09-13", 6400.0), ("2026-09-20", 6090.0)]
+# Convert principal ($mm): all six notes were issued by 2025-02-21; $1.5B of the 2029s
+# were repurchased and cancelled 2026-05-19 (Q2 10-Q). Live steps take strategy.com's
+# figure after that.
+MSTR_DEBT_STEPS = [("2025-02-21", 8213.75), ("2026-05-19", 6713.75)]
 MNAV_START = {"MSTR": "2025-10-01", "ASST": "2026-01-01"}   # chart windows
 
 
@@ -172,10 +196,11 @@ def _step(steps, iso):
     return v
 
 
-# STRE is EUR-denominated: 7,750,000 shares × €100 stated amount (Nov 13, 2025
-# offering, per 8-K) = €775mm, converted at the live ECB EURUSD rate each refresh.
-# The tracker carries a stale fixed conversion ($899mm), so we override it.
-STRE_EUR_NOTIONAL = 775.0
+def _save_live_step(live, key, day, value):
+    """Persist a live history step, keeping one per day (the latest)."""
+    live[key] = [x for x in live.get(key, []) if x[0] != day] + [[day, value]]
+
+
 # The USD stated amount Strategy carries STRE at in its own preferred total: the
 # issue-date conversion of the €775M, fixed since Nov 2025. Kept as a constant
 # rather than EUR x spot so our five-series sum ties to strategy.com's figure.
@@ -194,11 +219,15 @@ SI_SPLITS = {"ASST": [("2026-02-06", 20)]}
 # daily shares-outstanding history (millions) per ticker, filled by
 # fetch_strategytracker (mcap / price) and used for per-date float below
 _SHARES_HIST = {}
-# daily share volume per ticker: preferreds from the tracker's price log,
-# commons from Yahoo — used for trailing-20-day days-to-cover
+# daily share volume per PREFERRED ticker, from the tracker's price log — used for
+# the preferreds' days-to-cover. Commons volume is not kept here: fetch_short_interest
+# pulls it from Nasdaq (_nasdaq_vol) and consumes it within the loop iteration.
 _VOL_HIST = {}
 # intraday 15-min candles per preferred ticker, for the ATM tracker
 _ATM_CANDLES = {}
+# settled daily dollar volume (close x volume) per preferred ticker, [(iso, $)] ascending:
+# one series behind both the preferred's rvol and the ATM's absorption denominator
+_PREF_DVOL = {}
 # 8-K filing index per company: [(filing date, primary doc url)] — lets each
 # action in the log link back to the filing that disclosed it
 _FILINGS = {}
@@ -252,6 +281,101 @@ def _stamp_price(co, price, chg_pct, date_et):
     co["dayChangePct"] = round((price / prev - 1) * 100, 2) if prev else 0.0
 
 
+# The tracker's closing print lags the 4:00pm auction and it rebuilds its snapshot
+# about every 15 minutes, so a session is not taken as final until well after the bell.
+SESSION_OPEN_ET = datetime.time(9, 30)
+SESSION_SETTLED_ET = datetime.time(16, 15)
+
+
+def _settled_sessions(rows, snap_et):
+    """The rows of [(iso, ...)] that are finished sessions as of snapshot time snap_et.
+
+    The tracker's tail can't be taken at face value. From the open it grows a row
+    for the running session, and from 8pm ET, when UTC rolls over, it adds a row
+    dated the NEXT day that repeats the session just closed plus after-hours prints
+    (on 2026-09-22 ASST's was an exact copy; MSTR's carried 30,568 more shares).
+    Neither is a session. A row counts once its date is past, or once the snapshot
+    was taken after that day's close. Weekend dates never count.
+
+    Judged by the snapshot's own timestamp, not the clock this runs on: a run just
+    after the bell can read a snapshot built before the closing auction printed.
+
+    Known gap: there is no holiday calendar here, so a weekday market holiday's
+    placeholder row counts once the snapshot passes the settle time that day. The
+    tracker's history holds none of the last ten holidays, so the row is transient,
+    but while it stands rvol, beta, the day change and ATM absorption treat it as a
+    session (absorption can count the newest filed window a day early).
+    """
+    day = snap_et.date().isoformat()
+    closed = snap_et.time() >= SESSION_SETTLED_ET
+    return [r for r in rows
+            if datetime.date.fromisoformat(r[0]).weekday() < 5
+            and (r[0] < day or (r[0] == day and closed))]
+
+
+def _quote_session(closes, price, snap_et):
+    """(session, previous close) for a quote taken at snap_et, given settled [(iso, close)].
+
+    While a session trades, the quote is its running price and the base is the last
+    settled close. Any other time — pre-market, after the settle, the weekend — the
+    quote should be the last settled session's close, based on the session before
+    it. When it isn't (a missing row, an after-hours print), the session it belongs
+    to is unknown, so None.
+    """
+    if snap_et.weekday() < 5 and SESSION_OPEN_ET <= snap_et.time() < SESSION_SETTLED_ET:
+        return snap_et.date().isoformat(), closes[-1][1]
+    if round(closes[-1][1], 2) != price:
+        return None
+    return closes[-1][0], closes[-2][1]
+
+
+def _rvol(series, snap_et, window=30):
+    """Relative volume: {mult, sessionUsd, avg30Usd, asOf} from [(iso, $vol)] ascending.
+
+    Anchored to the last SETTLED session (see _settled_sessions), never the running
+    one: dividing a part-session by full ones reads backwards — at 11:23 ET on
+    2026-09-22 MSTR printed 0.55x ("quiet") against 2.15x for the session that had
+    actually closed. `asOf` names the session used.
+
+    Holding still between closes also keeps main()'s before/after no-op check
+    meaningful — a figure that drifted every run would commit data.json every cron.
+    """
+    rows = sorted((d, v) for d, v in _settled_sessions(series, snap_et) if v and v > 0)
+    if len(rows) < window + 1:
+        return None
+    day = rows[-1]
+    avg = sum(v for _, v in rows[-1 - window:-1]) / window
+    if avg <= 0:
+        return None
+    return {"mult": round(day[1] / avg, 2), "sessionUsd": round(day[1]),
+            "avg30Usd": round(avg), "asOf": day[0]}
+
+
+def _beta(stock, btc):
+    """Beta of stock daily returns vs BTC daily returns over shared dates.
+
+    Both are [(date, price)]. Returns run between consecutive dates the two have
+    in common, so a Friday-to-Monday stock move is paired with BTC's whole weekend.
+    That only holds if the stock series carries real sessions alone — a filled
+    weekend or holiday row would pair a 0% stock move with a real BTC one.
+    """
+    sd, bd = dict(stock), dict(btc)
+    days = sorted(set(sd) & set(bd))
+    sr, br = [], []
+    for i in range(1, len(days)):
+        p, q = days[i - 1], days[i]
+        if sd[p] and bd[p]:
+            sr.append(sd[q] / sd[p] - 1)
+            br.append(bd[q] / bd[p] - 1)
+    n = len(br)
+    if n <= 60:                       # under ~3 months of sessions the slope is noise
+        return None
+    mb, ms = sum(br) / n, sum(sr) / n
+    var = sum((x - mb) ** 2 for x in br) / n
+    cov = sum((sr[i] - ms) * (br[i] - mb) for i in range(n)) / n
+    return cov / var if var else None
+
+
 def fetch_strategytracker(data):
     """Refresh current metrics + real history for MSTR/ASST from strategytracker."""
     try:
@@ -262,28 +386,42 @@ def fetch_strategytracker(data):
         return
     comps = full.get("companies", {})
     try:
-        tracker_date = _et_date(datetime.datetime.fromisoformat(
-            (full.get("timestamp") or idx["timestamp"]).replace("Z", "+00:00")))
+        snap = datetime.datetime.fromisoformat(
+            (full.get("timestamp") or idx["timestamp"]).replace("Z", "+00:00"))
     except Exception:
-        tracker_date = _et_date(datetime.datetime.now(datetime.timezone.utc))
-    try:    # live EURUSD (ECB) for the EUR-denominated STRE notional
-        data["eurUsd"] = round(get_json("https://api.frankfurter.dev/v1/latest?base=EUR&symbols=USD")["rates"]["USD"], 4)
-    except Exception:
-        log("[skip] EURUSD fetch failed — keeping previous rate")
+        snap = datetime.datetime.now(datetime.timezone.utc)
+    tracker_date = _et_date(snap)
+    snap_et = (snap if snap.tzinfo else snap.replace(tzinfo=datetime.timezone.utc)).astimezone(ET)
+    data.pop("eurUsd", None)    # STRE is carried at STRE_USD_STATED; nothing reads the rate
     hist = {}
     for tk in ("MSTR", "ASST"):
         c = comps.get(tk)
         if not c:
             continue
         pm, hd = c["processedMetrics"], c["historicalData"]
+        liq = pm.get("historicalLiquidity") or {}     # session $vol + closes: rvol, beta, day change
         co = data["companies"].get(tk)
         if not co:
             continue
+        try:
+            closes = [(d, float(p)) for d, p in _settled_sessions(
+                zip(liq.get("dates") or [], liq.get("prices") or []), snap_et) if p]
+        except Exception as e:
+            log(f"[skip] {tk} settled closes: {e}")
+            closes = []
         co["holdings"]      = int(round(pm["latestBtcBalance"]))
         co["avgCost"]       = round(pm["avgCostPerBtc"])
         co["stockPrice"]    = round(pm["stockPrice"], 2)
-        _stamp_price(co, co["stockPrice"],
-                     round(pm["stockPriceDelta"]["percent"], 2), tracker_date)
+        # The tracker's own delta compares its last two calendar rows, which hold the
+        # same close whenever no session is trading: ASST read +0.00% on Sat 2026-09-19
+        # against Friday's +6.40%. Base the move on the settled sessions instead.
+        quote = _quote_session(closes, co["stockPrice"], snap_et) if len(closes) >= 2 else None
+        if quote:
+            session, base = quote
+            _stamp_price(co, co["stockPrice"], (co["stockPrice"] / base - 1) * 100, session)
+        else:
+            _stamp_price(co, co["stockPrice"],
+                         round(pm["stockPriceDelta"]["percent"], 2), tracker_date)
         co["sharesOutstanding"] = round(pm["latestTotalShares"] / 1e6, 2)
         co["floatSharesM"] = round(co["sharesOutstanding"] - CLASS_B_SHARES_M.get(tk, 0), 2)
         # daily shares outstanding (split-adjusted, millions) for per-date float
@@ -310,9 +448,21 @@ def fetch_strategytracker(data):
         co["pctSupply"]     = round(co["holdings"] / data["btcSupply"] * 100, 4)
         co["navPremiumBasic"] = round(pm["navPremiumBasic"], 3)
         co["treasuryDate"]  = pm.get("latestTreasuryDate")
+        # relative volume. `historicalLiquidity` ships daily_traded_values already
+        # equal to volumes x prices, trading-day shaped (no weekend rows) — so this
+        # needs no join against stockHistory, which is calendar-shaped and would
+        # misalign by a growing offset.
+        try:
+            rv = _rvol(list(zip(liq.get("dates") or [], liq.get("daily_traded_values") or [])), snap_et)
+            if rv:
+                co["rvol"] = rv
+        except Exception as e:
+            log(f"[skip] {tk} rvol: {e} — keeping existing value")
         # the tracker zeroes cash/debt when it values a name on market-cap basis
         # (useEv False) — only trust it when useEv is True; else keep filing values.
-        if pm.get("latestUseEv"):
+        # Not for MSTR: its balance leaves out USD Cash ($5.04B vs strategy.com's $6.09B
+        # on 2026-09-25); fetch_holdings and strategy.com set MSTR's cash.
+        if pm.get("latestUseEv") and tk != "MSTR":
             co["cash"] = round(pm["latestCashBalance"] / 1e6)
         # preferred: live per-series notionals, prices, and the implied annual dividend
         ps = pm.get("preferredStocks") or []
@@ -381,6 +531,17 @@ def fetch_strategytracker(data):
                         no.append(round(n) if n is not None else None)
                     if px:
                         co["prefHistory"] = {"dates": dts, "iso": isod, "px": px, "notional": no}
+                        # close and volume sit on one record, so $vol needs no join. Settled
+                        # here once: intraday, hp carries the running session's row too
+                        try:
+                            _PREF_DVOL[t] = sorted(_settled_sessions(
+                                [(q["date"], (q.get("volume") or 0) * (q.get("close") or 0)) for q in hp],
+                                snap_et))
+                            rv = _rvol(_PREF_DVOL[t], snap_et)
+                            if rv:
+                                co["prefRvol"] = rv
+                        except Exception as e:
+                            log(f"[skip] {t} rvol: {e} — keeping existing value")
             # STRC is the only series with a live ATM and buyback programme, and the
             # tracker's notional for it runs one filing behind — on 2026-09-18 it still
             # carried the 1,420,467 shares Strategy had already retired, putting our
@@ -435,28 +596,27 @@ def fetch_strategytracker(data):
         def _pt(i):
             if shs[i] and bal[i]:
                 od.append(_iso_lbl(dts[i], "%b '%y")); ov.append(round(bal[i]*1e8/(shs[i]*1e6)))
-        for i in range(0, len(dts), 5):
+        for i in range(0, len(dts), 7):
             _pt(i)
         _pt(len(dts) - 1)
         co["bpsHistory"] = {"dates": od, "sats": ov, "basis": "basic"}
 
-        # beta to BTC: regression of trailing-1y daily stock returns on BTC returns
+        # beta to BTC over the trailing year of TRADING days. historicalData has a
+        # row for every calendar day, with weekends and market holidays repeating the
+        # prior close, so regressing on its last 253 rows treated each of those as a
+        # day the stock ignored BTC — on 2026-09-23, 81 of the 252 stock returns were
+        # exactly zero, and the window spanned Jan 14 -> Sep 23 rather than a year.
+        # That read 1.40 for both names against MSTR 1.49 / ASST 1.70 on sessions
+        # alone. historicalLiquidity's history holds sessions only, with identical
+        # closes; its tail doesn't, so `closes` above keeps settled sessions only,
+        # and _beta pairs each session with BTC's move over the same interval.
         try:
-            sp = hd["stock_prices"][-253:]
-            bp = hd["btc_prices"][-253:]
-            rs, rb = [], []
-            for i in range(1, min(len(sp), len(bp))):
-                if sp[i] and sp[i-1] and bp[i] and bp[i-1]:
-                    rs.append(sp[i]/sp[i-1] - 1)
-                    rb.append(bp[i]/bp[i-1] - 1)
-            if len(rb) > 60:
-                mb = sum(rb)/len(rb); ms = sum(rs)/len(rs)
-                cov = sum((rb[i]-mb)*(rs[i]-ms) for i in range(len(rb)))/len(rb)
-                var = sum((x-mb)**2 for x in rb)/len(rb)
-                if var > 0:
-                    co["betaBtc"] = round(cov/var, 2)
-        except Exception:
-            pass
+            btc = [(d, p) for d, p in zip(hd["dates"], hd["btc_prices"]) if p]
+            beta = _beta(closes[-253:], btc)
+            if beta is not None:
+                co["betaBtc"] = round(beta, 2)
+        except Exception as e:
+            log(f"[skip] {tk} beta: {e} — keeping existing value")
 
         # ---- daily EV mNAV history: (mcap + debt + pref notional − cash) / BTC NAV ----
         try:
@@ -478,23 +638,28 @@ def fetch_strategytracker(data):
                         series[t] = [x for x in STRC_BACKFILL if x[0] < first] + lg
                         continue
                     cur = p.get("notionalMillions") or (p.get("notionalUSD") or 0) / 1e6
-                    st = sorted(set(map(tuple, MSTR_PREF_STEPS.get(t, []) + [tuple(x) for x in live.get(t, [])] + lg)))
+                    # one step per date, the later source winning (as for cash and debt
+                    # below); a set would keep both of a day's values, and _step the larger
+                    st = sorted(dict(MSTR_PREF_STEPS.get(t, []) + [tuple(x) for x in live.get(t, [])] + lg).items())
                     if st and cur and abs(st[-1][1] - cur) > 0.6:
                         st.append((today, round(cur, 1)))
-                        live.setdefault(t, []).append([today, round(cur, 1)])
+                        _save_live_step(live, t, today, round(cur, 1))
                     series[t] = st
-                cash_st = sorted(set(map(tuple, MSTR_CASH_STEPS + [tuple(x) for x in live.get("cash", [])])))
-                # anchor the newest step on strategy.com's USD reserve, not co["cash"]:
-                # a few lines up the tracker's latestCashBalance overwrote it (it reads
-                # ~$1.6B light today) and kpi #2 only restores the live field afterwards.
-                # Without this the mNAV *series* is built on a different balance sheet
-                # than the live headline and the chart's last point sits ~3% above it.
-                cash_now = (_KPI.get(tk) or {}).get("cash") or co["cash"]
-                if abs(cash_st[-1][1] - cash_now) > 1.5:
-                    cash_st.append((today, cash_now)); live.setdefault("cash", []).append([today, cash_now])
-                debt_st = sorted(set(map(tuple, MSTR_DEBT_STEPS + [tuple(x) for x in live.get("debt", [])])))
+                # live steps only extend the filed constants; those dated before the last
+                # include the retired roll-forward's and the tracker's (Jul 9–Aug 24 2026,
+                # $1.1–1.6B off). live is co["histStepsLive"], so data.json drops them too
+                live["cash"] = [x for x in live.get("cash", []) if x[0] > MSTR_CASH_STEPS[-1][0]]
+                cash_st = sorted(dict(MSTR_CASH_STEPS + [tuple(x) for x in live["cash"]]).items())
+                # anchor the newest step on strategy.com's USD Reserve + USD Cash, the
+                # balance sheet the live headline uses; otherwise the chart's last point
+                # drifts from it. With strategy.com down there is no step at all, rather
+                # than one from co["cash"], which then holds the previous run's figure.
+                cash_now = (_KPI.get(tk) or {}).get("cash") or 0
+                if cash_now > 0 and abs(cash_st[-1][1] - cash_now) > 1.5:
+                    cash_st.append((today, cash_now)); _save_live_step(live, "cash", today, cash_now)
+                debt_st = sorted(dict(MSTR_DEBT_STEPS + [tuple(x) for x in live.get("debt", [])]).items())
                 if abs(debt_st[-1][1] - co["seniorDebt"]) > 1.5:
-                    debt_st.append((today, co["seniorDebt"])); live.setdefault("debt", []).append([today, co["seniorDebt"]])
+                    debt_st.append((today, co["seniorDebt"])); _save_live_step(live, "debt", today, co["seniorDebt"])
                 if live:
                     co["histStepsLive"] = live
                 pref_at = lambda d: sum(_step(s, d) or 0 for s in series.values())
@@ -521,9 +686,10 @@ def fetch_strategytracker(data):
             # Net framework (Strategy, Jul-2026): net mNAV = fully-diluted mcap /
             # (BTC NAV + cash - OTM converts - preferred). Only out-of-the-money
             # converts are debt-like claims; in-the-money converts dilute the share
-            # count instead. Uses today's tranche set for the whole window (all six
-            # MSTR tranches were outstanding across it). ASST: all debt is a claim.
+            # count instead. Uses today's tranche set for the whole window, plus any
+            # debt the steps carry beyond it. ASST: all debt is a claim.
             sched = co.get("debtSchedule") or []
+            sched_total = sum(t["principal"] for t in sched)
             rows = [(i, d, hd["market_cap_basic"][i], hd["btc_balance"][i],
                      hd["btc_prices"][i], hd["stock_prices"][i])
                     for i, d in enumerate(hd["dates"])
@@ -566,7 +732,11 @@ def fetch_strategytracker(data):
                 px_m.append(round(sp, 2))
                 mnv.append(round(ev / nav, 3))
                 if sched:
-                    otm = sum(t["principal"] for t in sched if sp < t["convPrice"])
+                    # debt the steps carry beyond today's schedule is a claim too: the
+                    # 2029s repurchased 2026-05-19 (they convert at $672, far out of the
+                    # money), and $40M of secured loans in strategy.com's Jul 25–Aug 30 debt
+                    otm = (sum(t["principal"] for t in sched if sp < t["convPrice"])
+                           + max(0.0, debt_at(d, i) - sched_total))
                     itm_sh = sum(t["principal"] * t["convRate"] / 1000
                                  for t in sched if sp >= t["convPrice"])   # M shares
                 else:
@@ -597,7 +767,7 @@ def fetch_strategytracker(data):
 
 
 # --------------------------------------------------------------------------- #
-# FALLBACK: equity stats & 1-year price  (Yahoo Finance chart API)
+# FALLBACK: daily volume when Nasdaq fails  (Yahoo Finance chart API) — see _yahoo_vol
 # --------------------------------------------------------------------------- #
 def _yahoo_chart(symbol, tries=6):
     """Fetch a Yahoo 1y daily chart, retrying across hosts on 429/5xx."""
@@ -611,100 +781,11 @@ def _yahoo_chart(symbol, tries=6):
         except urllib.error.HTTPError as e:
             last = e
             if e.code in (429, 500, 502, 503):
-                time.sleep(2 ** i)                    # 1s, 2s, 4s, 8s backoff
+                if i < tries - 1:                     # no try follows the last one
+                    time.sleep(2 ** i)                # 1,2,4,8,16s between tries — ~31s total
                 continue
             raise
     raise last
-
-
-def _yahoo_daily(symbol):
-    """Return ([(date, close), ...] ascending, meta dict) for a 1y daily chart."""
-    res = _yahoo_chart(symbol)["chart"]["result"][0]
-    ts = res["timestamp"]
-    closes = res["indicators"]["quote"][0]["close"]
-    series = [(datetime.datetime.utcfromtimestamp(t).date(), float(c))
-              for t, c in zip(ts, closes) if c is not None]
-    series.sort()
-    return series, res.get("meta", {})
-
-
-def _beta(stock, btc):
-    """Beta of stock daily returns vs BTC daily returns over shared dates."""
-    sd, bd = dict(stock), dict(btc)
-    days = sorted(set(sd) & set(bd))
-    sr, br = [], []
-    for i in range(1, len(days)):
-        p, q = days[i - 1], days[i]
-        if sd[p] and bd[p]:
-            sr.append(sd[q] / sd[p] - 1)
-            br.append(bd[q] / bd[p] - 1)
-    n = len(br)
-    if n < 30:
-        return None
-    mb, ms = sum(br) / n, sum(sr) / n
-    var = sum((x - mb) ** 2 for x in br) / n
-    cov = sum((sr[i] - ms) * (br[i] - mb) for i in range(n)) / n
-    return cov / var if var else None
-
-
-def fetch_equity(data):
-    """stockPrice, dayChangePct, week52High/Low, betaBtc, and stockHistory."""
-    try:
-        btc_series, _ = _yahoo_daily("BTC-USD")
-    except Exception as e:
-        log(f"[skip] equity: BTC history failed ({e}) — keeping existing values")
-        return
-
-    daily, ok = {}, []
-    for tk in data["companies"]:
-        try:
-            series, meta = _yahoo_daily(tk)
-            if len(series) < 2:
-                raise ValueError("insufficient data")
-            c = data["companies"][tk]
-            price = meta.get("regularMarketPrice") or series[-1][1]
-            c["stockPrice"] = round(price, 2)
-            c["dayChangePct"] = round((series[-1][1] / series[-2][1] - 1) * 100, 2)
-            if meta.get("fiftyTwoWeekHigh"):
-                c["week52High"] = round(meta["fiftyTwoWeekHigh"], 2)
-            if meta.get("fiftyTwoWeekLow"):
-                c["week52Low"] = round(meta["fiftyTwoWeekLow"], 2)
-            beta = _beta(series, btc_series)
-            if beta is not None:
-                c["betaBtc"] = round(beta, 2)
-            daily[tk] = dict(series)                 # {date: close}
-            daily[tk][series[-1][0]] = round(price, 2)  # last point = current price
-            ok.append(tk)
-            log(f"{tk}: ${c['stockPrice']:,.2f}  ({c['dayChangePct']:+.2f}%)  "
-                f"52w {c['week52Low']}-{c['week52High']}  betaBTC {c.get('betaBtc')}")
-        except Exception as e:
-            log(f"[skip] equity {tk} failed: {e} — keeping existing values")
-
-        # preferred (STRC / SATA) latest price + day change for the header boxes
-        pref = data["companies"][tk].get("prefTicker")
-        if pref:
-            try:
-                ps, pm = _yahoo_daily(pref)
-                pprice = pm.get("regularMarketPrice") or ps[-1][1]
-                data["companies"][tk]["prefPrice"] = round(pprice, 2)
-                if len(ps) >= 2:
-                    data["companies"][tk]["prefChangePct"] = round((ps[-1][1] / ps[-2][1] - 1) * 100, 2)
-                log(f"  {pref}: ${pprice:,.2f} ({data['companies'][tk].get('prefChangePct')}%)")
-            except Exception as e:
-                log(f"  [skip] {pref} pref price failed: {e}")
-
-    # rebuild the shared DAILY stockHistory from dates common to all companies
-    if len(daily) == len(data["companies"]) and daily:
-        common = sorted(set.intersection(*(set(m) for m in daily.values())))[-DAILY_POINTS:]
-        if common:
-            sh = data.setdefault("stockHistory", {})
-            sh["illustrative"] = False
-            sh["daily"] = True
-            sh["dates"] = [d.strftime("%b %-d") for d in common]
-            for tk, mp in daily.items():
-                sh[tk] = [round(mp[d], 2) for d in common]
-            log(f"stockHistory rebuilt: {len(common)} daily points for {', '.join(ok)}")
-            log(f"stockHistory rebuilt: {len(common)} months for {', '.join(ok)}")
 
 
 # --------------------------------------------------------------------------- #
@@ -746,6 +827,46 @@ def _pdate(s):
     return None
 
 
+_MSTR_SECTION_HEAD = re.compile(r"ATM (?:and BTC )?Updates?|Repurchase Program Update|BTC Updates?"
+                                r"|USD Reserve Update|Financial Update|Item \d\.\d\d")
+
+
+def _period_texts(text):
+    """An MSTR 8-K once per reporting period, oldest first, each keeping only that
+    period's tables.
+
+    A quarter end splits a week in two, each half with its own ATM and BTC table
+    (2026-04-06: Mar 30-31 and Apr 1-5), and every parser here reads the first table
+    it finds. The second half went unread: its 4,871 BTC landed in the next week's
+    bar, and its $174.6M raise never reached the cash roll-forward or the log. A
+    period's block runs from its "During Period" to the next one or the next section
+    heading; only periods in the ATM or BTC section count, so a quarter summary under
+    "Financial Update" (2025-10-06) doesn't split a filing.
+    """
+    heads = list(_MSTR_SECTION_HEAD.finditer(text))
+    marks = list(_MSTR_PERIOD.finditer(text))
+    section = lambda m: next((h.group(0) for h in reversed(heads) if h.start() < m.start()), "")
+    periods = list(dict.fromkeys(m.groups() for m in marks if section(m).startswith(("ATM", "BTC"))))
+    if len(periods) < 2:
+        return [text]
+    def block_end(m):
+        return min((x.start() for x in marks + heads if x.start() > m.start()), default=len(text))
+    def only(period):
+        kept, pos = [], 0
+        for m in marks:
+            if m.groups() in periods and m.groups() != period:
+                kept.append(text[pos:m.start()])
+                pos = block_end(m)
+        return "".join(kept) + text[pos:]
+    return [only(p) for p in periods]
+
+
+# one sale row: "<BTC sold> $<proceeds> $<avg price>". The header before it runs past
+# 200 chars in 2026-08-03/08-10, and the count can be 2 digits (32 BTC, 2026-06-01);
+# stopping at "As of" keeps a dash-only row from reading the holdings row as a sale.
+_BTC_SOLD_ROW = re.compile(r"BTC Sold(?:(?!As of ).){0,220}?([\d,]+)\s*(?:\(\d\))?\s*\$\s*[\d,.]+\s+\$\s*([\d,]+)")
+
+
 def _parse_flows(text):
     """Weekly cash flows from an MSTR 8-K: ATM net proceeds in, BTC spend out,
     BTC sale proceeds in (all $mm). BTC dollar amounts are derived as
@@ -760,7 +881,7 @@ def _parse_flows(text):
                    r"\s+[\d,]{5,}\s+\$\s*[\d,.]+\s+\$\s*[\d,]+", text)
     if tm:
         spent = int(tm.group(1).replace(",", "")) * int(tm.group(2).replace(",", "")) / 1e6
-    for m in re.finditer(r"BTC Sold.{0,140}?([\d,]{3,})\s*(?:\(\d\))?\s*\$\s*[\d,.]+\s+\$\s*([\d,]+)", text):
+    for m in _BTC_SOLD_ROW.finditer(text):
         sold += int(m.group(1).replace(",", "")) * int(m.group(2).replace(",", "")) / 1e6
     return {"raised": raised, "btcSpent": spent, "btcSold": sold}
 
@@ -778,13 +899,13 @@ def _parse_mstr(text):
         return None
     # sale weeks (first seen 2026-07-06): use the LAST period block + the final
     # "As of" holdings figure; column headers carry footnote digits like "(2)",
-    # so gaps are bounded non-greedy scans rather than [^0-9]*
+    # so gaps are bounded non-greedy scans rather than [^0-9]*. 2026-08-03/08-10 put
+    # sale and holdings columns under one header.
     if "BTC Sold" in text:
         periods = list(re.finditer(r"During Period\s+(.+?)\s+to\s+([A-Z][a-z]+ \d{1,2}, \d{4})", text))
-        asofs = list(re.finditer(r"As of [A-Z][a-z]+ \d{1,2}, \d{4}\*?\s*Aggregate BTC Holdings"
+        asofs = list(re.finditer(r"As of [A-Z][a-z]+ \d{1,2}, \d{4}\*?\s*(?:BTC Sold.{0,120}?)?Aggregate BTC Holdings"
                                  r".{0,120}?([\d,]{7,})\s+\$\s*[\d,.]+\s+\$\s*([\d,]+)", text))
-        sold = [int(m.group(1).replace(",", "")) for m in
-                re.finditer(r"BTC Sold.{0,140}?([\d,]{3,})\s*(?:\(\d\))?\s*\$\s*[\d,.]+\s+\$\s*[\d,]+", text)]
+        sold = [int(m.group(1).replace(",", "")) for m in _BTC_SOLD_ROW.finditer(text)]
         if periods and asofs:
             p = periods[-1]
             h = int(asofs[-1].group(1).replace(",", ""))
@@ -877,33 +998,28 @@ def _asst_obs(text):
     return obs
 
 
-# MSTR cash roll-forward: anchor at the last filed balance-sheet cash, then add
-# weekly 8-K flows (ATM net proceeds + BTC sale proceeds − BTC purchases) and
-# subtract scheduled preferred dividends / convert coupons.
-MSTR_CASH_FILED = ("2026-03-31", 2207.2)      # Q1-26 10-Q — bump when the next 10-Q lands
-STRC_DIV_RATE = 0.115                          # current per-annum rate (monthly payer)
-QTRLY_PREF_DIV = (1402 * .08 + 1284 * .10 + 1402 * .10) / 4   # STRK/STRF/STRD, $mm per quarter
-CONVERT_COUPONS = {"06-15": 800 * .0225 / 2, "12-15": 800 * .0225 / 2,     # 2032s
-                   "03-15": (1010 * .00625 + 800 * .00625 + 603.66 * .00875) / 2,
-                   "09-15": (1010 * .00625 + 800 * .00625 + 603.66 * .00875) / 2}
+def _mstr_usd_balances(text):
+    """{"reserve": $M, "usdCash": $M or None} as a weekly MSTR 8-K states them, else None.
 
-
-def _mstr_dividends_paid(data, start, end):
-    """Scheduled MSTR dividend/coupon cash out between (start, end], $mm (approx)."""
-    steps = [tuple(x) for x in (data["companies"]["MSTR"].get("strcNotionalSteps") or [])]
-    stre = next((x[2] for x in data["companies"]["MSTR"].get("prefBreakdown", []) if x[0] == "STRE"), 886)
-    total = 0.0
-    d = start
-    while d < end:
-        d += datetime.timedelta(days=1)
-        nxt = d + datetime.timedelta(days=1)
-        if nxt.day == 1:                                   # d is a month end
-            rate = (data["companies"]["MSTR"].get("strcRate") or STRC_DIV_RATE * 100) / 100
-            total += (_step(steps, d.isoformat()) or 0) * rate / 12   # STRC monthly
-            if d.month in (3, 6, 9, 12):                   # quarter-end payers
-                total += QTRLY_PREF_DIV + stre * .10 / 4
-        total += CONVERT_COUPONS.get(d.strftime("%m-%d"), 0)
-    return total
+    Every weekly 8-K since 2026-05-26 gives the balances, in three phrasings:
+    "the balance of the USD Reserve is $871 million" ("was", 2026-07-06); the
+    2026-08-24 bullets "USD Reserve: $5.10 billion" / "USD Cash: $1.59 billion";
+    and from 2026-08-31 one sentence, "the balances of the USD Reserve and USD
+    Cash were $5.10 billion and $1.61 billion". The unit's case varies too
+    ("$1.0 Billion", 2026-06-08).
+    """
+    amt = r"\$\s?([\d,.]+)\s*(billion|million)"
+    mm = lambda m, i: round(float(m.group(i).replace(",", ""))
+                            * (1000 if m.group(i + 1).lower() == "billion" else 1), 1)
+    both = re.search(rf"balances of the USD Reserve and USD Cash were {amt}\s*and\s*{amt}", text, re.I)
+    if both:
+        return {"reserve": mm(both, 1), "usdCash": mm(both, 3)}
+    reserve = (re.search(rf"USD Reserve: {amt}", text, re.I)
+               or re.search(rf"balance of the USD Reserve (?:is|was) {amt}", text, re.I))
+    if not reserve:
+        return None
+    cash = re.search(rf"USD Cash: {amt}", text, re.I)
+    return {"reserve": mm(reserve, 1), "usdCash": mm(cash, 1) if cash else None}
 
 
 _ATM_LABEL = {"STRC": "STRC", "STRF": "STRF", "STRK": "STRK", "STRD": "STRD", "MSTR": "common stock"}
@@ -1013,8 +1129,30 @@ def _atm_allocation(text, raised):
     return parts
 
 
-def _mstr_actions(text, rec, fl):
-    """Readable weekly actions from an MSTR 8-K."""
+# a convertible note repurchase in prose: "agreed to repurchase approximately $1.50 billion
+# aggregate principal amount of the 2029 Notes" (2026-05-15), or "... Convertible Senior
+# Notes due March 15, 2030". The note is named by year (2030A) or by maturity; the gap
+# before it may cross a coupon's decimal point ("0.875%").
+_CONVERT_REPURCHASE = re.compile(
+    r"(?:[Rr]epurchased|agreed to repurchase)\b[^.]{0,80}?\$\s?([\d,.]+)\s*(million|billion)[^.]{0,60}?"
+    r"principal amount(?:[^.]|\.(?=\d)){0,80}?(?:(20\d\d[AB]?)\s+(?:[Cc]onvertible\s+)?(?:[Ss]enior\s+)?[Nn]otes"
+    r"|[Cc]onvertible\s+(?:[Ss]enior\s+)?[Nn]otes\s+due\s+(?:[A-Z][a-z]+\s+\d{1,2},\s+)?(20\d\d))")
+
+
+def _convert_retirement(text):
+    """The activity item for a convertible note repurchase the text states, or None."""
+    m = _CONVERT_REPURCHASE.search(text)
+    if not m:
+        return None
+    v = float(m.group(1).replace(",", "")) * (1000 if m.group(2) == "billion" else 1)
+    verb = "Agreed to repurchase" if m.group(0).startswith("agreed") else "Repurchased"
+    return f"{verb} ~${v:,.0f}M principal of {m.group(3) or m.group(4)} convertible notes"
+
+
+def _mstr_actions(text, rec, fl, whole_filing=True):
+    """Readable weekly actions from an MSTR 8-K period. Only the newest period of a
+    split filing (see _period_texts) carries the items that describe the filing as a
+    whole — dividend rate, buybacks, balances — so they aren't listed twice."""
     items = []
     if rec[2] > 0:
         avg = round(fl["btcSpent"] * 1e6 / rec[2]) if fl["btcSpent"] else None
@@ -1035,6 +1173,8 @@ def _mstr_actions(text, rec, fl):
         alloc = _atm_allocation(text, fl["raised"])
         if alloc:
             items.append("Proceeds to " + " · ".join(alloc))
+    if not whole_filing:
+        return items
     rm = re.search(r"dividend rate[^.]{0,200}?from ([\d.]+)% to ([\d.]+)%", text)
     if rm and "STRC" in text:
         items.append(f"{'Raised' if float(rm.group(2)) > float(rm.group(1)) else 'Cut'} STRC dividend rate "
@@ -1048,38 +1188,20 @@ def _mstr_actions(text, rec, fl):
                 sh, amt = int(m.group(1).replace(",", "")), float(m.group(2).replace(",", ""))
                 items.append(f"Repurchased {sh:,} {s} shares (~${amt:,.0f}M)")
     # convertible note retirements (no dedicated table yet — prose disclosure)
-    cm2 = re.search(r"repurchased[^.]{0,80}\$\s?([\d,.]+)\s*(million|billion)[^.]{0,60}principal amount"
-                    r"[^.]{0,80}[Cc]onvertible[^.]{0,40}(20\d\d)", text)
-    if cm2:
-        v = float(cm2.group(1).replace(",", "")) * (1000 if cm2.group(2) == "billion" else 1)
-        items.append(f"Repurchased ~${v:,.0f}M principal of {cm2.group(3)} convertible notes")
+    if (retired := _convert_retirement(text)):
+        items.append(retired)
     # remaining repurchase headroom — sizes what the program can still do
     auth = []
     for m in re.finditer(r"\$\s?([\d,.]+)\s*(billion|million) aggregate purchase price of"
                          r"([^.]{0,60}?)remains available", text):
         v = float(m.group(1).replace(",", "")) * (1000 if m.group(2) == "billion" else 1)
-        auth.append(f"${v:,.0f}M {'MSTR' if 'MSTR' in m.group(3) else 'preferred'}")
+        auth.append(f"${v:,.0f}M {'MSTR' if re.search(r'MSTR|class A common', m.group(3), re.I) else 'preferred'}")
     if auth:
         items.append("Buyback capacity left: " + " · ".join(auth))
-    # Weekly balances. The Jun-2026 framework filings wrote one prose sentence;
-    # from 2026-08-24 it became a bulleted pair once USD Cash was introduced.
-    mm = lambda v, u: float(v.replace(",", "")) * (1000 if u == "billion" else 1)
-    bal = [f"{k} ${mm(v, u):,.0f}M"
-           for k, v, u in re.findall(r"USD (Reserve|Cash): \$\s?([\d,.]+)\s*(billion|million)", text)]
-    if not bal:
-        # 2026-08-31 folded the bullets back into one sentence: "the balances of the
-        # USD Reserve and USD Cash were $5.10 billion and $1.61 billion, respectively"
-        pm = re.search(r"balances of the USD Reserve and USD Cash were \$\s?([\d,.]+)\s*(billion|million)"
-                       r"\s*and\s*\$\s?([\d,.]+)\s*(billion|million)", text)
-        if pm:
-            bal = [f"Reserve ${mm(pm.group(1), pm.group(2)):,.0f}M",
-                   f"Cash ${mm(pm.group(3), pm.group(4)):,.0f}M"]
-    if not bal:
-        um = re.search(r"balance of the USD Reserve is \$([\d,.]+)\s*(billion|million)", text)
-        if um:
-            bal = [f"Reserve ${mm(um.group(1), um.group(2)):,.0f}M"]
+    bal = _mstr_usd_balances(text)
     if bal:
-        items.append("USD " + " · ".join(bal))
+        items.append(f"USD Reserve ${bal['reserve']:,.0f}M"
+                     + (f" · Cash ${bal['usdCash']:,.0f}M" if bal["usdCash"] is not None else ""))
     if re.search(r"establishment of\s*[\"“]USD Cash[\"”]", text):
         items.append("Established USD Cash — a flexible liquidity pool alongside the USD Reserve")
     return items
@@ -1247,43 +1369,52 @@ def fetch_holdings(data, max_points=60):
                     base = f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{acc}/"
                     _FILINGS.setdefault(tk, []).append((r["filingDate"][i],
                                                         base + r["primaryDocument"][i]))
-                    yield (base + r["primaryDocument"][i], base)
+                    yield (base + r["primaryDocument"][i], base, r["filingDate"][i])
 
         if tk == "MSTR":
             t3 = {"pref": 0.0, "common": 0.0}
             strc_rate = None
-            anchor = datetime.date.fromisoformat(MSTR_CASH_FILED[0])
-            flows = {"raised": 0.0, "btcSpent": 0.0, "btcSold": 0.0}
-            flow_asof = anchor
             pts, seen, fetched = [], set(), 0
             newest_txt = ""          # EDGAR lists newest first, so the first hit is it
-            for url, base in docs():
+            balances = None          # likewise the newest filing that states them
+            for url, base, filed in docs():
+                t8 = ""
                 try:
                     t8 = _edgar_text(url)
-                    rec = _parse_mstr(t8)
+                    # newest period first, as EDGAR lists filings; one unless a quarter
+                    # end split the week (see _period_texts)
+                    periods = [(t, _parse_mstr(t)) for t in reversed(_period_texts(t8))]
                 except Exception:
-                    rec = None; t8 = ""
+                    periods = []
                 fetched += 1
-                if rec and rec[1] and rec[3] and rec[1] not in seen:
+                # a standalone convert repurchase 8-K (2026-05-15) has no holdings table
+                if not any(rec for _, rec in periods) and (retired := _convert_retirement(t8)):
+                    acts.append({"d": filed, "co": "MSTR", "items": [retired], "filed": filed, "url": url})
+                for k, (t, rec) in enumerate(periods):
+                    if not (rec and rec[1] and rec[3] and rec[1] not in seen):
+                        continue
                     seen.add(rec[1]); pts.append(rec)
                     if not newest_txt:
-                        newest_txt = t8
-                    fl = _parse_flows(t8) if t8 else {"raised": 0, "btcSpent": 0, "btcSold": 0}
-                    if rec[1] > anchor:                    # roll cash forward from filed anchor
-                        for k in flows: flows[k] += fl[k]
-                        flow_asof = max(flow_asof, rec[1])
-                    ai = _mstr_actions(t8, rec, fl) if t8 else []
+                        newest_txt = t
+                    if k == 0 and not balances:    # a whole-filing statement, dated to its period end
+                        bal = _mstr_usd_balances(t)
+                        if bal:
+                            balances = dict(bal, asOf=rec[1].isoformat())
+                    fl = _parse_flows(t)
+                    ai = _mstr_actions(t, rec, fl, whole_filing=(k == 0))
                     if ai:
-                        acts.append({"d": rec[1].isoformat(), "co": "MSTR", "items": ai})
-                    if t8 and rec[1] > datetime.date.today() - datetime.timedelta(days=92):
-                        bd = _atm_netM(t8)
+                        acts.append({"d": rec[1].isoformat(), "co": "MSTR", "items": ai,
+                                     "filed": filed, "url": url})
+                    if rec[1] > datetime.date.today() - datetime.timedelta(days=92):
+                        bd = _atm_netM(t)
                         t3["pref"] += bd["pref"]; t3["common"] += bd["common"]
-                    if strc_rate is None and t8:
+                    if strc_rate is None:
                         rm = (re.search(r"dividend rate per annum on[^.]{0,140}?STRC[^.]{0,200}?to ([\d.]+)%", t8)
                               or re.search(r"maintained[^.]{0,140}?STRC[^.]{0,140}?at ([\d.]+)%", t8))
                         if rm:
                             strc_rate = float(rm.group(1))
                     if len(pts) >= max_points: break
+                if len(pts) >= max_points: break
                 if fetched >= max_points * 3: break
                 time.sleep(0.12)
             if not pts:
@@ -1318,20 +1449,26 @@ def fetch_holdings(data, max_points=60):
                 else:
                     log(f"[cost basis] {tk}: {cur:,} BTC @ ${avg_filed:,} = ${implied/1000:,.2f}B "
                         f"(filed ${agg_filed/1000:,.2f}B)")
-            # estimated current cash: filed anchor + weekly flows − scheduled dividends
-            divs = _mstr_dividends_paid(data, anchor, flow_asof)
-            est = MSTR_CASH_FILED[1] + flows["raised"] + flows["btcSold"] - flows["btcSpent"] - divs
             co = data["companies"][tk]
-            co["cashFlows"] = {"anchor": MSTR_CASH_FILED[1], "anchorDate": MSTR_CASH_FILED[0],
-                               "raised": round(flows["raised"]), "btcSold": round(flows["btcSold"]),
-                               "btcSpent": round(flows["btcSpent"]), "divs": round(divs),
-                               "asOf": flow_asof.isoformat()}
-            co["cashFiled"] = MSTR_CASH_FILED[1]
-            co["cash"] = round(est)
+            co.pop("cashFlows", None)    # the retired cash roll-forward; cashFiled carries the filed balances
+            co.pop("strcRate", None)     # only that roll-forward read it
+            # cash = USD Reserve + USD Cash per the newest 8-K; strategy.com's live figure
+            # (same balances) replaces it in main() when it answers
+            if balances:
+                co["cashFiled"] = balances
+            else:
+                log(f"[drift] {tk} USD balances: no parsed 8-K states them — keeping the prior cashFiled")
+            stated = co.get("cashFiled")
+            if isinstance(stated, dict):
+                total = round(stated["reserve"] + (stated["usdCash"] or 0))
+                co["cash"] = total
+                live = (_KPI.get(tk) or {}).get("cash") or 0
+                if live > 0 and abs(live - total) > 25:   # the 8-K rounds each balance to $10M
+                    log(f"[drift] {tk} cash: the 8-K balances total ${total:,}M (as of "
+                        f"{stated['asOf']}) but strategy.com shows ${live:,}M")
             co["trail3m"] = {"prefMo": round(t3["pref"] / 3), "commonMo": round(t3["common"] / 3)}
             # the tracker's STRC dividendRate lags rate-change 8-Ks; the filings win
             if strc_rate:
-                co["strcRate"] = strc_rate
                 fixed = {"STRK": 8.0, "STRF": 10.0, "STRD": 10.0, "STRE": 10.0, "STRC": strc_rate}
                 bd = co.get("prefBreakdown") or []
                 pref_div = 0.0
@@ -1342,9 +1479,6 @@ def fetch_holdings(data, max_points=60):
                 coup = sum(x["principal"] * x["coupon"] / 100 for x in (co.get("debtSchedule") or []))
                 co["annualObligations"] = round(pref_div + coup)
                 log(f"MSTR STRC rate from 8-K: {strc_rate}% -> annualObligations {co['annualObligations']}")
-            log(f"MSTR cash est: {MSTR_CASH_FILED[1]} filed + {flows['raised']:,.0f} raised "
-                f"+ {flows['btcSold']:,.0f} BTC sold - {flows['btcSpent']:,.0f} BTC bought "
-                f"- {divs:,.0f} divs = ${est:,.0f}M (as of {flow_asof})")
         else:  # ASST — observation-based
             allobs, fetched = {}, 0
             cash_usd = strc_sh = None
@@ -1353,7 +1487,7 @@ def fetch_holdings(data, max_points=60):
             cutoff92 = datetime.date.today() - datetime.timedelta(days=92)
             _sh = data.get("stockHistory") or {}
             pxmap = dict(zip(_sh.get("dates") or [], _sh.get("ASST") or []))
-            for url, base in docs():
+            for url, base, _filed in docs():
                 try:
                     t8 = _edgar_text(url)
                     obs_dates = []
@@ -1487,10 +1621,12 @@ def fetch_holdings(data, max_points=60):
         data["weekly"] = weekly
     if acts:    # merge with previously stored actions so old weeks never drop off
         # link each action to its source filing: the earliest 8-K filed on or after
-        # the period it covers is the one that disclosed it
+        # the period it covers is the one that disclosed it. MSTR's already carry
+        # theirs: a split week's first half ends mid-week, and another 8-K (a STRC
+        # dividend notice, say) can land before the weekly one that reports it
         for a in acts:
             cand = sorted(x for x in _FILINGS.get(a["co"], []) if x[0] >= a["d"])
-            if cand:
+            if cand and not a.get("url"):
                 a["filed"], a["url"] = cand[0]
         old = {(a["d"], a["co"]): a for a in (data.get("actions") or [])}
         for a in acts:
@@ -1554,7 +1690,7 @@ def _yahoo_vol(symbol):
     res = _yahoo_chart(symbol)["chart"]["result"][0]
     ts = res["timestamp"]
     vols = res["indicators"]["quote"][0]["volume"]
-    return sorted((datetime.datetime.utcfromtimestamp(t).date().isoformat(), int(v))
+    return sorted((datetime.datetime.fromtimestamp(t, datetime.timezone.utc).date().isoformat(), int(v))
                   for t, v in zip(ts, vols) if v)
 
 
@@ -1667,7 +1803,7 @@ def _apply_per_share(co, tk):
       diluted   — basic + effective dilution overlay; this is "BTC Per Share" on
                   strategy.com and "Sats Per Diluted Share" on treasury.strive.com
       net       — bitcoin left for common AFTER senior claims, per diluted share;
-                  strategy.com's "Net BTC Per Share". Uses the same diluted count.
+                  strategy.com's "Net BTC Per Share". Uses a narrower count (below).
     For MSTR the first two are overwritten with strategy.com's own published
     figures in fetch_strategy_kpi, so we never drift from the source.
     """
@@ -1679,14 +1815,25 @@ def _apply_per_share(co, tk):
     co["satsPerShareBasic"] = round(sats / (live * 1e6))
     co["assumedDilutedShares"] = round(live + overlay, 2)
     co["satsPerShareDiluted"] = round(sats / ((live + overlay) * 1e6))
-    # Net BTC per share uses a NARROWER denominator than the gross figure:
-    # fully diluted (out-of-the-money converts excluded) rather than assumed
-    # diluted. For MSTR that is 388.65M vs 414.26M; for ASST the effective count
-    # already excludes its out-of-the-money warrants, so the two coincide.
-    co["netDilutedShares"] = round(live + overlay, 2)
+    # Net BTC per share uses a NARROWER denominator than the gross figure: fully
+    # diluted rather than assumed diluted. Converts in the money at today's price count
+    # as shares and the rest as debt, as netParts on the page does; STRK's conversion
+    # shares (0.1 MSTR share per $100-par STRK, a $1,000 strike, so notional $M / 1000)
+    # drop out, since STRK is counted in the preferred. For MSTR that is ~429.8M vs
+    # 450.1M, the count strategy.com divides by; ASST has neither, so the two coincide.
+    # With no price every convert counts as shares.
+    px = co.get("stockPrice")
+    itm, otm = [], []
+    for t in co.get("debtSchedule") or []:
+        if t.get("convPrice"):
+            (otm if px and px < t["convPrice"] else itm).append(t)
+    otm_sh = sum(t["principal"] * t["convRate"] / 1000 for t in otm)
+    strk_sh = sum(row[2] for row in co.get("prefBreakdown") or [] if row[0] == "STRK") / 1000
+    co["netDilutedShares"] = round(live + overlay - otm_sh - strk_sh, 2)
     btc = _BTC_PX.get("usd") or 0
+    debt_claims = (co.get("seniorDebt") or 0) - sum(t["principal"] for t in itm)
     net_res = (co["holdings"] * btc / 1e6) + (co.get("cash") or 0) \
-        - (co.get("seniorDebt") or 0) - (co.get("prefNotional") or 0)
+        - debt_claims - (co.get("prefNotional") or 0)
     if btc and net_res > 0:
         co["netSatsPerShare"] = round((net_res * 1e6 / btc) * 1e8 / (co["netDilutedShares"] * 1e6))
 
@@ -1696,8 +1843,8 @@ def fetch_strategy_kpi(data):
     (open, no auth): market cap -> current basic shares, convertible debt, and
     USD reserve derived via the EV identity (cash = mcap + debt + pref - EV).
     Called before fetch_strategytracker (so the history builder and step series
-    see fresh values) and again after fetch_holdings (which recomputes its own
-    cash estimate and must be overridden)."""
+    see fresh values) and again after fetch_holdings (which sets cash from the
+    8-K balances, and the live figure wins)."""
     try:
         k = _KPI.get("_raw") or get_json("https://api.strategy.com/btc/mstrKpiData")[0]
         _KPI["_raw"] = k
@@ -1744,9 +1891,9 @@ def fetch_strategy_kpi(data):
                 # can keep the figure live as BTC moves instead of freezing it
                 net_btc = float(r["netBtcReserve"]) / float(r["ufPrice"])
                 co["netDilutedShares"] = round(net_btc * 1e8 / float(r["netSatsPerShare"]) / 1e6, 2)
-                # stash it: fetch_strategytracker calls _apply_per_share, which
-                # transiently resets the field to the ASSUMED-diluted count, and the
-                # mNAV history builder runs while that stand-in is in place
+                # stash it: fetch_strategytracker calls _apply_per_share, which resets
+                # the field to our own estimate of this count (on the tracker's price
+                # and overlay), and the mNAV history builder should use theirs
                 _KPI.setdefault("MSTR", {})["netSharesM"] = co["netDilutedShares"]
             # debtByBN is convertible debt as a % of BTC NAV *after* the USD assets
             # offset it — the figure Strategy markets as "Net Leverage" (it printed
@@ -1814,6 +1961,11 @@ ATM_PAR = 100.0
 ATM_THRESHOLD = 99.95          # a nickel below par — see note above
 ATM_DEFAULT_CAPTURE = 0.75     # prior when we have no confirmed week yet
                                # (bitcointreasuries.net publishes 74.4%)
+ATM_SPAN_DAYS = 182            # absorption covers the newest 26 weeks of filed windows...
+ATM_LOOKBACK_DAYS = 200        # ...so read a little further back, to find the one that closes them
+ATM_MAX_FILINGS = 60           # 8-Ks per company; 200 days of MSTR's come to about 40
+ATM_MAX_WINDOW_DAYS = 15       # longest window filed: MSTR Nov 17-30 2025 (13 days); longest
+                               # a filing trails a window's end: 6 days (MSTR 2026-04-06)
 
 
 def _atm_daily(candles):
@@ -1834,36 +1986,253 @@ def _atm_daily(candles):
     return sorted((d, r[0], r[1]) for d, r in by.items())
 
 
+_DATE = r"([A-Z][a-z]+ \d{1,2}, \d{4})"
+_DASH = "[-–—]"
+# A week with no sales often gets no table at all, just a sentence, and under at least
+# three headings ("ATM Update", "ATM Updates", "ATM and BTC Update for the Period ..."),
+# so this one searches the whole filing. 8-K of 2026-09-21: "...during the period between
+# September 14, 2026 and September 20, 2026, Strategy did not sell any shares under its
+# at-the-market offering program." Six of the 27 weeks filed from Mar 23 to Sep 20 2026
+# read this way.
+_MSTR_ATM_NIL = re.compile(
+    r"[Pp]eriod (?:between|from) " + _DATE + r" (?:and|to|through) " + _DATE +
+    r",?[^.]{0,60}?did not sell any shares under (?:its|the) at.the.market offering program")
+_MSTR_PERIOD = re.compile(r"During Period " + _DATE + r" to " + _DATE)    # one period's table
+# Tolerant on purpose: an optional footnote "(1)", an optional description ending
+# "Preferred Stock" between the name and the numbers, and blank or dashed cells. The
+# 2026-03-09 filing wrote "STRC Stock Variable Rate Series A Perpetual Stretch Preferred
+# Stock 3,776,205 $ 377.6 $ 377.1 $ 3,158.0" and left zero cells blank.
+_MSTR_STRC_ROW = re.compile(
+    r"STRC Stock(?:\s*\(\d\))?\s+(?:[A-Za-z%.\d ]{0,80}?Preferred Stock\s+)?"
+    rf"([\d,]+|{_DASH})?\s*\$\s*([\d,.]+|{_DASH})?\s*\$\s*([\d,.]+|{_DASH})?\s*\$\s*([\d,.]+)")
+# A zero week can also print the capacity cell alone. 8-K of 2025-12-01: "STRC Stock
+# $ 4,042.4 Variable Rate Series A Perpetual Stretch Preferred Stock STRK Stock ...".
+# The lookahead keeps it off a normal row with its shares cell left blank.
+_MSTR_STRC_CAPACITY_ONLY = re.compile(r"STRC Stock(?:\s*\(\d\))?\s+\$\s*([\d,.]+)(?![\d,.]|\s*\$)")
+# "This filing reports on the ATM", whether or not a window could be read from it —
+# a hit with no window is format drift, not a filing about something else. Each looks
+# for two independent marks, so rewording one is a loud miss rather than a quiet fall
+# back to the week before. Strategy's heading has read four ways since Aug 2025 ("ATM
+# Update", "ATM Updates", "ATM and BTC Update", "... for the Period"), so its second mark
+# is the "During Period" line every weekly table carries; Strive's are the table's header
+# pair and its SATA row ("SATA Stock (1) ...", "As of Sept. 4" would each slip one). In
+# the 80 newest 8-Ks of either company, none fires on a filing that isn't an ATM report.
+_MSTR_ATM_SECTION = re.compile(r"ATM (?:and BTC )?Updates?|did not sell any shares under"
+                               r"|During Period [A-Z][a-z]+ \d{1,2}, \d{4} to")
+_ASST_ATM_SECTION = re.compile(r"As of [A-Z][a-z]+ \d{1,2}, \d{4} As of [A-Z][a-z]+ \d{1,2}, \d{4}"
+                               r"|SATA Stock\s+[\d,]{6,}")
+
+
 def _mstr_strc_atm(text):
-    """STRC row of the MSTR 8-K ATM table: shares, net proceeds ($M), capacity ($M)."""
-    per = re.search(r"During Period ([A-Z][a-z]+ \d+, \d{4}) to ([A-Z][a-z]+ \d+, \d{4})", text)
-    m = re.search(r"STRC Stock\s+([\d,]+|-|\u2014)\s+\$\s*([\d,.]+|-|\u2014)\s+"
-                  r"\$\s*([\d,.]+|-|\u2014)\s+\$\s*([\d,.]+)", text)
-    if not m:
-        return None
-    num = lambda x: 0.0 if x in ("-", "\u2014") else float(x.replace(",", ""))
-    return {"from": _pdate(per.group(1)).isoformat() if per else None,
-            "to": _pdate(per.group(2)).isoformat() if per else None,
-            "shares": int(num(m.group(1))), "proceedsM": num(m.group(3)),
-            "capacityM": num(m.group(4))}
+    """Every STRC window an MSTR 8-K reports: [{from, to, shares, proceedsM, capacityM}].
+
+    Each "During Period" block of the ATM table is one window, and a quarter end splits
+    a week into two (2026-04-06: Mar 30-31 and Apr 1-5). Zero weeks may be prose only;
+    where a week appears both ways the table wins, since it states capacity. A table
+    period with no readable STRC row raises: that filing is unparsed, not a zero week.
+    """
+    iso = lambda s: _pdate(s).isoformat()
+    num = lambda x: 0.0 if not x or re.fullmatch(_DASH, x) else float(x.replace(",", ""))
+    found = {}
+    for m in _MSTR_ATM_NIL.finditer(text):
+        found[(iso(m.group(1)), iso(m.group(2)))] = {"shares": 0, "proceedsM": 0.0, "capacityM": None}
+    tbl = _atm_table(text)
+    periods = list(_MSTR_PERIOD.finditer(tbl))
+    for k, per in enumerate(periods):
+        block = tbl[per.end():periods[k + 1].start() if k + 1 < len(periods) else len(tbl)]
+        row = _MSTR_STRC_ROW.search(block)
+        if row:
+            shares, _notional, net, available = row.groups()
+        elif capacity_only := _MSTR_STRC_CAPACITY_ONLY.search(block):
+            shares, net, available = None, None, capacity_only.group(1)
+        else:
+            raise ValueError(f"no STRC row for {per.group(1)} to {per.group(2)}")
+        found[(iso(per.group(1)), iso(per.group(2)))] = {
+            "shares": int(num(shares)), "proceedsM": num(net), "capacityM": num(available)}
+    return [{"from": start, "to": end, **sale} for (start, end), sale in found.items()]
 
 
 def _asst_sata_atm(text):
-    """SATA share count delta from the Strive 8-K weekly holdings table."""
+    """The SATA window of a Strive 8-K's weekly holdings table, as a list of at most one.
+
+    Proceeds are the share-count change x $100 par; the filing states no dollars.
+    """
     per = re.search(r"As of ([A-Z][a-z]+ \d+, \d{4}) As of ([A-Z][a-z]+ \d+, \d{4})", text)
     m = re.search(r"SATA Stock ([\d,]+) ([\d,]+)", text)
     if not (per and m):
-        return None
+        return []
     a, b = (int(x.replace(",", "")) for x in m.groups())
-    return {"from": _pdate(per.group(1)).isoformat(), "to": _pdate(per.group(2)).isoformat(),
-            "shares": b - a, "proceedsM": round((b - a) * ATM_PAR / 1e6, 1), "capacityM": None}
+    start, end = _pdate(per.group(1)).isoformat(), _pdate(per.group(2)).isoformat()
+    if b < a:       # a buyback or conversion, not an ATM sale — book it as no issuance
+        log(f"[drift] SATA count fell {a:,} -> {b:,} between {start} and {end} — "
+            f"counting 0 ATM proceeds for that window")
+    sold = max(b - a, 0)
+    return [{"from": start, "to": end, "shares": sold,
+             "proceedsM": round(sold * ATM_PAR / 1e6, 1), "capacityM": None}]
+
+
+def _iso_plus(iso, days):
+    return (datetime.date.fromisoformat(iso) + datetime.timedelta(days=days)).isoformat()
+
+
+def _plausible_window(w, filing_date):
+    """Whether a filed window runs forwards for at most ATM_MAX_WINDOW_DAYS and ends within
+    ATM_MAX_WINDOW_DAYS before its filing, so a typo'd year can't become `confirmed`."""
+    span = datetime.date.fromisoformat(w["to"]) - datetime.date.fromisoformat(w["from"])
+    return (0 <= span.days <= ATM_MAX_WINDOW_DAYS
+            and _iso_plus(filing_date, -ATM_MAX_WINDOW_DAYS) <= w["to"] <= filing_date)
+
+
+def _filed_atm_windows(pref, cik, parser, reports_atm, first_day_offset):
+    """Every ATM window in the 8-Ks back to ATM_LOOKBACK_DAYS before the newest one, newest
+    first, each with the firstDay its sales can fall on; None when the newest ATM filing
+    can't be read.
+
+    Calibration and absorption both lean on the newest week, and falling back to the week
+    before without a word is how STRC's confirmed week sat on Aug 24-30 2026 through three
+    newer 8-Ks. A network error raises, so the caller keeps the last values rather than
+    publishing a span that one failed fetch cut short.
+    """
+    rec = get_json(f"https://data.sec.gov/submissions/CIK{cik}.json")["filings"]["recent"]
+    found, examined, oldest_filing_date = {}, 0, ""
+    for i in range(len(rec["form"])):          # EDGAR lists newest first
+        if rec["form"][i] != "8-K":
+            continue
+        filing_date = rec["filingDate"][i]
+        if filing_date < oldest_filing_date:
+            break
+        if examined >= ATM_MAX_FILINGS:
+            log(f"[drift] ATM {pref}: read {ATM_MAX_FILINGS} 8-Ks without getting back to "
+                f"{oldest_filing_date or 'a filed window'} — the span may end early")
+            break
+        examined += 1
+        url = (f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/"
+               f"{rec['accessionNumber'][i].replace('-', '')}/{rec['primaryDocument'][i]}")
+        memoised = url in _EDGAR_TXT            # fetch_holdings has read nearly all of them
+        text = _edgar_text(url)
+        if not memoised:
+            time.sleep(0.12)
+        try:                                    # [] for an 8-K about something else
+            windows = parser(text)
+            if not windows and reports_atm.search(text):
+                raise ValueError("an ATM section, but no window could be read from it")
+            for w in windows:
+                if not _plausible_window(w, filing_date):
+                    raise ValueError(f"implausible window {w['from']} -> {w['to']}")
+        except Exception as e:
+            log(f"[drift] ATM {pref} 8-K filed {filing_date}: {e}" + ("" if found else
+                " — it is the newest ATM filing, so keeping the last filed week and absorption"))
+            if not found:
+                return None
+            continue
+        for w in windows:
+            w["firstDay"] = _iso_plus(w["from"], first_day_offset)
+            kept = found.setdefault((w["from"], w["to"]), w)
+            if kept is not w and (kept["shares"], kept["proceedsM"]) != (w["shares"], w["proceedsM"]):
+                log(f"[drift] ATM {pref}: {w['from']} -> {w['to']} was filed on {filing_date} as "
+                    f"${w['proceedsM']:,.1f}M ({w['shares']:,} sh) and later as ${kept['proceedsM']:,.1f}M "
+                    f"({kept['shares']:,} sh) — the later filing stands")
+        if windows and not oldest_filing_date:
+            oldest_filing_date = _iso_plus(max(w["to"] for w in windows), -ATM_LOOKBACK_DAYS)
+    if not found:
+        raise ValueError(f"no ATM window in the newest {examined} 8-Ks")
+    return sorted(found.values(), key=lambda w: w["to"], reverse=True)
+
+
+def _absorption(pref, windows, dvol):
+    """Σ filed proceeds ÷ Σ session dollar volume over the newest filed windows the tape
+    covers, with a ±1-session band and the newest run of windows that sold nothing; None
+    when no window counts.
+
+    A window counts once a session AFTER its `to` has settled: Strategy files on Monday
+    morning with Friday settled, and counting that week at once would leave the band's +1
+    side missing until Monday's close, then move absorption a second time (a quarter-end
+    split still does: on 2026-04-06, Mar 30-31 counted that morning and Apr 1-5 after the
+    close). The span runs back ATM_SPAN_DAYS from the newest window counted, or to where
+    the price history starts, and ends sooner, with a [drift], at a window that doesn't
+    tile with the one after it or whose proceeds exceed its tape. So the counted sessions
+    are one slice of the tape, and the band slides it a session either way, leaving out a
+    side that would run off the series. The zero run is a filing fact and reads every
+    window, counted or not: on the Monday a paused ATM sells again, "none since May 17"
+    would otherwise sit beside a Confirmed tile showing the new week.
+    """
+    days = [d for d, _ in dvol]
+    covered = [w for w in windows if w["to"] < days[-1]]
+    if not covered:
+        return None
+    start = max(_iso_plus(covered[0]["to"], -ATM_SPAN_DAYS), days[0])
+    counted, stop = [], "start"                 # "start": the filings read run out first
+    for w in covered:
+        if counted and _iso_plus(w["to"], 1) != counted[-1]["firstDay"]:
+            stop = "gap"
+            log(f"[drift] ATM {pref}: the filed window {w['firstDay']} -> {w['to']} doesn't end the day "
+                f"before {counted[-1]['firstDay']} — absorption leaves it and everything older out")
+            break
+        if w["firstDay"] < start:
+            stop = "span" if start > days[0] else "history"
+            break
+        tape = sum(v for d, v in dvol if w["firstDay"] <= d <= w["to"])
+        if w["proceedsM"] * 1e6 > tape:
+            stop = "tape"
+            log(f"[drift] ATM {pref}: ${w['proceedsM']:,.1f}M filed for {w['firstDay']} -> {w['to']} against "
+                f"${tape / 1e6:,.1f}M traded — absorption leaves it and everything older out")
+            break
+        counted.append({"firstDay": w["firstDay"], "to": w["to"], "proceedsM": round(w["proceedsM"], 1),
+                        "dollarVolM": round(tape / 1e6, 1)})
+    if not counted:
+        return None
+    first, end = bisect.bisect_left(days, counted[-1]["firstDay"]), bisect.bisect_right(days, counted[0]["to"])
+    tapes = [sum(v for _, v in dvol[first + s:end + s])
+             for s in (0, -1, 1) if first + s >= 0 and end + s <= len(dvol)]
+    if not all(tapes):                          # a feed without volume: nothing to divide by
+        return None
+    proceeds = sum(w["proceedsM"] for w in counted) * 1e6
+    ratios = [proceeds / t for t in tapes]
+    zero_run = next((k for k, w in enumerate(windows) if w["proceedsM"] > 0), len(windows))
+    log(f"[ATM] {pref} absorption {ratios[0]:.2%} (±1 session {min(ratios):.2%}-{max(ratios):.2%}) over "
+        f"{len(counted)} filed windows {counted[-1]['firstDay']} -> {counted[0]['to']}, ended by {stop}")
+    return {"agg": round(ratios[0], 4), "lo": round(min(ratios), 4), "hi": round(max(ratios), 4),
+            "n": len(counted), "fromDate": counted[-1]["firstDay"], "toDate": counted[0]["to"],
+            "zeroRun": zero_run, "lastSaleTo": windows[zero_run]["to"] if zero_run < len(windows) else None,
+            "windows": counted}
+
+
+def _confirmed_and_absorption(prior, pref, cik, parser, reports_atm, first_day_offset, proceeds_basis):
+    """(confirmed, absorption) for one preferred from its filed ATM windows, each kept whole
+    from the previous run wherever the filings or the tape can't replace it."""
+    try:
+        windows = _filed_atm_windows(pref, cik, parser, reports_atm, first_day_offset)
+    except Exception as e:                      # a network error, or no ATM window at all
+        log(f"[skip] ATM {pref} filings: {e} — keeping the last filed week and absorption")
+        return prior.get("confirmed"), prior.get("absorption")
+    if windows is None:                         # the newest ATM filing is unreadable, as logged
+        return prior.get("confirmed"), prior.get("absorption")
+    # prose weeks state no capacity, and a new programme was once announced inside one
+    # (Mar 23-29 2026: $1,975.8M available before it, $22,748.2M after)
+    newest, stated = windows[0], next((w for w in windows if w["capacityM"] is not None), None)
+    confirmed = {"from": newest["from"], "to": newest["to"], "shares": newest["shares"],
+                 "proceedsM": newest["proceedsM"], "capacityM": stated and stated["capacityM"],
+                 "capacityAsOf": stated and stated["to"]}
+    absorption = _PREF_DVOL.get(pref) and _absorption(pref, windows, _PREF_DVOL[pref])
+    if not absorption:
+        log(f"[skip] ATM {pref} absorption: no settled tape to count a filed window against — "
+            f"keeping the last value")
+        return confirmed, prior.get("absorption")
+    return confirmed, {**absorption, "basis": proceeds_basis}
 
 
 def fetch_atm(data):
     """Live ATM issuance estimate per preferred, calibrated against the filings."""
     btc = _BTC_PX.get("usd") or data.get("btcPriceUsd") or 0
-    for tk, doc_cik, parser in (("MSTR", "0001050446", _mstr_strc_atm),
-                                ("ASST", "0001920406", _asst_sata_atm)):
+    # The session rule, per filer, in one place: the day offset from a filed window's
+    # `from` to the first day its sales can fall on. Strategy's "During Period Mon to Sun"
+    # is inclusive on a trade-date basis, so its Monday counts; Strive's "As of A / As of
+    # B" are share counts at A's and B's close, so the sales between them fall in (A, B].
+    # proceeds_basis names what the proceeds are: STRC's net proceeds as filed, SATA's
+    # share delta x $100 par.
+    for tk, doc_cik, parser, reports_atm, first_day_offset, proceeds_basis in (
+            ("MSTR", "0001050446", _mstr_strc_atm, _MSTR_ATM_SECTION, 0, "net"),
+            ("ASST", "0001920406", _asst_sata_atm, _ASST_ATM_SECTION, 1, "par")):
         co = data["companies"].get(tk)
         if not co:
             continue
@@ -1872,26 +2241,14 @@ def fetch_atm(data):
         if not daily:
             log(f"[skip] ATM {pref}: no intraday candles")
             continue
-        # newest 8-K row for this security -> confirmed issuance to calibrate against
-        confirmed = None
-        try:
-            sub = get_json(f"https://data.sec.gov/submissions/CIK{doc_cik}.json")
-            rec = sub["filings"]["recent"]
-            for i in range(len(rec["form"])):
-                if rec["form"][i] != "8-K":
-                    continue
-                url = (f"https://www.sec.gov/Archives/edgar/data/{int(doc_cik)}/"
-                       f"{rec['accessionNumber'][i].replace('-', '')}/{rec['primaryDocument'][i]}")
-                got = parser(_edgar_text(url))
-                if got and got.get("to"):
-                    confirmed = got
-                    break
-        except Exception as e:
-            log(f"[skip] ATM {pref} filing: {e}")
+        # newest filed window -> confirmed issuance to calibrate against
+        confirmed, absorption = _confirmed_and_absorption(
+            co.get("atm") or {}, pref, doc_cik, parser, reports_atm, first_day_offset, proceeds_basis)
         # calibrate: actual proceeds over eligible volume across the confirmed window
         cap, basis = ATM_DEFAULT_CAPTURE, "default (no confirmed week yet)"
         if confirmed and confirmed["from"]:
-            elig = sum(e for d, _t, e in daily if confirmed["from"] < d <= confirmed["to"])
+            first_day = _iso_plus(confirmed["from"], first_day_offset)
+            elig = sum(e for d, _t, e in daily if first_day <= d <= confirmed["to"])
             if elig > 1e5 and confirmed["proceedsM"] > 0:
                 raw = confirmed["proceedsM"] * 1e6 / elig
                 cap = max(0.2, min(1.5, raw))
@@ -1900,7 +2257,9 @@ def fetch_atm(data):
             elif confirmed["proceedsM"] == 0:
                 basis = f"no issuance in the week to {confirmed['to']}"
         today = daily[-1]
-        wk = [r for r in daily if r[0] > (confirmed or {}).get("to", "")] or [today]
+        # sessions since the confirmed window: none yet on a Monday morning, rather than
+        # Friday again (it sits inside the window the 8-K just confirmed)
+        wk = [r for r in daily if r[0] > ((confirmed or {}).get("to") or "")]
         est = lambda e: (e * cap, (e * cap / btc) if btc else None)   # 0 is a real value, not "unknown"
         t_usd, t_btc = est(today[2])
         w_usd, w_btc = est(sum(r[2] for r in wk))
@@ -1916,6 +2275,7 @@ def fetch_atm(data):
             "weekEligUsd": round(sum(r[2] for r in wk)),
             "weekEstUsd": round(w_usd), "weekEstBtc": round(w_btc, 2) if w_btc is not None else None,
             "confirmed": confirmed,
+            "absorption": absorption,
             "daily": [{"d": d, "tot": round(t), "elig": round(e)} for d, t, e in daily[-30:]],
         }
         log(f"[ATM] {pref}: {co['atm']['status']} | capture {cap:.0%} ({basis}) | "
@@ -1946,6 +2306,47 @@ def fetch_borrow_fees(data):
         except Exception as e:
             log(f"[skip] borrow fee {sym}: {e} — keeping existing values")
         time.sleep(1)                       # be polite: 8 requests total per refresh
+
+
+# --------------------------------------------------------------------------- #
+# apxUSD lending banner: Morpho API (open GraphQL, no key)
+# --------------------------------------------------------------------------- #
+MORPHO_GRAPHQL = "https://api.morpho.org/graphql"
+# (kind, Morpho id, label). The banner's "Up to" quotes the best of these, and its
+# "on 4 lending options" counts them. The ids are the ones app.morpho.org links to.
+APXUSD_LENDING = [
+    ("market", "0xebd23a871b52e0a8c92bd719f4413600101b69e946cb72923b3a33fb5bc6ec85", "apxUSD / PT-apyUSD-5NOV2026"),
+    ("market", "0xd86df29b48f2d88a0453027212247a29e68ff52c6589c46054f57285da2fa7e3", "apxUSD / PT-apxUSD-5NOV2026"),
+    ("market", "0xe23380494e365453f72f736f2d941959ae945773eb67a06cf4f538c7c4201264", "apxUSD / apyUSD"),
+    ("vault", "0x3a618E9D4159dff94E90bd6239161dE4dd7C0082", "Apyx apxUSD vault"),
+]
+
+
+def fetch_lending(data):
+    """The APY of each apxUSD lending option in APXUSD_LENDING, from the Morpho API.
+
+    Markets report avgNetSupplyApy, the figure api.apyx.fi/v1/lending/markets
+    republishes (matched to 4 dp on 2026-09-28), so the banner agrees with the lending
+    tab its button opens. That feed lists no vault, hence Morpho. The vault is a Vault
+    V2 and reports avgNetApy, net of its performance fee. All or nothing: one missing
+    option keeps the last full set, so "Up to" is never the best of three.
+    """
+    try:
+        fields = [f'o{i}: marketById(marketId: "{ident}", chainId: 1) {{ state {{ avgNetSupplyApy }} }}'
+                  if kind == "market" else
+                  f'o{i}: vaultV2ByAddress(address: "{ident}", chainId: 1) {{ avgNetApy }}'
+                  for i, (kind, ident, _) in enumerate(APXUSD_LENDING)]
+        res = post_json(MORPHO_GRAPHQL, {"query": "{ " + " ".join(fields) + " }"})["data"]
+        options = []
+        for i, (kind, _, label) in enumerate(APXUSD_LENDING):
+            node = res[f"o{i}"]
+            apy = node["state"]["avgNetSupplyApy"] if kind == "market" else node["avgNetApy"]
+            options.append({"name": label, "apy": round(float(apy) * 100, 2)})
+        data["lending"] = {"asOf": datetime.date.today().isoformat(), "options": options}
+        best = max(options, key=lambda o: o["apy"])
+        log(f"[lending] apxUSD up to {best['apy']:.2f}% ({best['name']}) across {len(options)} options")
+    except Exception as e:
+        log(f"[skip] Morpho lending APY: {e} — keeping existing values")
 
 
 def record_filing_watermark(data):
@@ -1993,10 +2394,11 @@ def main():
     fetch_sata_notional(data)         # SEC EDGAR: filed SATA count (the tracker's stalls)
     fetch_strategytracker(data)       # PRIMARY: current metrics + real history (both names)
     fetch_holdings(data)             # SEC EDGAR: weekly accumulation (8-K period ranges)
-    fetch_strategy_kpi(data)          # re-apply: holdings clobbers cash with its own estimate
+    fetch_strategy_kpi(data)          # re-apply: holdings sets cash from the 8-K balances; live wins
     fetch_short_interest(data)        # Nasdaq: days to cover (semi-monthly)
     fetch_borrow_fees(data)           # ChartExchange/IBKR: annualized cost to short
     fetch_atm(data)                   # preferred ATM issuance estimate + filing calibration
+    fetch_lending(data)               # Morpho API: apxUSD lending APYs for the banner
     # debt schedule + preferred breakdown are parsed from the 10-Q (see notes);
     # cebe / per-share / valuation are computed live in the dashboard.
 

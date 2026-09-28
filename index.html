@@ -104,6 +104,14 @@
     color:var(--bx); font-variant-numeric:tabular-nums; }
   .sg-item .sub { font-size:12px; color:var(--faint); margin-top:2px; }
   .sg-item .defhint { margin-left:4px; }
+  /* relative volume is its own hint — the figure carries the tooltip rather than a
+     separate glyph, so it must not pick up the glyph's spacing or size. nowrap: on
+     phones a wrapped "Mon · last trade" reads as Monday's last trade */
+  .sg-item .sub .defhint { margin-left:0; font-size:inherit; vertical-align:0; white-space:nowrap; }
+  /* Above 1100px the stat cards sit three across and a column is ~124px at most: two
+     clauses fit, three don't, so the word wrapped onto a line of its own. As on phones,
+     the multiple wins; a line without one keeps its word ("-1.86% · common"). */
+  @media (min-width: 1101px) { .sg-item .sub .defhint ~ .secword { display: none; } }
   .statbox {
     background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
     padding: 13px 15px; position: relative; overflow: hidden;
@@ -119,6 +127,43 @@
   .statbox .sub.live { color: var(--pos); }
   .statbox .refresh { margin-top: 8px; display:inline-block; }
   @media (max-width: 1100px) { .statbar { grid-template-columns: 1fr; } .btchero { max-width: none; } }
+
+  /* apxUSD lending banner: Apyx's "Slim lending banner", dark variant, at the design's
+     geometry (104px tall on desktop, 194px stacked on phones; the 1px border is part of
+     both). It sits in the header, outside every tab pane, so the calculator shows it too.
+     The streak is drawn in CSS because the design's texture is a 6 MB raster. */
+  .lendbar { display:flex; flex-wrap:wrap; align-items:center; gap:16px 24px; padding:23px;
+    border:1px solid transparent; border-radius:8px;
+    background:
+      linear-gradient(109deg, transparent 71%, rgba(247,245,245,0.07) 71.4%, transparent 71.8%) padding-box,
+      linear-gradient(135deg, transparent 61%, rgba(220,20,60,0.13) 75%, rgba(220,20,60,0.05) 87%, transparent) padding-box,
+      linear-gradient(90deg, transparent, rgba(220,20,60,0.03)) padding-box,
+      linear-gradient(#100c0d, #100c0d) padding-box,
+      /* the border: faint all round, lit at the top-left and bottom-right corners */
+      radial-gradient(300px 26px at 0 0, rgba(247,245,245,0.32), transparent) border-box,
+      radial-gradient(300px 26px at 100% 100%, rgba(247,245,245,0.26), transparent) border-box,
+      linear-gradient(rgba(247,245,245,0.25), rgba(247,245,245,0.25)) border-box; }
+  .lb-copy { flex: 1 1 auto; }
+  .lb-head { font-size:24px; line-height:32px; font-weight:600; color:#fff; }
+  .lb-sub, .lb-stat .s { color:#949494; white-space:nowrap; }
+  .lb-sub { font-size:14px; line-height:20px; margin-top:4px; }
+  .lb-right { display:flex; align-items:center; gap:24px; margin-left:auto; }
+  .lb-stats { display:flex; gap:24px; }
+  .lb-stat .v { font-size:24px; line-height:32px; font-weight:600; color:#fff; white-space:nowrap; }
+  .lb-stat .s { font-size:12px; line-height:18px; }
+  .lb-stat .lb-pips { color:#FFE788; }
+  .lb-cta { flex:0 0 auto; padding:0 16px; line-height:48px; border-radius:8px; background:#F7F5F5;
+    color:#131111; font-size:14px; font-weight:500; white-space:nowrap; }
+  .lb-cta:hover { background:#fff; text-decoration:none; }
+  @media (max-width: 760px) {
+    .lendbar { flex-direction:column; align-items:stretch; gap:12px; padding:15px; }
+    .lb-head { font-size:20px; line-height:26px; }
+    .lb-sub { margin-top:0; }
+    .lb-right { flex-direction:column; align-items:stretch; gap:12px; margin-left:0; }
+    .lb-stats { justify-content:space-between; flex-wrap:wrap; row-gap:12px; }   /* 320px phones */
+    .lb-stat .v { font-size:20px; line-height:26px; }
+    .lb-cta { text-align:center; }
+  }
 
   /* ---------- Sections ---------- */
   section { margin-bottom: 40px; }
@@ -292,6 +337,9 @@
   .atm-grid .v { font-size:22px; font-weight:700; font-style:italic; margin-top:4px;
     font-variant-numeric:tabular-nums; color:var(--text); line-height:1.15; }
   .atm-grid .s { font-size:11.5px; color:var(--faint); margin-top:3px; }
+  /* 761–1100px sets the two cards side by side, too narrow for four tiles: the nowrap
+     labels pushed the grid past its card, and at 800px the page scrolled sideways */
+  @media (min-width:761px) and (max-width:1100px){ .atm-grid { grid-template-columns:repeat(2,1fr); } }
   @media (max-width:640px){ .atm-grid { grid-template-columns:repeat(2,1fr); } .atm-grid .v { font-size:18px; } }
   /* short-interest stat chips */
   .si-chips { display:flex; flex-wrap:wrap; gap:8px; margin:2px 0 10px; }
@@ -350,6 +398,10 @@
   .chartcard h3 { margin:0; font-weight:700; font-size: 14.5px; letter-spacing:.3px;
     display:flex; align-items:center; gap:7px; color:#fff; }
   .chartcard h3 .dot { width:9px; height:9px; }
+  .chartcard h3 .pngbtn { margin-left:auto; flex:0 0 auto; background:none;
+    border:1px solid var(--border); border-radius:4px; color:var(--faint);
+    font:inherit; font-size:11.5px; font-weight:600; padding:2px 8px; cursor:pointer; }
+  .chartcard h3 .pngbtn:hover { color:#fff; border-color:rgba(255,255,255,0.45); }
   .chartcard .ch-sub { color: var(--faint); font-size: 12.5px; margin: 4px 0 10px; font-style: italic; }
   .chartwrap { position: relative; height: 250px; }
   .illus { color: var(--btc); font-size: 12.5px; margin-top: 6px; opacity:.9; }
@@ -371,6 +423,9 @@
     .sg-items { gap: 8px; }
     .sg-item .val { font-size: 17px; }
     .sg-item .lbl, .sg-item .sub { font-size: 10.5px; letter-spacing: .6px; }
+    /* .sg-items stays repeat(3, 1fr) here, so the sub-line has a third of the width
+       for three clauses. The multiple carries more than the word does. */
+    .sg-item .sub .secword { display: none; }
     /* one sticky row on phones: links scroll sideways, chips stay put */
     .secnav { margin: -14px 0 18px; gap: 10px; flex-wrap: nowrap; padding: 7px 0; }
     .secnav-links { gap: 15px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
@@ -432,6 +487,22 @@
         </div>
       </div>
     </div>
+    <aside class="lendbar" aria-label="apxUSD lending">
+      <div class="lb-copy">
+        <div class="lb-head">Make more of your apxUSD</div>
+        <div class="lb-sub">No lockup · No staking fee</div>
+      </div>
+      <div class="lb-right">
+        <div class="lb-stats">
+          <!-- hidden until renderLendingBanner() has a live figure -->
+          <div class="lb-stat" id="lb-apy" style="display:none"><div class="v" id="lb-apy-v"></div>
+            <div class="s">lending APY · variable</div></div>
+          <div class="lb-stat"><div class="v lb-pips">100× Pips</div>
+            <div class="s">on <span id="lb-count">4</span> lending options</div></div>
+        </div>
+        <a class="lb-cta" href="https://app.apyx.fi/discover?tab=lending&amp;campaign=boosted-pips" target="_blank" rel="noopener">Explore lending</a>
+      </div>
+    </aside>
   </header>
 
   <nav class="tabs">
@@ -456,7 +527,7 @@
   <section id="atm">
     <div class="sec-head"><h2>Preferred ATM Tracker</h2><span class="tag stub" id="tag-atm">seed data</span></div>
     <p class="sec-note">An estimate of how much bitcoin each company is buying through its preferred ATM today, inferred from live trading and calibrated to the filings.
-      <span class="evhint hint-icon" aria-label="Methodology" data-title="How this estimate is built" data-rows="Eligible volume~15-min bars printed at/above $99.95, prorated when a bar straddles it|Capture rate~the share of that volume that was really ATM issuance|Calibration~capture solved from the last 8-K that disclosed actual shares issued|To bitcoin~estimated proceeds ÷ live BTC price|Why $99.95, not $100~SATA hugs par to the cent; a strict cutoff undercounted a confirmed $44.1M week roughly 4x|Assumption~issuance tracks at-par volume evenly through the session|Confirmed vs estimate~the 8-K figure is fact; the intraday number is an estimate between filings">&#9432;</span></p>
+      <span class="evhint hint-icon" aria-label="Methodology" data-title="How this estimate is built" data-rows="At-par volume~15-min bars printed at/above $99.95, prorated when a bar straddles it|Capture rate~the share of that volume that was really ATM issuance|Calibration~capture solved from the newest filed week, else a default rate|To bitcoin~estimated proceeds ÷ live BTC price|Why $99.95, not $100~SATA hugs par to the cent; a strict cutoff undercounted a confirmed $44.1M week roughly 4x|Assumption~issuance tracks at-par volume evenly through the session|Confirmed vs estimate~the 8-K figure is fact; the intraday number is an estimate between filings">&#9432;</span></p>
     <div class="charts" id="atm-cards"></div>
   </section>
 
@@ -582,6 +653,7 @@
         <button class="cobtn" data-co="ASST">ASST · Strive</button>
         <span class="calc-snap" id="calc-snap"></span>
         <button class="cobtn" id="ci-share" title="Download a shareable image of these assumptions and results">&#128247; Share Card</button>
+        <button class="cobtn" id="ci-link" title="Copy a link that reopens these exact assumptions">&#128279; Copy link</button>
       </div>
       <div class="calc-inputs">
         <label>BTC Price Target ($)<input type="number" id="ci-btc" value="150000" step="5000" min="1000"></label>
@@ -750,6 +822,8 @@ const sUsdM = (v) => (v<0?"-":"")+"$"+fmt(Math.abs(v)/1e6,0)+"M";
 const capFmt = (mm) => { if(mm==null||isNaN(mm)) return "—"; const s=mm<0?"-":"", a=Math.abs(mm);
   return a>=1000 ? s+"$"+fmt(a/1000,2)+"B" : s+"$"+fmt(a,0)+"M"; };
 const pct = (n, d=1) => n==null||isNaN(n) ? "—" : fmt(n,d)+"%";
+// "May 17" from an ISO date, read as a calendar day wherever the viewer is
+const shortDate = iso => new Date(iso+"T00:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric"});
 const sig = (n) => n>0?"+":"";
 
 // mNAV = EV / BTC reserve.  EV = (price × basic shares) + debt + preferred notional − USD reserve(cash)
@@ -817,6 +891,8 @@ const METRIC_DEFS = {
     m:"What the market charges for one share of common stock — the starting point for market cap and every valuation ratio below."},
   "Day Change": {c:"Today's price versus the prior close, in percent.",
     m:"Direction and size of today's move — worth reading next to BTC's own 24-hour change above."},
+  "Relative Volume": {c:"Dollar volume (shares traded × close) of one full session, ÷ the mean of the 30 sessions before it. The running session never counts — a part-day divided by full ones reads low all morning — so from the open until the evening refresh this is the previous session's figure, and the tile names that day (\"2.2× vol Mon\"). Once the session it measures is today's, no day is shown; past 6 days old it is hidden.",
+    m:"Whether a price move carries conviction or is just noise. A 3% fall on 2× normal volume is the market repricing the name; the same 3% on 0.4× volume is a thin tape. Above 1 is busier than usual, below 1 quieter."},
   "Market Cap": {c:"Stock price × basic shares outstanding.",
     m:"The market's total value on the common equity — what all common shares are worth together."},
   "Shares Outstanding": {c:"Basic share count across common classes, from the latest SEC filing.",
@@ -829,7 +905,7 @@ const METRIC_DEFS = {
     m:"Below $100, the market demands more yield than the coupon pays — the discount is the market's live read on issuer risk."},
   "Crypto Holdings": {c:"Total bitcoin held, per the latest weekly 8-K filing.",
     m:"The treasury itself — the asset backing everything else on this page."},
-  "Cash & Cash Equivalents": {c:"MSTR: last filed balance rolled forward with weekly 8-K flows (ATM proceeds, BTC buys and sales, dividends). ASST: filed USD cash plus its 505,000 STRC shares marked at the live price.",
+  "Cash & Cash Equivalents": {c:"MSTR: the USD Reserve plus USD Cash balances stated in the latest weekly 8-K (strategy.com's live figure is built from the same balances). ASST: filed USD cash plus its 505,000 STRC shares marked at the live price.",
     m:"The liquid reserve that pays dividends and nets against debt and preferred claims in every ratio below."},
   "Senior Debt": {c:"Sum of convertible-note principal outstanding, per the latest 10-Q.",
     m:"The claims that rank ahead of both preferred and common if things go wrong."},
@@ -928,7 +1004,8 @@ function renderCompany(){
   const perfYtd = arr => { const ds=SH.dates||[]; const i=ds.findIndex(d=>d.includes(yrSfx)); const b=i>0?i-1:0;
     return (arr && arr[b]!=null) ? (arr.at(-1)/arr[b]-1)*100 : null; };
   const pctC = v => v==null ? "—" : `<span class='${v>=0?'pos':'neg'}'>${sig(v)}${fmt(v,1)}%</span>`;
-  const perfRows = arr => [["1 Week",pctC(perfN(arr,5))],["1 Month",pctC(perfN(arr,21))],["YTD",pctC(perfYtd(arr))]].map(r=>r.join("~")).join("|");
+  // stockHistory has a row per calendar day
+  const perfRows = arr => [["1 Week",pctC(perfN(arr,7))],["1 Month",pctC(perfN(arr,30))],["YTD",pctC(perfYtd(arr))]].map(r=>r.join("~")).join("|");
   const priceCell = (o,arr) => `<span class="evhint" data-title="Performance" data-rows="${perfRows(arr)}">${usd(o.stockPrice,2)}</span>`;
 
   // preferred-by-series breakdown hover (MSTR has STRC, STRF, STRK, STRD)
@@ -947,7 +1024,7 @@ function renderCompany(){
     ["Market Cap", bil(mcap(o))],
     ["+ Senior Debt", bil(o.seniorDebt)],
     ["+ Preferred", bil(o.prefNotional)],
-    ["− USD Reserve", bil(o.cash)],
+    ["− Cash", bil(o.cash)],
     ["Enterprise Value", bil(ev(o))]
   ].map(r=>r.join("~")).join("|");
   const evCell = o => `<span class="evhint" data-title="Enterprise Value" data-rows="${evRows(o)}">${bil(ev(o))}</span>`;
@@ -968,18 +1045,19 @@ function renderCompany(){
                   ["Total Reserve", capFmt(o.cashUsd+pos)]].map(r=>r.join("~")).join("|");
     return `<span class="evhint" data-title="Cash &amp; Equivalents" data-rows="${rows}">${capFmt(o.cash)}</span>`;
   };
-  // MSTR cash is rolled forward weekly from the last filed balance (8-K flows)
+  // MSTR cash is the USD Reserve + USD Cash the newest weekly 8-K states; strategy.com's
+  // live figure, built from the same balances, is what shows when it answered
   const mstrCashCell = o => {
-    const f = o.cashFlows; if(!f) return capFmt(o.cash);
-    const rows = [[`Filed Cash (${f.anchorDate} 10-Q)`, capFmt(f.anchor)],
-                  ["+ ATM Net Proceeds", capFmt(f.raised)],
-                  ["+ BTC Sale Proceeds", capFmt(f.btcSold)],
-                  ["− BTC Purchases", capFmt(f.btcSpent)],
-                  ["− Pref Dividends &amp; Coupons (est)", capFmt(f.divs)],
-                  [`Estimated Cash (as of ${f.asOf})`, capFmt(o.cash)]].map(r=>r.join("~")).join("|");
-    return `<span class="evhint" data-title="Estimated USD Reserve" data-rows="${rows}">${capFmt(o.cash)}</span>`;
+    const f = o.cashFiled;      // a bare number in a data.json from before the 8-K balances
+    if(!f || typeof f !== "object" || typeof f.reserve !== "number") return capFmt(o.cash);
+    const filedTotal = f.reserve + (f.usdCash || 0);
+    const rows = [["USD Reserve", capFmt(f.reserve)]];
+    if(f.usdCash != null) rows.push(["USD Cash", capFmt(f.usdCash)]);
+    rows.push([`Filed Total (8-K, as of ${shortDate(f.asOf)})`, capFmt(filedTotal)]);
+    if(capFmt(o.cash) !== capFmt(filedTotal)) rows.push(["Shown · strategy.com live", capFmt(o.cash)]);
+    return `<span class="evhint" data-title="USD Reserve + USD Cash" data-rows="${rows.map(r=>r.join("~")).join("|")}">${capFmt(o.cash)}</span>`;
   };
-  h += row({label:"Cash & Cash Equivalents", sub:"estimated from weekly filing flows · hover for build-up", MSTR:mstrCashCell(M), ASST:cashCell(A)});
+  h += row({label:"Cash & Cash Equivalents", sub:"per latest 8-K · hover for split", MSTR:mstrCashCell(M), ASST:cashCell(A)});
   h += row({label:"Senior Debt", sub:"convertible notes · hover for schedule", MSTR:debtCell(M), ASST:debtCell(A)});
   h += row({label:"Preferred Equity Notional", sub:"by series · hover for breakdown", MSTR:prefCell(M), ASST:prefCell(A)});
   h += row({label:"Annual Obligations", MSTR:capFmt(M.annualObligations), ASST:capFmt(A.annualObligations)});
@@ -1063,7 +1141,7 @@ function renderPerShare(){
   // hover reconciles to strategy.com, whose headline figure is per assumed-diluted share
   const bpsRows = o => [["Bitcoin held", fmt(o.holdings)+" BTC"],
       ["Basic shares", fmt(o.sharesOutstanding,2)+"M"],
-      ["+ in-the-money dilution", fmt((o.assumedDilutedShares||0)-o.sharesOutstanding,2)+"M"],
+      ["+ assumed dilution", fmt((o.assumedDilutedShares||0)-o.sharesOutstanding,2)+"M"],
       ["= Effective diluted", fmt(o.assumedDilutedShares,2)+"M"],
       ["Sats / diluted share", fmt(o.satsPerShareDiluted)],
       ["Sats / basic share", fmt(o.satsPerShareBasic)],
@@ -1102,12 +1180,12 @@ function renderValuation(){
 
   const mnavRows = o => [
     ["Market Cap", bil(mcap(o))], ["+ Senior Debt", bil(o.seniorDebt)],
-    ["+ Preferred", bil(o.prefNotional)], ["− USD Reserve", bil(o.cash)],
+    ["+ Preferred", bil(o.prefNotional)], ["− Cash", bil(o.cash)],
     ["= Enterprise Value", bil(evv(o))], ["÷ BTC Reserve", bil(nav(o))],
     ["= EV mNAV", fmt(evMnav(o),2)+"x"]
   ].map(r=>r.join("~")).join("|");
   const netRows = o => { const p = netParts(o); return [
-    ["BTC Reserve", bil(p.nav)], ["+ USD Reserve", bil(o.cash)],
+    ["BTC Reserve", bil(p.nav)], ["+ Cash", bil(o.cash)],
     ["− OTM Convertible Debt", bil(p.otm)], ["− Preferred", bil(o.prefNotional)],
     ["= Net Reserve", bil(p.netReserve)],
     [`Mkt Cap (${fmt(p.shares,2)}M fully-diluted sh)`, bil(p.mcap)],
@@ -1221,16 +1299,77 @@ function renderPriceHeader(){
   set("hdr-mnav-ASST", fmt(netMnav(A),2)+"x");
   set("hdr-strc", usd(M.prefPrice,2));
   set("hdr-sata", usd(A.prefPrice,2));
-  const chg = v => (v==null||isNaN(v)) ? "" : `<span class="${v>=0?'pos':'neg'}">${sig(v)}${fmt(v,2)}%</span> · `;
+  const chg = v => (v==null||isNaN(v)) ? "" : `<span class="${v>=0?'pos':'neg'}">${sig(v)}${fmt(v,2)}%</span>`;
+  // Relative volume is the last SETTLED session's (refresh_data.py leaves the running
+  // one out), so from the open until the evening refresh it describes the previous
+  // session while the change beside it is today's. The client doesn't know which
+  // session the preferreds' change describes, so today is the reference: name rvol's
+  // day whenever it isn't today, and drop it past 6 days, when a weekday name turns
+  // ambiguous and the feed has evidently stopped. "" also covers a data.json written
+  // before rvol shipped, so the line then reads exactly as it did before.
+  const rvolToken = r => {
+    const m = r && r.mult;
+    if(typeof m !== "number" || !isFinite(m)) return "";
+    const day = sessionDayName(r.asOf);
+    if(day == null) return "";                        // also rejects a missing or future asOf
+    // busy is neither good nor bad, so this borrows the page's emphasis colours
+    // rather than the pos/neg vocabulary
+    const c = m >= 2 ? "var(--btc)" : m >= 1.5 ? "#FFD9A0" : "var(--faint)";
+    return `<span class="defhint" data-def="Relative Volume" style="color:${c}">${fmt(m,1)}× vol${day ? " "+day : ""}</span>`;
+  };
   // After the bell the tile should carry the official 4:00pm consolidated print.
   // strategy.com can sit on a pre-close last trade for a while (on 2026-09-18 it
   // still showed 150.52 at 5:20pm against a 153.92 close), so say which one it is
   // rather than passing a last trade off as the close.
-  const tag = (o, k, base) => (o && o[k]) ? '<span class="lasttrade">last trade</span>' : base;
-  set("hdr-px-MSTR-sub", chg(M.dayChangePct)+tag(M,"_preClose","common"));
-  set("hdr-px-ASST-sub", chg(A.dayChangePct)+tag(A,"_preClose","common"));
-  set("hdr-strc-sub", chg(M.prefChangePct)+tag(M,"_prefPreClose","preferred"));
-  set("hdr-sata-sub", chg(A.prefChangePct)+tag(A,"_prefPreClose","preferred"));
+  const sub = (o, chgV, rv, k, base) => {
+    const head = [chg(chgV), rvolToken(rv)].filter(Boolean).join(" · ");
+    const sep = head ? " · " : "";
+    return (o && o[k])
+      ? `${head}${sep}<span class="lasttrade">last trade</span>`
+      // the separator sits inside .secword so wherever CSS hides the word, its
+      // separator goes with it, rather than stranding a dangling "·"
+      : `${head}<span class="secword">${sep}${base}</span>`;
+  };
+  set("hdr-px-MSTR-sub", sub(M, M.dayChangePct,  M.rvol,     "_preClose",     "common"));
+  set("hdr-px-ASST-sub", sub(A, A.dayChangePct,  A.rvol,     "_preClose",     "common"));
+  set("hdr-strc-sub",    sub(M, M.prefChangePct, M.prefRvol, "_prefPreClose", "preferred"));
+  set("hdr-sata-sub",    sub(A, A.prefChangePct, A.prefRvol, "_prefPreClose", "preferred"));
+}
+// One ATM stat tile; its tooltip rides in data-rows, which tipHTML splits on | then ~.
+function atmCell(k, v, sub, tip, color){
+  return `<div class="evhint" data-title="${k}" data-rows="${tip}">
+         <div class="k">${k}</div>
+         <div class="v"${color?` style="color:${color}"`:""}>${v}</div>
+         <div class="s">${sub}</div></div>`;
+}
+// The Absorption tile: what the 8-Ks say was sold ÷ all dollar volume across the filed
+// weeks. It replaced "Eligible volume", which read as the company absorbing the whole
+// tape when it only meant the ATM was allowed to sell; that reading survives as atParRow.
+function absorptionTile(ab, atParRow){
+  const wholePct = Math.round(ab.agg*100);
+  const [lo, agg, hi] = [ab.lo, ab.agg, ab.hi].map(v => fmt(v*100,2));
+  const sumOf = key => ab.windows.reduce((s, w) => s + w[key], 0);
+  // data-rows sits in a "-quoted attribute and splits on | then ~, so no value may hold
+  // any of the three; the last row is styled as a total, so end on the figure
+  const tip = [
+    `Span~${shortDate(ab.fromDate)} → ${shortDate(ab.toDate)}`,
+    atParRow,
+    ab.basis === "par" ? "Proceeds~share count × $100 par" : "Proceeds~net, as filed",
+    "Periods~8-K dates, trade-date basis",
+    ab.agg > 0 && `±1 session~${lo === agg && agg === hi ? "unchanged" : lo+"–"+hi+"%"}`,
+    `Issuance~${bil(sumOf("proceedsM"))}`,
+    `Traded~${bil(sumOf("dollarVolM"))} (close × volume)`,
+    `Absorption~${agg}%`,
+  ].filter(Boolean).join("|");
+  // the newest filed weeks sold nothing: say since when, so a faint value carries its reason
+  const quiet = ab.zeroRun > 0 && ab.lastSaleTo && ab.agg > 0;
+  return atmCell("Absorption",
+    ab.agg > 0 ? (wholePct < 1 ? "&lt;1%" : "~"+wholePct+"%") : "No sales",
+    quiet ? "none since "+shortDate(ab.lastSaleTo) : "8-Ks since "+shortDate(ab.fromDate),
+    tip,
+    // four filed windows in a row without a sale (about a month; a split week counts
+    // twice): the rate describes the past, not what the ATM is doing
+    ab.zeroRun >= 4 ? "var(--faint)" : "");
 }
 function renderATM(){
   const el = document.getElementById("atm-cards"); if(!el) return;
@@ -1241,32 +1380,42 @@ function renderATM(){
     any = true;
     const live = a.status === "active";
     const c = a.confirmed || {};
-    const usd = v => !v ? "$0" : v >= 1e6 ? "$"+fmt(v/1e6,1)+"M" : "$"+fmt(Math.round(v/1e3))+"k";
+    // named apart from the global usd(), which would print $19,622,173 here
+    const usdCompact = v => !v ? "$0" : v >= 1e6 ? "$"+fmt(v/1e6,1)+"M" : "$"+fmt(Math.round(v/1e3))+"k";
     const btc = v => v==null ? "—" : "₿"+fmt(v,2);
+    // The "today" figures describe a.asOf's session, a previous one until the first
+    // refresh after the open. Name it as the header's rvol does; past a week give the
+    // date instead, and read a missing or future asOf as today.
+    const sessionDay = sessionDayName(a.asOf)
+      ?? (Date.parse(a.asOf) < Date.parse(etDateStr()) ? shortDate(a.asOf) : "");
+    // share of the session's dollar volume that printed at/above the threshold
+    const parPct = a.todayTotalUsd > 0 ? Math.round(a.todayEligUsd / a.todayTotalUsd * 100) : null;
+    // kept from the tile Absorption replaced: how much of the session the ATM could sell into
+    const atParRow = "At-par volume~" + (parPct == null ? "no volume yet"
+      : `${parPct}% of ${usdCompact(a.todayTotalUsd)} ${sessionDay ? "on "+sessionDay : "today"}`);
     // detail that used to sit in chips and a footnote now rides on the numbers it explains
     const capTip = `Capture rate ${fmt(a.captureRate*100,0)}% — ${a.captureBasis}. `
       + `Applied to volume printed at/above $${fmt(a.threshold,2)}, then divided by the BTC price.`;
+    // capacity is stated only in table weeks, so it can be older than the confirmed week
+    const capAsOf = c.capacityAsOf && c.capacityAsOf !== c.to ? ` (as of ${shortDate(c.capacityAsOf)})` : "";
     const confTip = c.proceedsM!=null
       ? `Actual issuance disclosed in the 8-K for ${c.from} → ${c.to}.`
-        + (c.capacityM!=null ? ` ATM capacity remaining: $${fmt(c.capacityM/1000,1)}B.` : "")
+        + (c.capacityM!=null ? ` ATM capacity remaining: $${fmt(c.capacityM/1000,1)}B${capAsOf}.` : "")
       : "Awaiting the next 8-K.";
-    const cell = (k, v, sub, tip, color) =>
-      `<div class="evhint" data-title="${k}" data-rows="${tip}">
-         <div class="k">${k}</div>
-         <div class="v"${color?` style="color:${color}"`:""}>${v}</div>
-         <div class="s">${sub}</div></div>`;
     h += `<div class="chartcard">
       <h3><span class="dot" style="background:${ac}"></span>${a.ticker} — ATM
         <span class="atm-pill ${live?"on":"off"}">${live ? "ACTIVE" : "STANDBY"}</span></h3>
       <div class="atm-grid">
-        ${cell("Est. BTC today", btc(a.todayEstBtc), usd(a.todayEstUsd)+" est. proceeds",
+        ${atmCell("Est. BTC "+(sessionDay||"today"), btc(a.todayEstBtc), usdCompact(a.todayEstUsd)+" est. proceeds",
                "Estimate~"+capTip, ac)}
-        ${cell("Eligible volume", usd(a.todayEligUsd),
-               a.todayTotalUsd>0 ? fmt(a.todayEligUsd/a.todayTotalUsd*100,0)+"% of "+usd(a.todayTotalUsd)+" traded" : "no volume yet",
+        ${a.absorption ? absorptionTile(a.absorption, atParRow)
+          // no absorption yet, as in a data.json from before it shipped: the old tile
+          : atmCell("Eligible volume", usdCompact(a.todayEligUsd),
+               a.todayTotalUsd>0 ? fmt(a.todayEligUsd/a.todayTotalUsd*100,0)+"% of "+usdCompact(a.todayTotalUsd)+" traded" : "no volume yet",
                "At-par volume~Dollar volume printed at or above $"+fmt(a.threshold,2)+" today — the pool the ATM could have sold into.")}
-        ${cell("Since last filing", btc(a.weekEstBtc), usd(a.weekEstUsd)+" est. proceeds",
+        ${atmCell("Since last filing", btc(a.weekEstBtc), usdCompact(a.weekEstUsd)+" est. proceeds",
                "Running estimate~Accumulated since the last confirmed 8-K. "+capTip)}
-        ${cell("Confirmed (8-K)", c.shares ? fmt(Math.round(c.shares/1e3))+"k sh" : "none",
+        ${atmCell("Confirmed (8-K)", c.shares ? fmt(Math.round(c.shares/1e3))+"k sh" : "none",
                c.proceedsM ? "$"+fmt(c.proceedsM,1)+"M · "+(c.to||"") : (c.to||"—"),
                "Filed~"+confTip)}
       </div>
@@ -1323,7 +1472,19 @@ function renderActions(){
   }).join("");
 }
 
-function renderAll(){ renderPriceHeader(); renderCompany(); renderHoldings(); renderCost(); renderPerShare(); renderValuation(); renderCapital(); renderATM(); renderActions(); if(typeof runCalc==="function") runCalc();
+// The lending banner quotes the best APY among the options refresh_data.py reads
+// (fetch_lending) and counts them. A data.json from before the banner has no lending
+// block, so the figure stays hidden rather than falling back to a typed-in number.
+function renderLendingBanner(){
+  const stat = document.getElementById("lb-apy"); if(!stat) return;
+  const opts = (DATA.lending && DATA.lending.options) || [];
+  const apys = opts.map(o => o.apy).filter(v => typeof v === "number" && isFinite(v));
+  stat.style.display = apys.length ? "" : "none";
+  if(apys.length) document.getElementById("lb-apy-v").textContent = "Up to " + fmt(Math.max(...apys), 2) + "%";
+  if(opts.length) document.getElementById("lb-count").textContent = opts.length;
+}
+
+function renderAll(){ renderPriceHeader(); renderLendingBanner(); renderCompany(); renderHoldings(); renderCost(); renderPerShare(); renderValuation(); renderCapital(); renderATM(); renderActions(); if(typeof runCalc==="function") runCalc();
   // keep every hint reachable by keyboard (re-rendered markup loses the attribute)
   document.querySelectorAll(".evhint, .defhint").forEach(el => {
     if(!el.hasAttribute("tabindex")){ el.setAttribute("tabindex","0"); el.setAttribute("role","button"); } });
@@ -1331,11 +1492,16 @@ function renderAll(){ renderPriceHeader(); renderCompany(); renderHoldings(); re
 
 // ---------- charts (Chart.js) ----------
 const CHARTS = {};
+// Chart.js normalises a config in place and resolves options through proxies, so a
+// live chart's own config cannot be reused to build a second one for export. Keep a
+// pristine copy of what was authored instead, taken before Chart.js ever sees it.
+const CHART_CFG = {};
 function mkChart(id, cfg){
   if(typeof Chart === "undefined") return;           // CDN offline -> skip gracefully
   const el = document.getElementById(id); if(!el) return;
   const prev = Chart.getChart(el);                   // destroy any chart bound to this canvas
   if(prev) prev.destroy();
+  CHART_CFG[id] = cloneCfg(cfg);
   CHARTS[id] = new Chart(el.getContext("2d"), cfg);
 }
 const GRID = "rgba(255,255,255,0.07)", AX = "#9aa0a6";
@@ -1352,7 +1518,7 @@ function clip(ppm, ...arrs){
   const n = Math.max(3, Math.round(mo*ppm));
   return arrs.map(a => Array.isArray(a) && a.length > n ? a.slice(-n) : a);
 }
-const PPM_DAY = 21, PPM_WEEK = 4.33, PPM_SEMI = 2;   // trading days / weeks / settlements per month
+const PPM_CAL = 30.44, PPM_DAY = 21, PPM_WEEK = 4.33, PPM_SEMI = 2;   // calendar days / trading days / weeks / settlements per month
 if(typeof Chart !== "undefined") Chart.defaults.font.family = "'Google Sans Flex','Google Sans',-apple-system,'Segoe UI',Roboto,sans-serif";
 const baseOpts = (extra={}) => Object.assign({
   responsive:true, maintainAspectRatio:false, interaction:{mode:"index",intersect:false},
@@ -1426,7 +1592,7 @@ function renderCharts(){
       x:{ ticks:{color:AX,font:{size:11},autoSkip:true,maxTicksLimit:MTL,maxRotation:0}, grid:{color:GRID} },
       y:axis("sats / share","left") } });
     bpsOpts.plugins.legend.display = false;
-    const [bhd_, bhs_] = clip(PPM_DAY, bh.dates, bh.sats);
+    const [bhd_, bhs_] = clip(PPM_WEEK, bh.dates, bh.sats);
     mkChart("ch-bps-"+co, { type:"line", data:{ labels: bhd_, datasets:[
       {label:"sats / share", data:bhs_, borderColor:c, backgroundColor:c+"22",
         borderWidth:2, tension:.25, pointRadius:0, fill:true} ]},
@@ -1437,7 +1603,7 @@ function renderCharts(){
     if(mhs){
       // MSTR from Oct 2025; ASST from Jan 1, 2026
       const _start = co==="ASST" ? Math.max(0, mhs.dates.findIndex(d=>d.startsWith("Jan"))) : 0;
-      const [labels, px, mn] = clip(PPM_DAY, mhs.dates.slice(_start), mhs.px.slice(_start),
+      const [labels, px, mn] = clip(PPM_CAL, mhs.dates.slice(_start), mhs.px.slice(_start),
             (mhs.net || mhs.mnav).slice(_start));
       const siOpts = baseOpts({ scales:{
         x:{ ticks:{color:AX,font:{size:11},autoSkip:true,maxTicksLimit:MTL,maxRotation:0}, grid:{color:GRID} },
@@ -1461,13 +1627,13 @@ function renderCharts(){
       if(ctx){
         const full = (mhs.net || mhs.mnav).filter(v=>v!=null);
         const live = netMnav(DATA.companies[co]);
-        // only report a window the history actually covers — ASST's treasury began
-        // Sep 2025, so a "1Y" average would be a 10-month average wearing the wrong label
-        const avg = n => { const need = Math.round(n*PPM_DAY);
+        // only report a window the history actually covers — it starts Oct 2025 (MSTR)
+        // and Jan 2026 (ASST), so a shorter average would wear the wrong label
+        const avg = n => { const need = Math.round(n*PPM_CAL);
           if(full.length < need) return null;
           const w = full.slice(-need); return w.reduce((a,b)=>a+b,0)/w.length; };
         const cell = (lbl, v) => v==null
-          ? `<span class="si-chip" title="Not enough history — the ${lbl} window predates this treasury strategy">${lbl} <b style="color:var(--faint)">—</b></span>`
+          ? `<span class="si-chip" title="Not enough history — this chart's data starts less than ${lbl} ago">${lbl} <b style="color:var(--faint)">—</b></span>`
           : `<span class="si-chip" title="Average net mNAV over the trailing ${lbl}${
               live!=null ? ` — today is ${Math.abs((live/v-1)*100).toFixed(0)}% ${live>=v?"above":"below"} it` : ""}">`+
             `${lbl} <b class="${live!=null && live<v ? "" : "warn"}">${fmt(v,2)}x</b></span>`;
@@ -1515,7 +1681,7 @@ function renderCharts(){
         return ctx.dataset.yAxisID==="yM" ? "EV mNAV: "+(+ctx.parsed.y).toFixed(2)+"x"
                                           : co+": $"+(+ctx.parsed.y).toFixed(2);
       }};
-      const [mhd_, mhpx_, mhev_] = clip(PPM_DAY, mh.dates, mh.px, mh.mnav);
+      const [mhd_, mhpx_, mhev_] = clip(PPM_CAL, mh.dates, mh.px, mh.mnav);
       mkChart("ch-mnav-"+co, { type:"line", data:{ labels: mhd_, datasets:[
         {label:"Price", data:mhpx_, yAxisID:"yP", borderColor:c, backgroundColor:c+"18",
           borderWidth:2, tension:.2, pointRadius:0, fill:false, order:1},
@@ -1591,6 +1757,7 @@ function renderCharts(){
       options: shOpts });
   });
   setStatus("shorts", !anyShorts);
+  wireExportButtons();
 }
 
 // ---------- generic hover breakdown tooltip (position:fixed, not clipped by the grid) ----------
@@ -1669,7 +1836,7 @@ function debtTipHTML(co){
   return `<div class="et-title">Convertible Notes · ${o.capStructAsOf||""}</div>
     <div class="dt-sum"><b>$${fmt(tot/1000,2)}B</b> total · Wtd coupon <b>${fmt(wac,2)}%</b> · Wtd maturity <b>${fmt(wam,1)} yr</b> · BTC par <b>$${fmt(btcPar,0)}</b></div>
     <table class="dt"><tr><th>Note</th><th>Coupon</th><th>Maturity</th><th>Put</th><th>Principal</th><th>Conv $</th><th>Parity</th></tr>${rows}</table>
-    <div class="dt-note">BTC par = BTC price at which reserves cover the bonds. Parity = conversion value ÷ par at live stock ($${fmt(px,2)}); stock 7d ${cc(chg(5))}, 1mo ${cc(chg(21))}. Actual bond prices trade above parity (bond floor) and need a TRACE/dealer feed.</div>`;
+    <div class="dt-note">BTC par = BTC price at which reserves cover the bonds. Parity = conversion value ÷ par at live stock ($${fmt(px,2)}); stock 7d ${cc(chg(7))}, 1mo ${cc(chg(30))}. Actual bond prices trade above parity (bond floor) and need a TRACE/dealer feed.</div>`;
 }
 const debttip=document.createElement("div"); debttip.id="debttip"; document.body.appendChild(debttip);
 document.addEventListener("mouseover", e => {
@@ -1835,15 +2002,20 @@ function simulate(s, cfg){
            endClaims:claims(pref,buf)/nav(hold,cfg.btcTarget)*100,
            idxStock, idxBtc, labels };
 }
-function runCalc(){
-  const out=document.getElementById("calc-out"); if(!out || !DATA.companies) return;
-  const s = calcSnapshot(calcCo);
-  const gv = id => parseFloat(document.getElementById(id).value)||0;
-  const cfg = { btcTarget:gv("ci-btc"), months:Math.max(1,Math.round(gv("ci-months"))),
+// Every calculator input, read once. runCalc() and shareCard() need the same field
+// list and the same coercions, so a new input is added here and works in both.
+function readCalcCfg(){
+  const gv = id => calcInputValue(document.getElementById(id))||0;
+  return { btcTarget:gv("ci-btc"), months:Math.max(1,Math.round(gv("ci-months"))),
     prefMo:gv("ci-pref"), commonMo:gv("ci-common"), rate:gv("ci-rate"),
     fundMix:gv("ci-fund")/100, endMnav:gv("ci-mnav"), runway:Math.max(0,gv("ci-runway")),
     basis:(document.getElementById("ci-basis")||{}).value || "ev",
     atmFloor:Math.max(0, gv("ci-floor")) };
+}
+function runCalc(){
+  const out=document.getElementById("calc-out"); if(!out || !DATA.companies) return;
+  const s = calcSnapshot(calcCo);
+  const cfg = readCalcCfg();
   const lbl = document.getElementById("ci-fund-lbl");
   if(lbl){ const m=Math.round(cfg.fundMix*100);
     lbl.textContent = m===0 ? "100% common issuance" : m===100 ? "100% BTC sales" : m+"% BTC sales · "+(100-m)+"% common"; }
@@ -1891,32 +2063,183 @@ function runCalc(){
       options: mnOpts });
   }
 }
-async function shareCard(){
-  const btn = document.getElementById("ci-share");
-  const gv = id => parseFloat(document.getElementById(id).value)||0;
-  const cfg = { btcTarget:gv("ci-btc"), months:Math.max(1,Math.round(gv("ci-months"))),
-    prefMo:gv("ci-pref"), commonMo:gv("ci-common"), rate:gv("ci-rate"),
-    fundMix:gv("ci-fund")/100, endMnav:gv("ci-mnav"), runway:Math.max(0,gv("ci-runway")),
-    basis:(document.getElementById("ci-basis")||{}).value || "ev",
-    atmFloor:Math.max(0, gv("ci-floor")) };
-  const snap = calcSnapshot(calcCo), r = simulate(snap, cfg), o = DATA.companies[calcCo];
-  if(!r) return;
-  const W=1200, H=675, SCALE=2;                 // render 2x for crisp social images
-  const cv=document.createElement("canvas"); cv.width=W*SCALE; cv.height=H*SCALE;
-  const x = cv.getContext("2d"); x.scale(SCALE, SCALE);
+// ---------- image export: the share card, and a PNG of any registered chart ----------
+const EXPORT_SCALE = 2;                 // 2x, so axis labels survive being reposted
+const APYX_EYEBROW = "APYX  ·  BTC TREASURY & DIGITAL CREDIT TRACKER";
+const EXPORT_FONT = w => `${w} 'Google Sans Flex','Google Sans',sans-serif`;
+
+// Copy plain objects and arrays; pass everything else through by reference. That
+// "everything else" is the point: several charts here configure tick and tooltip
+// callbacks, and JSON round-tripping would silently drop them.
+function cloneCfg(v){
+  if(Array.isArray(v)) return v.map(cloneCfg);
+  if(v && typeof v === "object"){
+    const proto = Object.getPrototypeOf(v);
+    if(proto === Object.prototype || proto === null){
+      const out = {};
+      for(const k in v) out[k] = cloneCfg(v[k]);
+      return out;
+    }
+  }
+  return v;
+}
+
+// Shared chrome: near-black ground, crimson radial, eyebrow, two-tone headline, notes.
+function apyxFrame(x, W, H, {eyebrow, head, tail, tailColor, note, titlePx}){
   x.fillStyle="#0a0a0b"; x.fillRect(0,0,W,H);
   const g = x.createRadialGradient(W*0.96,0,60,W*0.96,0,560);
   g.addColorStop(0,"rgba(220,20,60,0.18)"); g.addColorStop(1,"rgba(220,20,60,0)");
   x.fillStyle=g; x.fillRect(0,0,W,H);
-  const F = w => `${w} 'Google Sans Flex','Google Sans',sans-serif`;
-  // header
-  x.fillStyle="#9aa0a6"; x.font=F("600 19px"); x.fillText("APYX  ·  BTC TREASURY & DIGITAL CREDIT TRACKER", 56, 62);
-  x.font=F("italic 700 62px"); x.fillStyle="#ffffff";
-  x.fillText(`${calcCo} → `, 56, 138);
-  const w1 = x.measureText(`${calcCo} → `).width;
-  x.fillStyle=o.accent; x.fillText(`$${fmt(r.implied,2)}`, 56+w1, 138);
-  x.fillStyle="#b9bdc2"; x.font=F("400 22px");
-  x.fillText(`implied in ${cfg.months} months`, 56, 178);
+  x.fillStyle="#9aa0a6"; x.font=EXPORT_FONT("600 19px"); x.fillText(eyebrow, 56, 62);
+  const base = 76 + titlePx;
+  x.font=EXPORT_FONT(`italic 700 ${titlePx}px`); x.fillStyle="#ffffff";
+  x.fillText(head, 56, base);
+  if(tail){ x.fillStyle=tailColor; x.fillText(tail, 56 + x.measureText(head).width, base); }
+  x.fillStyle="#b9bdc2"; x.font=EXPORT_FONT("400 22px");
+  (Array.isArray(note) ? note : [note]).forEach((line, i) => x.fillText(line, 56, base + 40 + i*28));
+}
+
+// "Powered by" + logo bottom right, then the footer line bottom left. The address
+// leads in crimson rather than sitting grey inside a run-on sentence: the whole
+// point of an exported image is that it travels, and it should say where from.
+// Left-aligned because the bottom right belongs to the logo.
+async function apyxFooter(x, W, H, {left}){
+  try{
+    const img = new Image();
+    await new Promise((res,rej)=>{ img.onload=res; img.onerror=rej; img.src="apyx-logo.svg"; });
+    x.textAlign="right";
+    x.font=EXPORT_FONT("400 15px"); x.fillStyle="#9aa0a6";
+    x.fillText("Powered by", W-56, H-62);
+    x.textAlign="left";
+    x.drawImage(img, W-56-150, H-52, 150, 31);
+  }catch(e){}
+  const cta = "treasurytracker.net →";
+  const date = new Date().toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});
+  x.font=EXPORT_FONT("400 16px");
+  x.fillStyle="#dc143c"; x.fillText(cta, 56, H-34);
+  x.fillStyle="#9aa0a6";
+  x.fillText("  ·  "+left+"  ·  "+date, 56 + x.measureText(cta).width, H-34);
+}
+
+// Rebuild the chart offscreen rather than copying the on-page canvas, which gives
+// soft, unreadable axis labels (the bug fixed in 66f773d). devicePixelRatio does
+// the 2x, so every font and line weight keeps its authored size.
+// Chart.destroy() clears the canvas it drew on, so take the pixels off first.
+async function snapshotChart(id, w, h){
+  if(typeof Chart === "undefined" || !CHART_CFG[id]) return null;
+  const oc = document.createElement("canvas");
+  oc.width = w; oc.height = h;
+  const cfg = cloneCfg(CHART_CFG[id]);
+  const o = cfg.options = cfg.options || {};
+  o.responsive = false; o.animation = false; o.devicePixelRatio = EXPORT_SCALE;
+  o.plugins = o.plugins || {};
+  o.plugins.tooltip = {enabled:false};
+  const tmp = new Chart(oc.getContext("2d"), cfg);
+  await new Promise(res => setTimeout(res, 80));
+  const out = document.createElement("canvas");
+  out.width = oc.width; out.height = oc.height;
+  out.getContext("2d").drawImage(oc, 0, 0);
+  tmp.destroy();
+  return out;
+}
+
+// toBlob -> clipboard -> download. The clipboard write throws outside a secure
+// context and in some browsers; the download must still fire, hence the catch.
+function exportCanvas(cv, filename, btn){
+  cv.toBlob(async blob => {
+    try{ await navigator.clipboard.write([new ClipboardItem({"image/png": blob})]); }catch(e){}
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
+    if(btn){ const t=btn.innerHTML; btn.innerHTML="Saved &#10003;"; setTimeout(()=>btn.innerHTML=t, 2500); }
+  }, "image/png");
+}
+
+// A downloaded PNG has no page around it, so the note carries what the image loses:
+// the series names, which axis each sits on where that is ambiguous, the active
+// range, and the as-of date.
+function chartExportMeta(id, card){
+  const cfg = CHART_CFG[id] || {};
+  const h3 = card.querySelector("h3");
+  const title = [...h3.childNodes]
+    .filter(n => !(n.nodeType === 1 && n.classList.contains("pngbtn")))
+    .map(n => n.textContent).join("").trim();
+  const dash = title.indexOf("—");
+  const scales = (cfg.options && cfg.options.scales) || {};
+  const sets = ((cfg.data && cfg.data.datasets) || []).filter(d => d.label);
+  // Which side, not which axis title: on a dual-axis chart the series label usually
+  // already echoes the title ("Shorts % of Float" / "% float"), and what a reader
+  // cannot recover from a flat image is which of the two scales to read against.
+  const side = d => {
+    const sc = scales[d.yAxisID];
+    return sc && sc.position ? sc.position : null;
+  };
+  const twoAxes = new Set(sets.map(d => d.yAxisID).filter(Boolean)).size > 1;
+  const dot = h3.querySelector(".dot");
+  const chip = document.querySelector("#rangechips button.active");
+  return {
+    head: dash >= 0 ? title.slice(0, dash+1)+" " : title+" ",
+    tail: dash >= 0 ? title.slice(dash+1).trim() : "",
+    tailColor: dot ? getComputedStyle(dot).backgroundColor : "#ffffff",
+    note: [
+      sets.map(d => { const a = twoAxes && side(d); return a ? `${d.label} (${a})` : d.label; })
+          .join("  ·  "),
+      `${chip ? chip.textContent : chartRange}  ·  as of ${DATA.asOf || "—"}`,
+    ],
+    // name the file after the heading a reader saw, not the canvas id: "ch-si-MSTR"
+    // is the price-and-mNAV chart, which nobody could guess from apyx-si-mstr.png
+    filename: `apyx-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}-${chartRange}.png`,
+  };
+}
+
+async function downloadChartImage(id, meta, btn){
+  const W=1200, H=675, PX=56, PY=196, PW=1088, PH=392, PAD=14;
+  const cv=document.createElement("canvas"); cv.width=W*EXPORT_SCALE; cv.height=H*EXPORT_SCALE;
+  const x=cv.getContext("2d"); x.scale(EXPORT_SCALE, EXPORT_SCALE);
+  apyxFrame(x, W, H, {eyebrow:APYX_EYEBROW, head:meta.head, tail:meta.tail,
+                      tailColor:meta.tailColor, note:meta.note, titlePx:40});
+  x.strokeStyle="rgba(255,255,255,0.18)"; x.fillStyle="rgba(255,255,255,0.02)";
+  x.fillRect(PX,PY,PW,PH); x.strokeRect(PX,PY,PW,PH);
+  const oc = await snapshotChart(id, PW-PAD*2, PH-PAD*2);
+  if(oc) x.drawImage(oc, PX+PAD, PY+PAD, PW-PAD*2, PH-PAD*2);
+  await apyxFooter(x, W, H, {left:"not investment advice"});
+  exportCanvas(cv, meta.filename, btn);
+}
+
+// One pass over the rendered cards, so a new chart gets an export button for free.
+// renderCharts() re-runs on every range-chip click, so reuse any button already
+// there rather than appending a second one. Cards without a registered canvas --
+// the ATM cards, which reuse .chartcard for a stat grid -- are skipped.
+function wireExportButtons(){
+  document.querySelectorAll(".chartcard").forEach(card => {
+    const cv = card.querySelector(".chartwrap canvas");
+    const h3 = card.querySelector("h3");
+    if(!cv || !h3 || !CHART_CFG[cv.id]) return;
+    let btn = h3.querySelector(".pngbtn");
+    if(!btn){
+      btn = document.createElement("button");
+      btn.className = "pngbtn"; btn.type = "button";
+      btn.innerHTML = "&#10515; PNG";
+      btn.title = "Download this chart as an image";
+      h3.appendChild(btn);
+    }
+    btn.onclick = () => downloadChartImage(cv.id, chartExportMeta(cv.id, card), btn);
+  });
+}
+async function shareCard(){
+  const btn = document.getElementById("ci-share");
+  const cfg = readCalcCfg();
+  const snap = calcSnapshot(calcCo), r = simulate(snap, cfg), o = DATA.companies[calcCo];
+  if(!r) return;
+  const W=1200, H=675, SCALE=EXPORT_SCALE;      // render 2x for crisp social images
+  const cv=document.createElement("canvas"); cv.width=W*SCALE; cv.height=H*SCALE;
+  const x = cv.getContext("2d"); x.scale(SCALE, SCALE);
+  const F = EXPORT_FONT;
+  apyxFrame(x, W, H, {eyebrow:APYX_EYEBROW, head:`${calcCo} \u2192 `,
+                      tail:`$${fmt(r.implied,2)}`, tailColor:o.accent,
+                      note:`implied in ${cfg.months} months`, titlePx:62});
   // stat boxes beside the price: stock return (BTC subtly noted) + amplification
   const statBox = (bx, label, val, valColor, sub) => {
     x.strokeStyle="rgba(255,255,255,0.18)"; x.fillStyle="rgba(255,255,255,0.02)";
@@ -1969,28 +2292,92 @@ async function shareCard(){
     x.drawImage(oc, 652, 222, 480, 344);
     tmp.destroy();
   }
-  // "Powered by" + APYX logo, bottom right (top right now holds the stat boxes)
-  try{
-    const img = new Image();
-    await new Promise((res,rej)=>{ img.onload=res; img.onerror=rej; img.src="apyx-logo.svg"; });
-    x.textAlign="right";
-    x.font=F("400 15px"); x.fillStyle="#9aa0a6";
-    x.fillText("Powered by", W-56, H-62);
-    x.textAlign="left";
-    x.drawImage(img, W-56-150, H-52, 150, 31);
-  }catch(e){}
-  // footer
-  x.font=F("400 16px"); x.fillStyle="#9aa0a6";
-  x.fillText("treasurytracker.net  ·  a model, not investment advice  ·  "+new Date().toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}), 56, H-34);
-  cv.toBlob(async blob => {
-    try{ await navigator.clipboard.write([new ClipboardItem({"image/png": blob})]); }catch(e){}
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `apyx-${calcCo.toLowerCase()}-implied-price.png`;
-    a.click();
-    setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
-    if(btn){ const t=btn.innerHTML; btn.innerHTML="Saved &#10003;"; setTimeout(()=>btn.innerHTML=t, 2500); }
-  }, "image/png");
+  await apyxFooter(x, W, H, {left:"a model, not investment advice"});
+  exportCanvas(cv, `apyx-${calcCo.toLowerCase()}-implied-price.png`, btn);
+}
+
+// ---------- calculator permalinks: the scenario travels in the URL ----------
+// Short keys keep the link readable; the DOM id is the source of truth for bounds.
+const CALC_HASH_KEYS = { btc:"ci-btc", m:"ci-months", pref:"ci-pref", common:"ci-common",
+  floor:"ci-floor", rate:"ci-rate", fund:"ci-fund", runway:"ci-runway", mnav:"ci-mnav" };
+// The markup is the schema -- every input carries min and step -- but only four
+// carry max. These are the ceilings for the five that do not, so a hand-edited
+// link cannot push simulate() somewhere it renders NaN all the way through.
+const CALC_HASH_MAX = { "ci-btc":1e7, "ci-pref":1e5, "ci-common":1e5, "ci-rate":100, "ci-mnav":100 };
+
+function clampCalcInput(el, raw){
+  const v = parseFloat(raw);
+  if(!isFinite(v)) return null;
+  const min = el.min !== "" ? parseFloat(el.min) : -Infinity;
+  const max = el.max !== "" ? parseFloat(el.max)
+            : (CALC_HASH_MAX[el.id] !== undefined ? CALC_HASH_MAX[el.id] : Infinity);
+  return Math.min(max, Math.max(min, v));
+}
+// The calculator runs on this and the permalink carries it, so a link reopens exactly
+// what was on screen. An empty box is 0 here; dropping it would reopen the default.
+function calcInputValue(el){ return clampCalcInput(el, el.value === "" ? 0 : el.value); }
+
+// Everything in the hash is untrusted: numbers are clamped, the company and the
+// mNAV basis are whitelists. Returns null when the link carries no query at all.
+function parseCalcHash(){
+  const q = location.hash.indexOf("?");
+  if(q < 0) return null;
+  const p = new URLSearchParams(location.hash.slice(q+1));
+  const out = { inputs:{} };
+  const co = (p.get("co") || "").toUpperCase();
+  if(DATA.companies && DATA.companies[co]) out.co = co;
+  for(const key in CALC_HASH_KEYS){
+    if(!p.has(key)) continue;
+    const el = document.getElementById(CALC_HASH_KEYS[key]);
+    if(!el) continue;
+    const v = clampCalcInput(el, p.get(key));
+    if(v !== null) out.inputs[CALC_HASH_KEYS[key]] = v;
+  }
+  const b = p.get("basis");
+  if(b === "net" || b === "ev") out.basis = b;
+  return out;
+}
+
+// Write the validated values back into the inputs and let runCalc() read them, so
+// the DOM stays the single source of truth and no second field list exists.
+function applyCalcHash(link){
+  for(const id in link.inputs){
+    const el = document.getElementById(id);
+    if(el) el.value = link.inputs[id];
+  }
+  if(link.basis){
+    const sel = document.getElementById("ci-basis");
+    if(sel) sel.value = link.basis;
+  }
+  document.querySelectorAll(".cobtn[data-co]").forEach(b =>
+    b.classList.toggle("active", b.dataset.co === calcCo));
+}
+
+// replaceState, not a hash assignment: typing in a number field should not push a
+// history entry per keystroke. replaceState also fires no hashchange, so the
+// writer cannot loop back into the reader.
+function writeCalcToHash(){
+  const p = new URLSearchParams();
+  p.set("co", calcCo);
+  for(const key in CALC_HASH_KEYS){
+    const el = document.getElementById(CALC_HASH_KEYS[key]);
+    const v = el ? calcInputValue(el) : null;
+    if(v != null) p.set(key, v);
+  }
+  p.set("basis", readCalcCfg().basis);
+  lastCalcQuery = p.toString();
+  // The 400ms debounce can land after the user has left the tab: keep the scenario
+  // for the way back, but never put #calc on the dashboard's URL.
+  if(!document.body.classList.contains("tab-calc")) return;
+  try{ history.replaceState(null, "", location.pathname + "#calc?" + lastCalcQuery); }catch(e){}
+}
+let calcHashTimer = null;
+// Leaving the calculator strips the hash, so hold the scenario here: otherwise
+// building one, glancing at the dashboard and coming back would lose the link.
+let lastCalcQuery = "";
+function queueCalcHash(){
+  clearTimeout(calcHashTimer);
+  calcHashTimer = setTimeout(writeCalcToHash, 400);
 }
 
 function initCalc(){
@@ -1998,7 +2385,9 @@ function initCalc(){
   // Tab routing owns ONLY the #calc hash. Section anchors (#valuation etc.) must
   // pass straight through to the browser — routing them as "not calc" used to
   // scroll to top and strip the hash, which broke every section-nav link.
-  const isCalcHash = () => /^#calc(ulator)?$/i.test(location.hash);
+  // The (\?|$) is what lets a permalink through: #calc?btc=... must still route
+  // to the calculator, not fall through to the browser as a section anchor.
+  const isCalcHash = () => /^#calc(ulator)?(\?|$)/i.test(location.hash);
   const setTab = (tab, opts={}) => {
     const changing = document.body.classList.contains("tab-calc") !== (tab==="calc");
     document.querySelectorAll(".tabbtn").forEach(x=>x.classList.toggle("active", x.dataset.tab===tab));
@@ -2008,16 +2397,32 @@ function initCalc(){
       if(tab==="calc") runCalc();   // re-render the chart once visible
     }
     if(opts.writeHash){             // only tab clicks rewrite the hash
-      const want = tab==="calc" ? "#calc" : "";
-      if(location.hash !== want && (want || isCalcHash()))
-        try{ history.replaceState(null, "", location.pathname + want); }catch(e){}
+      // Entering calc leaves an incoming permalink alone and otherwise restores the
+      // scenario; leaving strips the hash only when it was ours, so a section
+      // anchor is never touched -- the regression 8cd72c3 fixed.
+      if(tab === "calc"){
+        if(!isCalcHash()){
+          const want = "#calc" + (lastCalcQuery ? "?" + lastCalcQuery : "");
+          try{ history.replaceState(null, "", location.pathname + want); }catch(e){}
+        }
+      } else if(isCalcHash()){
+        try{ history.replaceState(null, "", location.pathname); }catch(e){}
+      }
     }
   };
   document.querySelectorAll(".tabbtn").forEach(b =>
     b.addEventListener("click", () => setTab(b.dataset.tab, {writeHash:true})));
   // deep link: /#calc or /#calculator (the /calculator path redirects here)
   window.addEventListener("hashchange", () => {
-    if(isCalcHash()) setTab("calc");
+    if(isCalcHash()){
+      const link = parseCalcHash();
+      if(link){
+        if(link.co && link.co !== calcCo){ calcCo = link.co; setDefaults(); }
+        applyCalcHash(link);
+        runCalc();
+      }
+      setTab("calc");
+    }
     else if(!location.hash && document.body.classList.contains("tab-calc")) setTab("dash");
     // any other hash is a section anchor — leave it to the browser
   });
@@ -2034,9 +2439,10 @@ function initCalc(){
     document.querySelectorAll(".cobtn[data-co]").forEach(x=>x.classList.toggle("active", x===b));
     setDefaults();
     runCalc();
+    queueCalcHash();
   }));
   ["ci-btc","ci-months","ci-pref","ci-common","ci-rate","ci-mnav","ci-runway","ci-floor"].forEach(id =>
-    document.getElementById(id).addEventListener("input", runCalc));
+    document.getElementById(id).addEventListener("input", () => { runCalc(); queueCalcHash(); }));
   const basisSel = document.getElementById("ci-basis");
   if(basisSel) basisSel.addEventListener("change", () => {
     // prefill the target with today's multiple on the chosen basis (no re-rate)
@@ -2046,12 +2452,43 @@ function initCalc(){
                                        : (o.stockPrice*o.sharesOutstanding + cl)/nav0;
     document.getElementById("ci-mnav").value = (Math.round(cur*20)/20).toFixed(2);
     runCalc();
+    queueCalcHash();
   });
-  document.getElementById("ci-fund").addEventListener("input", runCalc);
+  document.getElementById("ci-fund").addEventListener("input", () => { runCalc(); queueCalcHash(); });
   document.getElementById("ci-share").addEventListener("click", shareCard);
+  const linkBtn = document.getElementById("ci-link");
+  const linkLabel = linkBtn && linkBtn.innerHTML;   // read once: a second click mid-flash would save "Copied"
+  let linkFlash = null;
+  if(linkBtn) linkBtn.addEventListener("click", async () => {
+    writeCalcToHash();                       // flush the debounce before copying
+    // navigator.clipboard is undefined on plain http and can reject (permissions,
+    // webviews), so fall back to execCommand and only claim a copy that happened
+    let ok = false;
+    try{ await navigator.clipboard.writeText(location.href); ok = true; }
+    catch(e){
+      const ta = document.createElement("textarea");
+      ta.value = location.href; ta.readOnly = true;
+      ta.style.cssText = "position:fixed;top:0;left:0;opacity:0";
+      document.body.appendChild(ta); ta.select();
+      try{ ok = document.execCommand("copy"); }catch(e2){}
+      ta.remove(); linkBtn.focus();          // the textarea took focus; give it back
+    }
+    linkBtn.innerHTML = ok ? "Copied &#10003;" : "Copy failed — use address bar";
+    clearTimeout(linkFlash);
+    linkFlash = setTimeout(() => linkBtn.innerHTML = linkLabel, 2500);
+  });
+  // Order matters: the company decides the defaults, and the link overrides both.
+  // A section anchor can carry its own ?query (#valuation?ref=x); only #calc is ours.
+  const link = isCalcHash() ? parseCalcHash() : null;
+  if(link && link.co) calcCo = link.co;
   setDefaults();
+  if(link) applyCalcHash(link);
   runCalc();
-  if(isCalcHash()) setTab("calc");   // arrived via /calculator or /#calc
+  if(isCalcHash()) setTab("calc");   // arrived via /calculator, /#calc or a permalink
+  // Rewrite an incoming link from the values actually used, so a hand-edited or
+  // out-of-range one shows its clamped form rather than the junk that was pasted.
+  // After setTab: the writer only touches the URL while the calculator is showing.
+  if(link) writeCalcToHash();
 }
 
 // real-time equity layer: the tracker's light feed (CORS-open, ~140KB) carries live
@@ -2270,6 +2707,15 @@ function etDateStr(d){
       year:"numeric",month:"2-digit",day:"2-digit"}).format(d || new Date());
   }catch(e){ return (d||new Date()).toISOString().slice(0,10); }
 }
+// How to name a past session beside figures that otherwise read as today's: "" when it
+// is today, its weekday within 6 days, and null when a weekday would mislead (a week or
+// more old, in the future, or no date). Both dates parse as UTC midnights, so DST
+// can't skew the age.
+function sessionDayName(iso){
+  const age = (Date.parse(etDateStr()) - Date.parse(iso)) / 864e5;
+  if(!(age >= 0 && age <= 6)) return null;
+  return age ? ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][new Date(iso).getUTCDay()] : "";
+}
 
 // The base for "today's change". GitHub throttles the refresh cron to a handful of
 // runs a day, so data.json usually holds a *previous* session's settled close — and
@@ -2316,8 +2762,6 @@ async function repollData(){
   }catch(e){ /* keep current data */ }
 }
 
-// cadence: every minute during market hours -> live stock px + BTC (all derived
-// metrics re-render with them); every 15 minutes -> full data.json repoll
 // ---------- section nav: active highlighting + chart range chips ----------
 (function initSecNav(){
   const nav = document.getElementById("secnav"); if(!nav) return;
@@ -2345,8 +2789,11 @@ async function repollData(){
   });
 })();
 
-// one chain, not three racing timers: the tracker feed and strategy.com both carry
-// an MSTR quote, and strategy.com (the official consolidated print) has to land last
+// cadence: in market hours, live stock and preferred quotes every minute (every
+// derived metric re-renders with them) and a data.json repoll every 5 minutes;
+// BTC every minute, always. One chain, not three racing timers: the tracker feed
+// and strategy.com both carry an MSTR quote, and strategy.com (the official
+// consolidated print) has to land last
 setInterval(() => {
   (marketOpenET() ? fetchLiveEquity().then(fetchLivePrefs) : Promise.resolve())
     .then(fetchStrategyLive);
