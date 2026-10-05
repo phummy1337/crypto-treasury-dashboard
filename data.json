@@ -1,7 +1,7 @@
 {
   "asOf": "2026-10-05",
   "priceAsOf": "2026-10-05",
-  "btcPriceUsd": 85860,
+  "btcPriceUsd": 85891,
   "btcSupply": 21000000,
   "btcCirculating": 20093693,
   "companies": {
@@ -4199,12 +4199,12 @@
       },
       "assumedDilutedShares": 451.67,
       "_dilOverlayM": 29.5988,
-      "netSatsPerShare": 158406,
+      "netSatsPerShare": 158417,
       "netMnavPub": 1.2041,
-      "amplificationPub": 1.2409,
-      "breakevenArrPub": 2.1692,
+      "amplificationPub": 1.2408,
+      "breakevenArrPub": 2.1686,
       "hurdleArrPub": 10.6299,
-      "floorArrPub": -17.5745,
+      "floorArrPub": -17.5786,
       "creditDurationPub": 6.3611,
       "netDilutedShares": 431.4,
       "atm": {
@@ -4565,7 +4565,7 @@
         "latestOnEdgar": "2026-10-05",
         "ingested": "2026-10-05"
       },
-      "netLeveragePub": 1.3763,
+      "netLeveragePub": 1.3759,
       "costBasisFiledM": 63970,
       "rvol": {
         "mult": 1.2,
@@ -7379,7 +7379,7 @@
       },
       "_dilOverlayM": 2.7758,
       "assumedDilutedShares": 103.72,
-      "netSatsPerShare": 17008,
+      "netSatsPerShare": 17012,
       "netDilutedShares": 103.72,
       "atm": {
         "ticker": "SATA",
@@ -7393,7 +7393,7 @@
         "todayTotalUsd": 44928195,
         "todayEligUsd": 44928195,
         "todayEstUsd": 27448981,
-        "todayEstBtc": 319.69,
+        "todayEstBtc": 319.58,
         "weekEligUsd": 0,
         "weekEstUsd": 0,
         "weekEstBtc": 0.0,
@@ -9798,7 +9798,7 @@
       "items": [
         "Bought 2,000 BTC at ~$84,422/BTC avg",
         "Cash +$35.9M ($248.8M \u2192 $284.7M)",
-        "Issued 3,255,119 Class A shares (ATM)",
+        "Issued 3,255,119 Class A shares (2,100,100 warrant exercises at $27 \u2192 ~$56.7M cash \u00b7 1,155,019 ATM/other)",
         "Issued 1,304,902 SATA preferred shares"
       ],
       "filed": "2026-10-05",
@@ -9824,7 +9824,7 @@
       "items": [
         "Bought 1,107 BTC at ~$85,396/BTC avg",
         "Cash +$19.2M ($229.6M \u2192 $248.8M)",
-        "Issued 649,072 Class A shares (ATM)",
+        "Issued 649,072 Class A shares (460,649 warrant exercises at $27 \u2192 ~$12.4M cash \u00b7 188,423 ATM/other)",
         "Issued 1,009,020 SATA preferred shares"
       ],
       "filed": "2026-09-28",
@@ -9848,7 +9848,7 @@
       "items": [
         "Bought 1,355 BTC at ~$79,475/BTC avg",
         "Cash +$25.4M ($204.2M \u2192 $229.6M)",
-        "Issued 2,073,760 Class A shares (ATM)",
+        "Issued 2,073,760 Class A shares (785,555 warrant exercises at $27 \u2192 ~$21.2M cash \u00b7 1,288,205 ATM/other)",
         "Issued 786,194 SATA preferred shares"
       ],
       "filed": "2026-09-21",
@@ -10874,7 +10874,7 @@
       },
       {
         "name": "Apyx apxUSD vault",
-        "apy": 7.32
+        "apy": 7.09
       }
     ]
   }
