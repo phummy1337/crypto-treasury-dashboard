@@ -1261,7 +1261,24 @@ def _asst_actions(text):
             items.append(f"Cash {'+' if b >= a else '−'}${abs(b-a):,.1f}M (${a:,.1f}M → ${b:,.1f}M)")
     sm = re.search(r"Class A common stock\s*([\d,]+)\s*([\d,]+)\s*([\d,]+)", text)
     if sm and int(sm.group(3).replace(",", "")) > 1000:
-        items.append(f"Issued {sm.group(3)} Class A shares (ATM)")
+        # The table reports Class A growth as one number, but it mixes two very
+        # different things: ATM sales (new capital at market) and traditional
+        # warrant exercises (shares at the fixed $27 strike, already counted in
+        # the overhang — dilutive but not a raise at market). Calling the whole
+        # line ATM overstated the ATM by 2.1M shares in the week to Oct 2 alone.
+        # The warrant row in the same table gives the exercise count exactly, so
+        # back it out. The remainder is "ATM/other" rather than pure ATM: vested
+        # employee awards and option exercises also land in Class A, and the
+        # filing nets those into the awards rows instead of breaking them out.
+        issued = int(sm.group(3).replace(",", ""))
+        ex = (_asst_warrants(text, None) or {}).get("weekExercised") or 0
+        if 0 < ex <= issued:
+            items.append(
+                f"Issued {issued:,} Class A shares ({ex:,} warrant exercises at "
+                f"${WARRANT_STRIKE:,.0f} → ~${ex * WARRANT_STRIKE / 1e6:,.1f}M cash · "
+                f"{issued - ex:,} ATM/other)")
+        else:
+            items.append(f"Issued {issued:,} Class A shares (ATM)")
     pm = re.search(r"SATA Stock[^0-9]{0,60}([\d,]{6,})\s*([\d,]{6,})\s*([\d,]+)", text)
     if pm and int(pm.group(3).replace(",", "")) > 1000:
         items.append(f"Issued {pm.group(3)} SATA preferred shares")
