@@ -886,6 +886,16 @@ def _parse_flows(text):
     return {"raised": raised, "btcSpent": spent, "btcSold": sold}
 
 
+# "As of <date> Aggregate BTC Holdings … <holdings> $<agg $B> $<avg>" — one per
+# period block, so a quarter-split filing yields two. Averages may be fractional.
+_AGG_BLOCKS = re.compile(
+    r"As of ([A-Z][a-z]+ \d{1,2}, \d{4})\*?\s*Aggregate BTC Holdings.{0,140}?"
+    r"([\d,]{6,})\s+\$\s*([\d,.]+)\s+\$\s*([\d,.]+)", re.S)
+# the BTC-acquired cell of each period block ("-" on a no-purchase stretch)
+_PERIOD_ACQ = re.compile(
+    r"BTC (?:Acquired|Purchased).{0,160}?Average Purchase Price\s*\(\d\)\s*([\d,]+|[-–—])", re.S)
+
+
 def _parse_mstr(text):
     """Strategy 8-K 'BTC Update' -> (start, end, acquired, holdings, avg_cost).
 
@@ -917,6 +927,21 @@ def _parse_mstr(text):
     if not dm:
         return None
     start, end = _pdate(dm.group(1)), _pdate(dm.group(2))
+
+    # Aggregate "As of" blocks. A quarter boundary splits one 8-K into TWO period
+    # /"As of" pairs (2026-10-05: Sep 28-30 then Oct 1-4), so take the LAST block
+    # for holdings and basis and sum the periods for the week's acquisition. The
+    # same filing also started printing fractional averages ("$75,436.6") and
+    # dropped the space after "$", both of which the old row regex rejected —
+    # it returned None and the filing was skipped whole.
+    blocks = _AGG_BLOCKS.findall(text)
+    if blocks:
+        holdings = int(blocks[-1][1].replace(",", ""))
+        avg = round(float(blocks[-1][3].replace(",", "")))
+        acquired = sum(0 if a.strip() in "-–—" else int(a.replace(",", ""))
+                       for a in _PERIOD_ACQ.findall(text))
+        last_end = _pdate(blocks[-1][0]) or end
+        return (start, last_end, acquired, holdings, avg)
 
     # table row (tolerates "$ 101.3" or "$34.9", and "-" for no-purchase weeks)
     tm = re.search(r"Aggregate BTC Holdings.*?([\d,]+|-)\s+\$\s*[\d,.\-]+\s+\$\s*[\d,.\-]+"
@@ -957,11 +982,16 @@ def _mstr_cost_basis(text):
     # because the preceding weeks were no-purchase weeks whose period columns are
     # "-". Anchor on the holdings figure instead: 6+ digits, with an aggregate
     # that is plausibly in billions.
-    for m in re.finditer(r"([\d,]{6,})\s+\$\s*([\d,.]+)\s+\$\s*([\d,]{5,})", text):
+    # A quarter-split filing carries two aggregate blocks; the LAST is current.
+    blocks = _AGG_BLOCKS.findall(text)
+    if blocks:
+        _, _, agg_b, avg = blocks[-1]
+        return float(agg_b.replace(",", "")) * 1000, round(float(avg.replace(",", "")))
+    for m in re.finditer(r"([\d,]{6,})\s+\$\s*([\d,.]+)\s+\$\s*([\d,.]{5,})", text):
         holdings = int(m.group(1).replace(",", ""))
         agg_b = float(m.group(2).replace(",", ""))
         if holdings > 100_000 and agg_b < 1000:
-            return agg_b * 1000, int(m.group(3).replace(",", ""))
+            return agg_b * 1000, round(float(m.group(3).replace(",", "")))
     return None, None
 
 
