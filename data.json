@@ -1,7 +1,7 @@
 {
   "asOf": "2026-10-06",
   "priceAsOf": "2026-10-06",
-  "btcPriceUsd": 85883,
+  "btcPriceUsd": 85709,
   "btcSupply": 21000000,
   "btcCirculating": 20093996,
   "companies": {
@@ -136,7 +136,7 @@
       "capStructAsOf": "2026-03-31 (10-Q)",
       "dilutedShares": 451.58,
       "marketCapBasic": 29540,
-      "navPremiumBasic": 0.951,
+      "navPremiumBasic": 0.952,
       "treasuryDate": "2026-10-05",
       "bpsHistory": {
         "dates": [
@@ -3275,8 +3275,8 @@
           1.152,
           1.149,
           1.125,
-          1.159,
-          1.159
+          1.16,
+          1.16
         ],
         "net": [
           1.621,
@@ -4207,12 +4207,12 @@
       },
       "assumedDilutedShares": 451.67,
       "_dilOverlayM": 29.5988,
-      "netSatsPerShare": 158409,
+      "netSatsPerShare": 158269,
       "netMnavPub": 1.2115,
-      "amplificationPub": 1.2409,
-      "breakevenArrPub": 2.169,
+      "amplificationPub": 1.242,
+      "breakevenArrPub": 2.177,
       "hurdleArrPub": 10.6283,
-      "floorArrPub": -17.5581,
+      "floorArrPub": -17.5057,
       "creditDurationPub": 6.3667,
       "netDilutedShares": 431.4,
       "atm": {
@@ -4573,7 +4573,7 @@
         "latestOnEdgar": "2026-10-05",
         "ingested": "2026-10-05"
       },
-      "netLeveragePub": 1.3762,
+      "netLeveragePub": 1.3812,
       "costBasisFiledM": 63970,
       "rvol": {
         "mult": 0.8,
@@ -6716,8 +6716,8 @@
           1.625,
           1.621,
           1.588,
-          1.606,
-          1.606
+          1.607,
+          1.607
         ],
         "net": [
           1.289,
@@ -7397,7 +7397,7 @@
       },
       "_dilOverlayM": 2.7758,
       "assumedDilutedShares": 103.72,
-      "netSatsPerShare": 17011,
+      "netSatsPerShare": 16988,
       "netDilutedShares": 103.72,
       "atm": {
         "ticker": "SATA",
@@ -7411,10 +7411,10 @@
         "todayTotalUsd": 62599485,
         "todayEligUsd": 62599485,
         "todayEstUsd": 38245295,
-        "todayEstBtc": 445.32,
+        "todayEstBtc": 446.22,
         "weekEligUsd": 62599485,
         "weekEstUsd": 38245295,
-        "weekEstBtc": 445.32,
+        "weekEstBtc": 446.22,
         "confirmed": {
           "from": "2026-09-25",
           "to": "2026-10-02",
