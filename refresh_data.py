@@ -1356,18 +1356,74 @@ WARRANT_EXPIRY = "2026-10-10"
 
 
 def _asst_warrants(text, filed):
-    """Traditional-warrant overhang from a Strive 8-K position table."""
+    """Traditional-warrant overhang from a Strive 8-K position table.
+
+    Up to expiry every week-on-week decline is an exercise — the warrants have
+    nowhere else to go — so issued-minus-outstanding is the exercise count. From
+    the expiry filing on that breaks: an unexercised block simply lapses, and the
+    same arithmetic would book the whole lapsed overhang as converted and report
+    ~100% exercised on the very week the warrants went to zero worthless.
+
+    The table carries both ends of the week, so the start-of-week figure is still
+    a clean pre-expiry reading. Hold the exercises earned up to it, then split the
+    final week's decline with the Class A row: every exercise mints one Class A
+    share, and no other line in the table can, so the Class A increase caps how
+    much of that decline can be exercise. The remainder lapsed.
+    """
     m = re.search(r"Traditional Warrants \(\d\)\s*([\d,]+)\s+([\d,]+)", text)
     if not m:
         return None
-    outstanding = int(m.group(2).replace(",", ""))
-    exercised = max(0.0, WARRANTS_ISSUED_SHARES - outstanding)
+    begin, outstanding = (int(g.replace(",", "")) for g in m.groups())
+    issued = WARRANTS_ISSUED_SHARES
+    expiry = datetime.date.fromisoformat(WARRANT_EXPIRY)
+    # the two "As of" headers bracket the window the row covers
+    asofs = re.findall(r"As of ([A-Z][a-z]+ \d{1,2}, \d{4})", text)
+    opens = _pdate(asofs[0]) if asofs else None
+    closes = _pdate(asofs[1]) if len(asofs) > 1 else None
+    decline = max(0, begin - outstanding)
+
+    if opens and opens >= expiry:
+        week_ex = 0                       # the whole window is past expiry
+    elif closes and closes > expiry:
+        # The window straddles expiry, so the decline mixes last-minute exercises
+        # with the lapse. Only a trading day after the previous reading and on or
+        # before expiry could have produced an exercise — the Oct 10 expiry falls
+        # on a Saturday, so the window that finally zeroes the row has none, and
+        # the whole decline is lapse. Where there is a tradable day, each exercise
+        # mints one Class A share and no other line in the table can, so Class A
+        # growth caps the exercise half.
+        day, tradable = opens, False
+        while day and day < expiry and not tradable:
+            day += datetime.timedelta(days=1)
+            tradable = day <= expiry and day.weekday() < 5
+        ca = re.search(r"Class A common stock\s*([\d,]+)\s*([\d,]+)\s*([\d,]+)", text)
+        week_ex = min(decline, int(ca.group(3).replace(",", "")) if ca else 0) if tradable else 0
+    else:
+        week_ex = decline                 # wholly pre-expiry: every decline is an exercise
+    exercised = (issued - begin) + week_ex
+
+    # Anything still outstanding once the expiry date has gone by is not overhang
+    # any more — it lapsed worthless. The filing never says so in words; it just
+    # stops being exercisable, so infer it from the date rather than waiting for
+    # the row to reach zero.
+    asof_d = _pdate(filed) if filed and not re.match(r"\d{4}-\d{2}-\d{2}$", filed or "") \
+        else (datetime.date.fromisoformat(filed) if filed else None)
+    past = max([d for d in (closes, asof_d) if d], default=None)
+    past = bool(past and past > expiry)
+    live = 0 if past else outstanding
+    expired = max(0, round(issued - exercised - live))
+
     return {
-        "outstanding": outstanding,
-        "issued": round(WARRANTS_ISSUED_SHARES),
+        "outstanding": live,
+        "issued": round(issued),
         "exercised": round(exercised),
-        "pctExercised": round(exercised / WARRANTS_ISSUED_SHARES * 100, 1),
-        "weekExercised": int(m.group(1).replace(",", "")) - outstanding,
+        "pctExercised": round(exercised / issued * 100, 1),
+        "expired": expired,
+        "pctExpired": round(expired / issued * 100, 1),
+        "cashRaisedM": round(exercised * WARRANT_STRIKE / 1e6, 1),
+        "lapsed": past,
+        "final": past,                    # frozen once expiry has passed
+        "weekExercised": week_ex,
         "strike": WARRANT_STRIKE,
         "expiry": WARRANT_EXPIRY,
         "asOf": filed,
@@ -1425,9 +1481,19 @@ def fetch_sata_notional(data):
             break
         time.sleep(0.12)
     if warrants:
+        # The tally is history once the warrants have lapsed: later filings keep
+        # printing the (now zero) row, and re-deriving from them would let ordinary
+        # ATM issuance leak into the exercise count. Keep the first final reading.
+        held = co.get("warrants") or {}
+        if held.get("final") and not warrants.get("final"):
+            warrants = held
+        elif held.get("final") and warrants.get("final"):
+            warrants = held if held.get("asOf", "") <= warrants.get("asOf", "") else warrants
         co["warrants"] = warrants
-        log(f"[warrants] ASST {warrants['outstanding']:,} shares underlying, "
-            f"{warrants['pctExercised']}% exercised, expires {warrants['expiry']}")
+        log(f"[warrants] ASST {warrants['exercised']:,} of {warrants['issued']:,} exercised "
+            f"({warrants['pctExercised']}%), ${warrants['cashRaisedM']:,.1f}M cash"
+            + (f", {warrants['expired']:,} expired worthless" if warrants.get("expired")
+               else f", {warrants['outstanding']:,} live, expires {warrants['expiry']}"))
     if steps:
         co["sataNotionalSteps"] = [[d, n] for d, n in sorted(steps.items())]
         _SATA["steps"] = co["sataNotionalSteps"]
