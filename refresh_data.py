@@ -1355,6 +1355,19 @@ WARRANT_STRIKE = 27.0
 WARRANT_EXPIRY = "2026-10-10"
 
 
+def _tradable_between(start, end):
+    """True if any weekday falls in (start, end] — i.e. a warrant could still
+    have been exercised after the `start` reading and on or before `end`."""
+    if not start or not end:
+        return False
+    d = start
+    while d < end:
+        d += datetime.timedelta(days=1)
+        if d <= end and d.weekday() < 5:
+            return True
+    return False
+
+
 def _asst_warrants(text, filed):
     """Traditional-warrant overhang from a Strive 8-K position table.
 
@@ -1392,24 +1405,23 @@ def _asst_warrants(text, filed):
         # the whole decline is lapse. Where there is a tradable day, each exercise
         # mints one Class A share and no other line in the table can, so Class A
         # growth caps the exercise half.
-        day, tradable = opens, False
-        while day and day < expiry and not tradable:
-            day += datetime.timedelta(days=1)
-            tradable = day <= expiry and day.weekday() < 5
         ca = re.search(r"Class A common stock\s*([\d,]+)\s*([\d,]+)\s*([\d,]+)", text)
-        week_ex = min(decline, int(ca.group(3).replace(",", "")) if ca else 0) if tradable else 0
+        week_ex = (min(decline, int(ca.group(3).replace(",", "")) if ca else 0)
+                   if _tradable_between(opens, expiry) else 0)
     else:
         week_ex = decline                 # wholly pre-expiry: every decline is an exercise
     exercised = (issued - begin) + week_ex
 
-    # Anything still outstanding once the expiry date has gone by is not overhang
-    # any more — it lapsed worthless. The filing never says so in words; it just
-    # stops being exercisable, so infer it from the date rather than waiting for
-    # the row to reach zero.
-    asof_d = _pdate(filed) if filed and not re.match(r"\d{4}-\d{2}-\d{2}$", filed or "") \
-        else (datetime.date.fromisoformat(filed) if filed else None)
-    past = max([d for d in (closes, asof_d) if d], default=None)
-    past = bool(past and past > expiry)
+    # Anything still outstanding is lapsed overhang once no further exercise was
+    # possible — the filing never says so in words, it just stops being
+    # exercisable. That turns on the reading's own close date, NOT on today:
+    # reading a stale filing after expiry does not make its count final, because
+    # trading days between its close and expiry are still unaccounted for. The
+    # last filing to close on or before expiry with no tradable day left after it
+    # is the one that settles the tally.
+    asof_d = datetime.date.fromisoformat(filed) if filed else None
+    settled = closes is not None and not _tradable_between(closes, expiry)
+    past = bool(settled and max([d for d in (closes, asof_d) if d], default=expiry) >= expiry)
     live = 0 if past else outstanding
     expired = max(0, round(issued - exercised - live))
 
