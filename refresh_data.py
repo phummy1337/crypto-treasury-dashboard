@@ -1230,13 +1230,19 @@ def _mstr_actions(text, rec, fl, whole_filing=True):
     if (retired := _convert_retirement(text)):
         items.append(retired)
     # remaining repurchase headroom — sizes what the program can still do
-    auth = []
+    # A filing that spans a quarter boundary states each programme's headroom once
+    # per period — the Oct 5 8-K carries both $620.9M as of Sep 30 and $547.2M as
+    # of Oct 4. Listing every match printed the stale figure first and read as two
+    # separate preferred programmes, so keep one entry per programme and let the
+    # last (latest period) win.
+    auth = {}
     for m in re.finditer(r"\$\s?([\d,.]+)\s*(billion|million) aggregate purchase price of"
                          r"([^.]{0,60}?)remains available", text):
         v = float(m.group(1).replace(",", "")) * (1000 if m.group(2) == "billion" else 1)
-        auth.append(f"${v:,.0f}M {'MSTR' if re.search(r'MSTR|class A common', m.group(3), re.I) else 'preferred'}")
+        auth["MSTR" if re.search(r"MSTR|class A common", m.group(3), re.I) else "preferred"] = v
     if auth:
-        items.append("Buyback capacity left: " + " · ".join(auth))
+        items.append("Buyback capacity left: "
+                     + " · ".join(f"${v:,.0f}M {k}" for k, v in auth.items()))
     bal = _mstr_usd_balances(text)
     if bal:
         items.append(f"USD Reserve ${bal['reserve']:,.0f}M"
