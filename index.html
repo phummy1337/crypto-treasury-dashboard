@@ -2631,7 +2631,7 @@ function isPreClose(stamp){
      after 16:00 ET      Cboe's `close` is authoritative for all four.
    Leave QUOTE_RELAY empty and everything below is a no-op — the page keeps its
    existing behaviour. */
-const QUOTE_RELAY = "";   // e.g. "https://quotes.treasurytracker.net/"
+const QUOTE_RELAY = "https://treasurytracker-quotes.apxusd-supply-1337.workers.dev/";
 
 async function fetchCboe(){
   if(!QUOTE_RELAY) return;
@@ -2727,7 +2727,7 @@ async function fetchStrategyLive(){
 // the tracker's light feed lags the closing auction by minutes and would otherwise
 // overwrite the official close with a staler intraday print.
 loadData().then(() => (marketOpenET() ? fetchLiveEquity().then(fetchLivePrefs) : Promise.resolve())
-                        .then(fetchStrategyLive));
+                        .then(fetchStrategyLive).then(fetchCboe));
 
 // live preferred quotes — the cron only lands ~hourly (GitHub throttles its
 // schedule), so the prefs tick client-side like the commons do:
@@ -2817,7 +2817,7 @@ async function repollData(){
       derivePrevClose();
       renderAll(); renderCharts();
       // re-apply the freshest tape on top, strategy.com last
-      fetchLiveEquity().then(fetchStrategyLive);
+      fetchLiveEquity().then(fetchStrategyLive).then(fetchCboe);
     }
   }catch(e){ /* keep current data */ }
 }
@@ -2856,7 +2856,7 @@ async function repollData(){
 // consolidated print) has to land last
 setInterval(() => {
   (marketOpenET() ? fetchLiveEquity().then(fetchLivePrefs) : Promise.resolve())
-    .then(fetchStrategyLive);
+    .then(fetchStrategyLive).then(fetchCboe);
 }, 60000);
 setInterval(fetchBtcPrice, 60000);          // BTC trades 24/7 — tick every minute always
 setInterval(() => { if(marketOpenET()) repollData(); }, 5*60*1000);
