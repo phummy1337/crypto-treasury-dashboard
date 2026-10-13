@@ -1,7 +1,7 @@
 {
   "asOf": "2026-10-13",
   "priceAsOf": "2026-10-13",
-  "btcPriceUsd": 83562,
+  "btcPriceUsd": 83536,
   "btcSupply": 21000000,
   "btcCirculating": 20097368,
   "companies": {
@@ -12,13 +12,13 @@
       "prefTicker": "STRC",
       "asset": "BTC",
       "accent": "#ed1946",
-      "stockPrice": 154.52,
-      "dayChangePct": 1.21,
+      "stockPrice": 154.38,
+      "dayChangePct": 1.12,
       "sharesOutstanding": 422.2,
       "betaBtc": 1.49,
       "week52Low": 82.31,
       "week52High": 301.91,
-      "prefPrice": 99.88,
+      "prefPrice": 99.8,
       "holdings": 848250,
       "pctSupply": 4.0393,
       "netChangeYtd": 175750,
@@ -41,7 +41,7 @@
       "prefNotional": 13748,
       "annualObligations": 1557,
       "staking": 0,
-      "prefChangePct": -0.01,
+      "prefChangePct": -0.09,
       "yearEnd": {
         "2020": 70470,
         "2021": 124391,
@@ -136,7 +136,7 @@
       "capStructAsOf": "2026-03-31 (10-Q)",
       "dilutedShares": 451.8,
       "marketCapBasic": 29540,
-      "navPremiumBasic": 0.915,
+      "navPremiumBasic": 0.918,
       "treasuryDate": "2026-10-12",
       "bpsHistory": {
         "dates": [
@@ -951,7 +951,7 @@
         "dtcLive": 1.54
       },
       "daysToCover": 1.23,
-      "prefMarket": 13321,
+      "prefMarket": 13310,
       "prefHistory": {
         "dates": [
           "Jul 25",
@@ -1878,7 +1878,7 @@
           99.45,
           99.66,
           99.88,
-          99.86
+          99.82
         ],
         "notional": [
           null,
@@ -2949,7 +2949,7 @@
           154.34,
           154.34,
           152.68,
-          153.46
+          154.07
         ],
         "mnav": [
           1.474,
@@ -3329,7 +3329,7 @@
           1.142,
           1.131,
           1.148,
-          1.129
+          1.132
         ],
         "net": [
           1.621,
@@ -3709,7 +3709,7 @@
           1.19,
           1.176,
           1.199,
-          1.173
+          1.177
         ]
       },
       "strcNotionalSteps": [
@@ -4031,7 +4031,7 @@
           1.23,
           1.23
         ],
-        "dtcLive": 1.35
+        "dtcLive": 1.31
       },
       "borrowFee": {
         "pct": 0.41,
@@ -4281,24 +4281,24 @@
       },
       "assumedDilutedShares": 451.8,
       "_dilOverlayM": 29.5979,
-      "netSatsPerShare": 157317,
-      "netMnavPub": 1.1786,
-      "amplificationPub": 1.2495,
-      "breakevenArrPub": 2.1985,
+      "netSatsPerShare": 157265,
+      "netMnavPub": 1.1751,
+      "amplificationPub": 1.2499,
+      "breakevenArrPub": 2.2014,
       "hurdleArrPub": 10.6031,
-      "floorArrPub": -17.2804,
-      "creditDurationPub": 6.3456,
+      "floorArrPub": -17.2638,
+      "creditDurationPub": 6.3449,
       "netDilutedShares": 431.53,
       "atm": {
         "ticker": "STRC",
         "par": 100.0,
         "threshold": 99.95,
         "status": "standby",
-        "vsPar": -0.12,
+        "vsPar": -0.2,
         "captureRate": 0.75,
         "captureBasis": "no issuance in the week to 2026-10-11",
         "asOf": "2026-10-13",
-        "todayTotalUsd": 32812661,
+        "todayTotalUsd": 71475071,
         "todayEligUsd": 0,
         "todayEstUsd": 0,
         "todayEstBtc": 0.0,
@@ -4636,18 +4636,18 @@
           },
           {
             "d": "2026-10-13",
-            "tot": 32812661,
+            "tot": 71475071,
             "elig": 0
           }
         ]
       },
-      "prevClose": 152.6727,
+      "prevClose": 152.6701,
       "priceDateET": "2026-10-13",
       "filingWatch": {
         "latestOnEdgar": "2026-10-13",
         "ingested": "2026-10-13"
       },
-      "netLeveragePub": 1.6886,
+      "netLeveragePub": 1.6908,
       "costBasisFiledM": 64000,
       "rvol": {
         "mult": 0.59,
@@ -4669,13 +4669,13 @@
       "prefTicker": "SATA",
       "asset": "BTC",
       "accent": "#4c9fff",
-      "stockPrice": 27.55,
-      "dayChangePct": -0.58,
+      "stockPrice": 27.52,
+      "dayChangePct": -0.69,
       "sharesOutstanding": 110.39,
       "betaBtc": 1.74,
       "week52Low": 7.16,
       "week52High": 32.8,
-      "prefPrice": 99.4,
+      "prefPrice": 99.42,
       "holdings": 32773,
       "pctSupply": 0.1561,
       "netChangeYtd": 25146,
@@ -4698,7 +4698,7 @@
       "prefNotional": 1403,
       "annualObligations": 182,
       "staking": 0,
-      "prefChangePct": 0.05,
+      "prefChangePct": 0.07,
       "yearEnd": {
         "2025": 7627
       },
@@ -4713,7 +4713,7 @@
       "capStructAsOf": "2026-06-18 (8-K)",
       "dilutedShares": 128.37,
       "marketCapBasic": 925,
-      "navPremiumBasic": 1.111,
+      "navPremiumBasic": 1.11,
       "treasuryDate": "2026-10-09",
       "bpsHistory": {
         "dates": [
@@ -5742,7 +5742,7 @@
           98.82,
           99.1,
           99.4,
-          99.39
+          99.41
         ],
         "notional": [
           null,
@@ -6556,7 +6556,7 @@
           27.8,
           27.8,
           27.71,
-          27.55
+          27.52
         ],
         "mnav": [
           1.172,
@@ -6844,7 +6844,7 @@
           1.513,
           1.499,
           1.531,
-          1.492
+          1.491
         ],
         "net": [
           1.288,
@@ -7132,7 +7132,7 @@
           1.878,
           1.85,
           1.915,
-          1.84
+          1.838
         ]
       },
       "cashUsd": 310.3,
@@ -7537,18 +7537,18 @@
       },
       "_dilOverlayM": 2.7289,
       "assumedDilutedShares": 113.12,
-      "netSatsPerShare": 17948,
+      "netSatsPerShare": 17945,
       "netDilutedShares": 113.12,
       "atm": {
         "ticker": "SATA",
         "par": 100.0,
         "threshold": 99.95,
         "status": "standby",
-        "vsPar": -0.6,
+        "vsPar": -0.58,
         "captureRate": 0.436,
         "captureBasis": "calibrated: $53.2M issued 2026-10-02 to 2026-10-09",
         "asOf": "2026-10-13",
-        "todayTotalUsd": 6747155,
+        "todayTotalUsd": 15432425,
         "todayEligUsd": 0,
         "todayEstUsd": 0,
         "todayEstBtc": 0.0,
@@ -7850,7 +7850,7 @@
           },
           {
             "d": "2026-10-13",
-            "tot": 6747155,
+            "tot": 15432425,
             "elig": 0
           }
         ]
@@ -7969,7 +7969,7 @@
       ],
       "filingWatch": {
         "latestOnEdgar": "2026-10-13",
-        "ingested": "2026-05-19"
+        "ingested": "2026-10-13"
       },
       "rvol": {
         "mult": 0.61,
@@ -9102,7 +9102,7 @@
       154.34,
       154.34,
       152.68,
-      153.46
+      154.07
     ],
     "ASST": [
       19.94,
@@ -9469,7 +9469,7 @@
       27.8,
       27.8,
       27.71,
-      27.55
+      27.52
     ]
   },
   "weekly": {
@@ -9987,7 +9987,7 @@
         "Issued 9,461,103 Class A shares (7,993,806 warrant exercises at $27 \u2192 ~$215.8M cash \u00b7 1,467,297 ATM/other)",
         "Issued 532,094 SATA preferred shares"
       ],
-      "filed": "2025-09-08",
+      "filed": "2026-10-13",
       "url": "https://www.sec.gov/Archives/edgar/data/1920406/000162828026065595/asst-20261013.htm"
     },
     {
@@ -10013,7 +10013,7 @@
         "Issued 3,255,119 Class A shares (2,100,100 warrant exercises at $27 \u2192 ~$56.7M cash \u00b7 1,155,019 ATM/other)",
         "Issued 1,304,902 SATA preferred shares"
       ],
-      "filed": "2025-09-08",
+      "filed": "2026-10-05",
       "url": "https://www.sec.gov/Archives/edgar/data/1920406/000162828026064753/asst-20261005.htm"
     },
     {
@@ -10039,7 +10039,7 @@
         "Issued 649,072 Class A shares (460,649 warrant exercises at $27 \u2192 ~$12.4M cash \u00b7 188,423 ATM/other)",
         "Issued 1,009,020 SATA preferred shares"
       ],
-      "filed": "2025-09-08",
+      "filed": "2026-09-28",
       "url": "https://www.sec.gov/Archives/edgar/data/1920406/000162828026063653/asst-20260928.htm"
     },
     {
@@ -10063,7 +10063,7 @@
         "Issued 2,073,760 Class A shares (785,555 warrant exercises at $27 \u2192 ~$21.2M cash \u00b7 1,288,205 ATM/other)",
         "Issued 786,194 SATA preferred shares"
       ],
-      "filed": "2025-09-08",
+      "filed": "2026-09-21",
       "url": "https://www.sec.gov/Archives/edgar/data/1920406/000162828026062806/asst-20260921.htm"
     },
     {
@@ -10086,7 +10086,7 @@
         "Issued 34,206 Class A shares (ATM)",
         "Issued 402,541 SATA preferred shares"
       ],
-      "filed": "2025-09-08",
+      "filed": "2026-09-14",
       "url": "https://www.sec.gov/Archives/edgar/data/1920406/000162828026061682/asst-20260914.htm"
     },
     {
@@ -10109,7 +10109,7 @@
         "Issued 2,226,612 Class A shares (ATM)",
         "Issued 921,511 SATA preferred shares"
       ],
-      "filed": "2025-09-08",
+      "filed": "2026-09-08",
       "url": "https://www.sec.gov/Archives/edgar/data/1920406/000162828026060809/asst-20260908.htm"
     },
     {
@@ -10135,7 +10135,7 @@
         "Issued 3,579,147 Class A shares (ATM)",
         "Issued 803,099 SATA preferred shares"
       ],
-      "filed": "2025-09-08",
+      "filed": "2026-08-31",
       "url": "https://www.sec.gov/Archives/edgar/data/1920406/000162828026059468/asst-20260831.htm"
     },
     {
@@ -10161,7 +10161,7 @@
         "Issued 3,646,300 Class A shares (ATM)",
         "Issued 441,313 SATA preferred shares"
       ],
-      "filed": "2025-09-08",
+      "filed": "2026-08-24",
       "url": "https://www.sec.gov/Archives/edgar/data/1920406/000162828026058518/asst-20260824.htm"
     },
     {
@@ -10185,7 +10185,7 @@
         "Bought 79 BTC at ~$63,231/BTC avg",
         "Issued 597,150 Class A shares (ATM)"
       ],
-      "filed": "2025-09-08",
+      "filed": "2026-08-17",
       "url": "https://www.sec.gov/Archives/edgar/data/1920406/000162828026057224/asst-20260817.htm"
     },
     {
@@ -10210,7 +10210,7 @@
         "Cash +$3.6M ($151.3M \u2192 $154.9M)",
         "Issued 1,230,000 Class A shares (ATM)"
       ],
-      "filed": "2025-09-08",
+      "filed": "2026-08-10",
       "url": "https://www.sec.gov/Archives/edgar/data/1920406/000162828026054983/asst-20260810.htm"
     },
     {
@@ -10234,7 +10234,7 @@
         "Cash \u2212$2.7M ($154.0M \u2192 $151.3M)",
         "Issued 110,000 Class A shares (ATM)"
       ],
-      "filed": "2025-09-08",
+      "filed": "2026-08-03",
       "url": "https://www.sec.gov/Archives/edgar/data/1920406/000162828026051539/asst-20260803.htm"
     },
     {
@@ -10266,7 +10266,7 @@
         "Cash \u2212$3.4M ($157.4M \u2192 $154.0M)",
         "Issued 437,477 Class A shares (ATM)"
       ],
-      "filed": "2025-09-08",
+      "filed": "2026-07-27",
       "url": "https://www.sec.gov/Archives/edgar/data/1920406/000162828026049666/asst-20260727.htm"
     },
     {
@@ -10287,7 +10287,7 @@
         "Cash +$3.3M ($154.1M \u2192 $157.4M)",
         "Issued 443,797 Class A shares (ATM)"
       ],
-      "filed": "2025-09-08",
+      "filed": "2026-07-20",
       "url": "https://www.sec.gov/Archives/edgar/data/1920406/000162828026048764/asst-20260720.htm"
     },
     {
@@ -10307,7 +10307,7 @@
         "Bought 18 BTC at ~$64,028/BTC avg",
         "Issued 480,351 Class A shares (ATM)"
       ],
-      "filed": "2025-09-08",
+      "filed": "2026-07-13",
       "url": "https://www.sec.gov/Archives/edgar/data/1920406/000162828026047938/asst-20260713.htm"
     },
     {
@@ -10327,7 +10327,7 @@
         "Cash +$11.7M ($141.7M \u2192 $153.4M)",
         "Issued 1,081,004 Class A shares (ATM)"
       ],
-      "filed": "2025-09-08",
+      "filed": "2026-07-06",
       "url": "https://www.sec.gov/Archives/edgar/data/1920406/000162828026047102/asst-20260706.htm"
     },
     {
@@ -10356,7 +10356,7 @@
         "Cash \u2212$2.8M ($144.5M \u2192 $141.7M)",
         "Issued 76,942 Class A shares (ATM)"
       ],
-      "filed": "2025-09-08",
+      "filed": "2026-06-29",
       "url": "https://www.sec.gov/Archives/edgar/data/1920406/000162828026045883/asst-20260629.htm"
     },
     {
@@ -10379,7 +10379,7 @@
         "Issued 1,893,822 Class A shares (ATM)",
         "Issued 315,595 SATA preferred shares"
       ],
-      "filed": "2025-09-08",
+      "filed": "2026-06-22",
       "url": "https://www.sec.gov/Archives/edgar/data/1920406/000162828026044484/asst-20260622.htm"
     },
     {
@@ -10401,7 +10401,7 @@
         "Cash +$2.2M ($139.2M \u2192 $141.4M)",
         "Issued 483,400 Class A shares (ATM)"
       ],
-      "filed": "2025-09-08",
+      "filed": "2026-06-15",
       "url": "https://www.sec.gov/Archives/edgar/data/1920406/000162828026043032/asst-20260615.htm"
     },
     {
@@ -10423,7 +10423,7 @@
         "Cash +$1.9M ($137.3M \u2192 $139.2M)",
         "Issued 321,500 Class A shares (ATM)"
       ],
-      "filed": "2025-09-08",
+      "filed": "2026-06-08",
       "url": "https://www.sec.gov/Archives/edgar/data/1920406/000162828026041386/asst-20260608.htm"
     },
     {
@@ -10435,7 +10435,7 @@
         "Issued 3,190,618 Class A shares (ATM)",
         "Issued 1,754,188 SATA preferred shares"
       ],
-      "filed": "2025-09-08",
+      "filed": "2026-06-02",
       "url": "https://www.sec.gov/Archives/edgar/data/1920406/000162828026039677/asst-20260602.htm"
     },
     {
@@ -10467,7 +10467,7 @@
         "Issued 2,232,000 Class A shares (ATM)",
         "Issued 515,298 SATA preferred shares"
       ],
-      "filed": "2025-09-08",
+      "filed": "2026-05-26",
       "url": "https://www.sec.gov/Archives/edgar/data/1920406/000162828026037925/asst-20260526.htm"
     },
     {
@@ -10507,7 +10507,7 @@
       "items": [
         "Bought 1,381 BTC at ~$76,524/BTC avg"
       ],
-      "filed": "2025-09-08",
+      "filed": "2026-05-14",
       "url": "https://www.sec.gov/Archives/edgar/data/1920406/000162828026034804/asst-20260514.htm"
     },
     {
@@ -11092,7 +11092,7 @@
     "options": [
       {
         "name": "apxUSD / PT-apyUSD-5NOV2026",
-        "apy": 7.09
+        "apy": 7.33
       },
       {
         "name": "apxUSD / PT-apxUSD-5NOV2026",
@@ -11100,11 +11100,11 @@
       },
       {
         "name": "apxUSD / apyUSD",
-        "apy": 6.94
+        "apy": 7.02
       },
       {
         "name": "Apyx apxUSD vault",
-        "apy": 6.38
+        "apy": 6.48
       }
     ]
   }

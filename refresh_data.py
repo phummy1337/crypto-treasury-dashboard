@@ -1747,7 +1747,7 @@ def fetch_holdings(data, max_points=60):
                         # fallback below can only sort by date, so it picked the
                         # wrong one of the pair.
                         acts.append({"d": max(obs_dates).isoformat(), "co": "ASST",
-                                     "items": ai, "filed": filed, "url": url})
+                                     "items": ai, "filed": _filed, "url": url})
                     if obs_dates and max(obs_dates) > cutoff92:
                         shm = re.search(r"Class A common stock\s*[\d,]+\s*[\d,]+\s*([\d,]+)", t8)
                         if shm:

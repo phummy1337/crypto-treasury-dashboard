@@ -97,9 +97,16 @@ export default {
   async scheduled(event, env, ctx) {
     ctx.waitUntil(check(env).then(r => console.log(JSON.stringify(r))));
   },
-  // Manual probe: GET reports status; ?dispatch=1 forces a run
+  // Manual probe: GET reports status; ?dispatch=1&key=<WATCH_KEY> forces a run.
+  // The force path starts a CI run, and this worker's name sits in a public repo,
+  // so its URL is effectively derivable — gate the override on a shared key and
+  // leave the plain probe open and read-only.
   async fetch(request, env) {
-    const force = new URL(request.url).searchParams.get('dispatch') === '1';
+    const url = new URL(request.url);
+    const force = url.searchParams.get('dispatch') === '1';
+    if (force && (!env.WATCH_KEY || url.searchParams.get('key') !== env.WATCH_KEY)) {
+      return new Response('forbidden\n', { status: 403 });
+    }
     const r = await check(env, { force });
     return new Response(JSON.stringify(r, null, 2), {
       headers: { 'Content-Type': 'application/json; charset=utf-8' },
