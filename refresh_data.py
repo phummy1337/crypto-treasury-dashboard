@@ -818,6 +818,52 @@ def _edgar_json(url):
     return json.loads(urllib.request.urlopen(req, timeout=25, context=_SSL_CTX).read())
 
 
+# Strategy moved the weekly BTC and ATM tables out of the 8-K body and into
+# Exhibit 99.1 on 2026-10-13: the filing switched from Item 8.01 to Item 7.01
+# (Regulation FD), leaving a primary document that is a cover page plus an
+# exhibit list and parses to nothing. Every pass here reads the primary document,
+# so the whole week went missing. Resolve each filing to whichever of its
+# documents actually carries the tables.
+_WEEKLY_MARKERS = ("Aggregate BTC Holdings", "bitcoin at an average price",
+                   "aggregate purchase price", "Bitcoin held")
+_DOC_FOR = {}
+
+
+def _filing_doc(base, primary, markers=_WEEKLY_MARKERS):
+    """The URL inside a filing that holds the weekly tables: the primary document
+    while it still does, else the exhibit it hands them off to."""
+    url = base + primary
+    if url in _DOC_FOR:
+        return _DOC_FOR[url]
+    _DOC_FOR[url] = url                       # default to the primary document
+    try:
+        txt = _edgar_text(url)
+    except Exception:
+        return url
+    low = txt.lower()
+    if any(m.lower() in low for m in markers):
+        return url
+    # Only chase exhibits when the body reads like a weekly update that points at
+    # one; otherwise an 8-K about anything else would cost an index read per run.
+    if "99.1" not in txt or "bitcoin" not in low:
+        return url
+    try:                                      # Archives rejects get_json's UA
+        items = _edgar_json(base + "index.json")["directory"]["item"]
+    except Exception:
+        return url
+    for n in [it["name"] for it in items
+              if re.search(r"ex-?99", it["name"], re.I)
+              and it["name"].lower().endswith((".htm", ".html"))][:3]:
+        try:
+            t = _edgar_text(base + n)
+        except Exception:
+            continue
+        if any(m.lower() in t.lower() for m in markers):
+            _DOC_FOR[url] = base + n
+            break
+    return _DOC_FOR[url]
+
+
 def _pdate(s):
     for fmt in ("%B %d, %Y", "%b %d, %Y", "%b. %d, %Y"):
         try:
@@ -1545,9 +1591,9 @@ def fetch_holdings(data, max_points=60):
                 if r["form"][i] == "8-K" and docpat.match(r["primaryDocument"][i] or ""):
                     acc = r["accessionNumber"][i].replace("-", "")
                     base = f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{acc}/"
-                    _FILINGS.setdefault(tk, []).append((r["filingDate"][i],
-                                                        base + r["primaryDocument"][i]))
-                    yield (base + r["primaryDocument"][i], base, r["filingDate"][i])
+                    url = _filing_doc(base, r["primaryDocument"][i])
+                    _FILINGS.setdefault(tk, []).append((r["filingDate"][i], url))
+                    yield (url, base, r["filingDate"][i])
 
         if tk == "MSTR":
             t3 = {"pref": 0.0, "common": 0.0}
@@ -1695,7 +1741,13 @@ def fetch_holdings(data, max_points=60):
                         except Exception:
                             pass
                     if ai and obs_dates:
-                        acts.append({"d": max(obs_dates).isoformat(), "co": "ASST", "items": ai})
+                        # carry the document the items were actually read from. Two
+                        # 8-Ks can share a filing date — Oct 13 brought the weekly
+                        # update and a SATA certificate amendment — and the link
+                        # fallback below can only sort by date, so it picked the
+                        # wrong one of the pair.
+                        acts.append({"d": max(obs_dates).isoformat(), "co": "ASST",
+                                     "items": ai, "filed": filed, "url": url})
                     if obs_dates and max(obs_dates) > cutoff92:
                         shm = re.search(r"Class A common stock\s*[\d,]+\s*[\d,]+\s*([\d,]+)", t8)
                         if shm:
@@ -2284,8 +2336,9 @@ def _filed_atm_windows(pref, cik, parser, reports_atm, first_day_offset):
                 f"{oldest_filing_date or 'a filed window'} — the span may end early")
             break
         examined += 1
-        url = (f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/"
-               f"{rec['accessionNumber'][i].replace('-', '')}/{rec['primaryDocument'][i]}")
+        url = _filing_doc(f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/"
+                          f"{rec['accessionNumber'][i].replace('-', '')}/",
+                          rec["primaryDocument"][i])
         memoised = url in _EDGAR_TXT            # fetch_holdings has read nearly all of them
         text = _edgar_text(url)
         if not memoised:
