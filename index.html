@@ -629,12 +629,12 @@
     <div class="charts">
       <div class="chartcard">
         <h3><span class="dot" style="background:var(--mstr)"></span>MSTR — Price vs. mNAV</h3>
-        <div class="ch-sub">Line: daily close (left) · Line: EV mNAV (right) · (mcap + debt + preferred − cash) ÷ BTC reserve</div>
+        <div class="ch-sub">Line: daily close (left) · Line: Net mNAV (right) · diluted mcap ÷ (BTC + USD reserve − OTM debt − preferred)</div>
         <div class="chartwrap"><canvas id="ch-mnav-MSTR"></canvas></div>
       </div>
       <div class="chartcard">
         <h3><span class="dot" style="background:var(--asst)"></span>ASST — Price vs. mNAV</h3>
-        <div class="ch-sub">Line: daily close (left) · Line: EV mNAV (right) · (mcap + debt + preferred − cash) ÷ BTC reserve</div>
+        <div class="ch-sub">Line: daily close (left) · Line: Net mNAV (right) · diluted mcap ÷ (BTC + USD reserve − OTM debt − preferred)</div>
         <div class="chartwrap"><canvas id="ch-mnav-ASST"></canvas></div>
       </div>
     </div>
@@ -1730,24 +1730,29 @@ function renderCharts(){
         options: prefOpts });
     }
 
-    // 5. Valuation: price (left) vs daily EV mNAV (right) — the whole structure's
-    // premium to its BTC reserve (the coverage lens preferred/credit holders care about)
+    // 5. Valuation: price (left) vs daily Net mNAV (right) — the premium left to
+    // common once debt and preferred have taken their cut, which is the lens an
+    // equity holder is actually buying. The EV series (mh.mnav) is still carried
+    // in the data and is the coverage view credit holders want; the table above
+    // shows both, so the chart plots the one the section is asking about.
     const mh = DATA.companies[co].mnavHistory;
     if(mh){
       const mnOpts = baseOpts({ scales:{
         x:{ ticks:{color:AX,font:{size:11},autoSkip:true,maxTicksLimit:MTL,maxRotation:0}, grid:{color:GRID} },
         yP:axis("","left",{ticks:{color:c,font:{size:11},callback:v=>"$"+(+v).toFixed(0)}}),
-        yM:axis("EV mNAV","right",{ticks:{color:"#ffffff",font:{size:11},callback:v=>(+v).toFixed(2)+"x"}}) } });
+        yM:axis("Net mNAV","right",{ticks:{color:"#ffffff",font:{size:11},callback:v=>(+v).toFixed(2)+"x"}}) } });
       mnOpts.plugins.tooltip.callbacks = { label: ctx => {
         if(ctx.parsed.y==null) return null;
-        return ctx.dataset.yAxisID==="yM" ? "EV mNAV: "+(+ctx.parsed.y).toFixed(2)+"x"
+        return ctx.dataset.yAxisID==="yM" ? "Net mNAV: "+(+ctx.parsed.y).toFixed(2)+"x"
                                           : co+": $"+(+ctx.parsed.y).toFixed(2);
       }};
-      const [mhd_, mhpx_, mhev_] = clip(PPM_CAL, mh.dates, mh.px, mh.mnav);
+      // net goes null on any day the net reserve is non-positive, so fall back to
+      // the EV series rather than drawing an empty right axis
+      const [mhd_, mhpx_, mhnet_] = clip(PPM_CAL, mh.dates, mh.px, (mh.net || mh.mnav));
       mkChart("ch-mnav-"+co, { type:"line", data:{ labels: mhd_, datasets:[
         {label:"Price", data:mhpx_, yAxisID:"yP", borderColor:c, backgroundColor:c+"18",
           borderWidth:2, tension:.2, pointRadius:0, fill:false, order:1},
-        {label:"EV mNAV", data:mhev_, yAxisID:"yM", borderColor:"rgba(255,255,255,0.85)",
+        {label:"Net mNAV", data:mhnet_, yAxisID:"yM", borderColor:"rgba(255,255,255,0.85)",
           backgroundColor:"transparent", borderWidth:2, tension:.2, pointRadius:0, fill:false, order:2} ]},
         options: mnOpts });
     }
