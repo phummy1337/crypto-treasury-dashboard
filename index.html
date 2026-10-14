@@ -629,12 +629,12 @@
     <div class="charts">
       <div class="chartcard">
         <h3><span class="dot" style="background:var(--mstr)"></span>MSTR — Price vs. mNAV</h3>
-        <div class="ch-sub">Line: daily close (left) · Line: Net mNAV (right) · diluted mcap ÷ (BTC + USD reserve − OTM debt − preferred)</div>
+        <div class="ch-sub">Line: daily close (left) · Right: Net mNAV solid (after debt &amp; preferred) · EV mNAV dashed (whole structure)</div>
         <div class="chartwrap"><canvas id="ch-mnav-MSTR"></canvas></div>
       </div>
       <div class="chartcard">
         <h3><span class="dot" style="background:var(--asst)"></span>ASST — Price vs. mNAV</h3>
-        <div class="ch-sub">Line: daily close (left) · Line: Net mNAV (right) · diluted mcap ÷ (BTC + USD reserve − OTM debt − preferred)</div>
+        <div class="ch-sub">Line: daily close (left) · Right: Net mNAV solid (after debt &amp; preferred) · EV mNAV dashed (whole structure)</div>
         <div class="chartwrap"><canvas id="ch-mnav-ASST"></canvas></div>
       </div>
     </div>
@@ -1740,20 +1740,28 @@ function renderCharts(){
       const mnOpts = baseOpts({ scales:{
         x:{ ticks:{color:AX,font:{size:11},autoSkip:true,maxTicksLimit:MTL,maxRotation:0}, grid:{color:GRID} },
         yP:axis("","left",{ticks:{color:c,font:{size:11},callback:v=>"$"+(+v).toFixed(0)}}),
-        yM:axis("Net mNAV","right",{ticks:{color:"#ffffff",font:{size:11},callback:v=>(+v).toFixed(2)+"x"}}) } });
+        // both multiples share one axis: same unit, and the gap between them IS
+        // the drag from debt and preferred, which only reads if they are to scale
+        yM:axis("mNAV","right",{ticks:{color:"#ffffff",font:{size:11},callback:v=>(+v).toFixed(2)+"x"}}) } });
       mnOpts.plugins.tooltip.callbacks = { label: ctx => {
         if(ctx.parsed.y==null) return null;
-        return ctx.dataset.yAxisID==="yM" ? "Net mNAV: "+(+ctx.parsed.y).toFixed(2)+"x"
+        return ctx.dataset.yAxisID==="yM" ? ctx.dataset.label+": "+(+ctx.parsed.y).toFixed(2)+"x"
                                           : co+": $"+(+ctx.parsed.y).toFixed(2);
       }};
       // net goes null on any day the net reserve is non-positive, so fall back to
       // the EV series rather than drawing an empty right axis
-      const [mhd_, mhpx_, mhnet_] = clip(PPM_CAL, mh.dates, mh.px, (mh.net || mh.mnav));
+      const [mhd_, mhpx_, mhnet_, mhev_] =
+        clip(PPM_CAL, mh.dates, mh.px, (mh.net || mh.mnav), mh.mnav);
       mkChart("ch-mnav-"+co, { type:"line", data:{ labels: mhd_, datasets:[
         {label:"Price", data:mhpx_, yAxisID:"yP", borderColor:c, backgroundColor:c+"18",
           borderWidth:2, tension:.2, pointRadius:0, fill:false, order:1},
-        {label:"Net mNAV", data:mhnet_, yAxisID:"yM", borderColor:"rgba(255,255,255,0.85)",
-          backgroundColor:"transparent", borderWidth:2, tension:.2, pointRadius:0, fill:false, order:2} ]},
+        // Net solid and bright — the section is about what is left for common.
+        // EV dashed and dimmer: the same structure before debt and preferred.
+        {label:"Net mNAV", data:mhnet_, yAxisID:"yM", borderColor:"rgba(255,255,255,0.9)",
+          backgroundColor:"transparent", borderWidth:2, tension:.2, pointRadius:0, fill:false, order:2},
+        {label:"EV mNAV", data:mhev_, yAxisID:"yM", borderColor:"rgba(255,255,255,0.4)",
+          backgroundColor:"transparent", borderWidth:1.5, borderDash:[5,3], tension:.2,
+          pointRadius:0, fill:false, order:3} ]},
         options: mnOpts });
     }
   });
