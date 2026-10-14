@@ -1481,37 +1481,39 @@ function renderWarrantBox(){
   const w = DATA.companies?.ASST?.warrants;
   if(!el || !w || !w.issued){ if(el) el.hidden = true; return; }
   const px = DATA.companies.ASST.stockPrice || 0;
-  const days = Math.ceil((new Date(w.expiry + "T21:00:00Z") - Date.now()) / 86400000);
   const dil  = DATA.companies.ASST.sharesOutstanding
              ? w.outstanding / 1e6 / DATA.companies.ASST.sharesOutstanding * 100 : null;
   const money = px > w.strike ? `${fmt((px/w.strike-1)*100,1)}% in the money`
               : px ? `${fmt((1-px/w.strike)*100,1)}% out of the money` : "";
-  const exDate = new Date(w.expiry+"T12:00:00Z").toLocaleDateString("en-US",{month:"short",day:"numeric"});
+  const asOf = w.asOf
+    ? new Date(w.asOf+"T12:00:00Z").toLocaleDateString("en-US",{month:"short",day:"numeric"})
+    : "";
   el.hidden = false;
 
-  // Once the warrants have lapsed the live-overhang framing is the wrong one:
-  // there is no countdown left and no cash still to come. Switch to the final
-  // scorecard — how much converted, how much expired worthless, cash collected.
-  if(w.lapsed){
-    const raised = w.exercised * w.strike / 1e6;
+  // Once a filing reports the programme closed, the live-overhang framing is the
+  // wrong one: there is no cash still to come. Switch to the final scorecard.
+  // "Never exercised" rather than "expired worthless" — the shares that went
+  // unconverted did so for whatever reason, and the filing only tells us none
+  // remain outstanding.
+  if(w.final){
     el.innerHTML =
-      `<div class="wb-title">ASST warrants — final<small>$${w.strike} strike · expired ${exDate}</small></div>
+      `<div class="wb-title">ASST warrants — final<small>$${w.strike} strike · resolved ${asOf}</small></div>
        <div class="wb-stat"><b>${fmt(w.pctExercised,1)}%</b>exercised · ${fmt(w.exercised/1e6,2)}M of ${fmt(w.issued/1e6,1)}M</div>
        <div class="wb-bar"><div class="wb-fill" style="width:${Math.min(100,w.pctExercised)}%"></div></div>
-       <div class="wb-stat"><b>${fmt(w.expired/1e6,2)}M</b>expired worthless · ${fmt(w.pctExpired,1)}%</div>
-       <div class="wb-stat"><b>$${fmt(raised,0)}M</b>cash collected</div>
+       <div class="wb-stat"><b>${fmt(w.expired/1e6,2)}M</b>never exercised · ${fmt(w.pctExpired,1)}%</div>
+       <div class="wb-stat"><b>$${fmt(w.cashRaisedM,0)}M</b>cash collected</div>
        <div class="wb-stat"><b>${w.outstanding ? fmt(w.outstanding/1e6,2)+"M" : "None"}</b>overhang left</div>`;
     return;
   }
 
   const cash = w.outstanding * w.strike / 1e6;
   el.innerHTML =
-    `<div class="wb-title">ASST warrants exercised<small>$${w.strike} strike · ${money} · expire ${exDate}</small></div>
+    `<div class="wb-title">ASST warrants exercised<small>$${w.strike} strike · ${money}</small></div>
      <div class="wb-stat"><b>${fmt(w.pctExercised,1)}%</b>${fmt(w.exercised/1e6,2)}M of ${fmt(w.issued/1e6,1)}M</div>
      <div class="wb-bar"><div class="wb-fill" style="width:${Math.min(100,w.pctExercised)}%"></div></div>
      <div class="wb-stat"><b>${fmt(w.outstanding/1e6,1)}M</b>left${dil?` · +${fmt(dil,0)}% dilution`:""}</div>
      <div class="wb-stat"><b>$${fmt(cash,0)}M</b>cash if exercised</div>
-     <div class="wb-stat"><b>${days > 0 ? days : 0}</b>${days === 1 ? "day" : "days"} to expiry</div>`;
+     <div class="wb-stat"><b>$${fmt(w.cashRaisedM,0)}M</b>collected so far</div>`;
 }
 
 function renderActions(){

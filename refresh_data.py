@@ -1399,99 +1399,102 @@ def _asst_sata_counts(text):
 # The FY2025 10-K rollforward is pre-reverse-split (20 warrants = 1 share after the
 # 1-for-20 of 2026-02-06), so it converts to shares underlying for comparison with
 # the weekly 8-K line. Strike is "$1.35 per share ($27 split-adjusted)" per the Q2
-# 10-Q. Expiry is the first anniversary of the effectiveness of the resale
-# registration — the 424B7 of 2025-10-10 off the S-3ASR shelf (Reg. 333-290252),
-# which auto-effected on filing, so there is no EFFECT notice to find.
+# 10-Q.
+#
+# There is deliberately no expiry constant any more. One was derived here from the
+# first anniversary of the 424B7 resale registration (2026-10-10) and used to infer
+# that whatever was still outstanding past that date had lapsed worthless. It was
+# wrong: 13,674,703 shares' worth were exercised on 2026-10-12 and 13 for $369.2M,
+# and the inference had already published "55% expired worthless" when the true
+# figure was 5.7%. A date we reasoned our way to is not evidence. Lapse is only
+# ever recorded when a filing says the warrants are gone.
 WARRANTS_ISSUED_SHARES = 555_259_256 / 20      # 27,762,963 shares underlying
 WARRANT_STRIKE = 27.0
-WARRANT_EXPIRY = "2026-10-10"
+
+# "273,493,909 traditional warrants to purchase 13,674,703 shares of Class A common
+# stock were exercised for expected gross proceeds of $369.2 million" — the
+# standalone exercise 8-K, which carries no position table at all.
+_WARRANT_PROSE = re.compile(
+    r"([\d,]+)\s+traditional warrants to purchase\s+([\d,]+)\s+shares of Class A"
+    r"[^.]{0,80}?were exercised[^.]{0,60}?gross proceeds of \$\s?([\d,.]+)\s*(million|billion)?",
+    re.I)
+# "from the period of October 12, 2026 through October 13, 2026" — a standalone
+# 8-K reports its own window rather than carrying the weekly position table.
+_ASST_PROSE_PERIOD = re.compile(
+    r"(?:from the period of|during the period(?: from)?)\s+([A-Z][a-z]+ \d{1,2}, \d{4})"
+    r"\s+(?:through|to)\s+([A-Z][a-z]+ \d{1,2}, \d{4})", re.I)
+_ASST_PROSE_BTC = re.compile(
+    r"purchased ([\d,]+) bitcoin at an average price", re.I)
+
+_WARRANT_NONE = re.compile(
+    r"(?:no|zero)\s+traditional warrants[^.]{0,160}?remaining outstanding", re.I)
 
 
-def _tradable_between(start, end):
-    """True if any weekday falls in (start, end] — i.e. a warrant could still
-    have been exercised after the `start` reading and on or before `end`."""
-    if not start or not end:
-        return False
-    d = start
-    while d < end:
-        d += datetime.timedelta(days=1)
-        if d <= end and d.weekday() < 5:
-            return True
-    return False
+def _asst_warrant_prose(text, filed):
+    """Exercises stated in prose rather than in the weekly position table."""
+    m = _WARRANT_PROSE.search(text)
+    if not m:
+        return None
+    gross = float(m.group(3).replace(",", "")) * (1000 if (m.group(4) or "").lower() == "billion" else 1)
+    return {"shares": int(m.group(2).replace(",", "")),
+            "grossM": round(gross, 1),
+            "noneLeft": bool(_WARRANT_NONE.search(text)),
+            "asOf": filed}
 
 
 def _asst_warrants(text, filed):
-    """Traditional-warrant overhang from a Strive 8-K position table.
+    """Traditional-warrant position from a Strive 8-K weekly table.
 
-    Up to expiry every week-on-week decline is an exercise — the warrants have
-    nowhere else to go — so issued-minus-outstanding is the exercise count. From
-    the expiry filing on that breaks: an unexercised block simply lapses, and the
-    same arithmetic would book the whole lapsed overhang as converted and report
-    ~100% exercised on the very week the warrants went to zero worthless.
-
-    The table carries both ends of the week, so the start-of-week figure is still
-    a clean pre-expiry reading. Hold the exercises earned up to it, then split the
-    final week's decline with the Class A row: every exercise mints one Class A
-    share, and no other line in the table can, so the Class A increase caps how
-    much of that decline can be exercise. The remainder lapsed.
+    Every week-on-week decline in the row is an exercise — the warrants have
+    nowhere else to go while they are live — so issued-minus-outstanding is the
+    running exercise count. What this must NOT do is decide on its own that the
+    remainder has lapsed; only a filing can establish that, and _asst_resolve
+    folds in the one that does.
     """
     m = re.search(r"Traditional Warrants \(\d\)\s*([\d,]+)\s+([\d,]+)", text)
     if not m:
         return None
     begin, outstanding = (int(g.replace(",", "")) for g in m.groups())
     issued = WARRANTS_ISSUED_SHARES
-    expiry = datetime.date.fromisoformat(WARRANT_EXPIRY)
-    # the two "As of" headers bracket the window the row covers
-    asofs = re.findall(r"As of ([A-Z][a-z]+ \d{1,2}, \d{4})", text)
-    opens = _pdate(asofs[0]) if asofs else None
-    closes = _pdate(asofs[1]) if len(asofs) > 1 else None
-    decline = max(0, begin - outstanding)
-
-    if opens and opens >= expiry:
-        week_ex = 0                       # the whole window is past expiry
-    elif closes and closes > expiry:
-        # The window straddles expiry, so the decline mixes last-minute exercises
-        # with the lapse. Only a trading day after the previous reading and on or
-        # before expiry could have produced an exercise — the Oct 10 expiry falls
-        # on a Saturday, so the window that finally zeroes the row has none, and
-        # the whole decline is lapse. Where there is a tradable day, each exercise
-        # mints one Class A share and no other line in the table can, so Class A
-        # growth caps the exercise half.
-        ca = re.search(r"Class A common stock\s*([\d,]+)\s*([\d,]+)\s*([\d,]+)", text)
-        week_ex = (min(decline, int(ca.group(3).replace(",", "")) if ca else 0)
-                   if _tradable_between(opens, expiry) else 0)
-    else:
-        week_ex = decline                 # wholly pre-expiry: every decline is an exercise
-    exercised = (issued - begin) + week_ex
-
-    # Anything still outstanding is lapsed overhang once no further exercise was
-    # possible — the filing never says so in words, it just stops being
-    # exercisable. That turns on the reading's own close date, NOT on today:
-    # reading a stale filing after expiry does not make its count final, because
-    # trading days between its close and expiry are still unaccounted for. The
-    # last filing to close on or before expiry with no tradable day left after it
-    # is the one that settles the tally.
-    asof_d = datetime.date.fromisoformat(filed) if filed else None
-    settled = closes is not None and not _tradable_between(closes, expiry)
-    past = bool(settled and max([d for d in (closes, asof_d) if d], default=expiry) >= expiry)
-    live = 0 if past else outstanding
-    expired = max(0, round(issued - exercised - live))
-
+    exercised = max(0.0, issued - outstanding)
     return {
-        "outstanding": live,
+        "outstanding": outstanding,
         "issued": round(issued),
         "exercised": round(exercised),
         "pctExercised": round(exercised / issued * 100, 1),
-        "expired": expired,
-        "pctExpired": round(expired / issued * 100, 1),
+        "expired": 0,
+        "pctExpired": 0.0,
         "cashRaisedM": round(exercised * WARRANT_STRIKE / 1e6, 1),
-        "lapsed": past,
-        "final": past,                    # frozen once expiry has passed
-        "weekExercised": week_ex,
+        "lapsed": False,
+        "final": False,
+        "weekExercised": max(0, begin - outstanding),
         "strike": WARRANT_STRIKE,
-        "expiry": WARRANT_EXPIRY,
         "asOf": filed,
     }
+
+
+def _asst_resolve_warrants(table, prose):
+    """Combine the newest weekly table with any later prose exercise statement.
+
+    The table stops at the last week it covers; a standalone 8-K can then report
+    exercises after it and declare the programme closed. Neither alone is the
+    answer once both exist.
+    """
+    if not table:
+        return None
+    w = dict(table)
+    if prose and prose["asOf"] >= (table.get("asOf") or ""):
+        w["exercised"] = min(w["issued"], w["exercised"] + prose["shares"])
+        w["outstanding"] = 0 if prose["noneLeft"] else max(0, w["outstanding"] - prose["shares"])
+        w["cashRaisedM"] = round(w["exercised"] * WARRANT_STRIKE / 1e6, 1)
+        w["asOf"] = prose["asOf"]
+        if prose["noneLeft"]:                 # the filing, not a date, closes it out
+            w["expired"] = w["issued"] - w["exercised"]
+            w["lapsed"] = True
+            w["final"] = True
+    w["pctExercised"] = round(w["exercised"] / w["issued"] * 100, 1)
+    w["pctExpired"] = round(w["expired"] / w["issued"] * 100, 1)
+    return w
 
 
 def fetch_sata_notional(data):
@@ -1522,7 +1525,7 @@ def fetch_sata_notional(data):
         return
     r = sub["filings"]["recent"]
     docpat = re.compile(r"^(?:asst-\d{8}\.htm|.*8k.*\.htm)$", re.I)
-    scanned, warrants = 0, None
+    scanned, warrants, wprose = 0, None, None
     for i in range(len(r["form"])):          # EDGAR lists newest first
         if r["form"][i] != "8-K" or not docpat.match(r["primaryDocument"][i] or ""):
             continue
@@ -1532,8 +1535,13 @@ def fetch_sata_notional(data):
         try:
             txt = _edgar_text(url)
             got = _asst_sata_counts(txt)
-            if not warrants:                 # newest filing wins
+            # two shapes, and the newest filing may carry only one of them: the
+            # weekly table gives the position, a standalone 8-K can report later
+            # exercises and close the programme out. Take the newest of each.
+            if not warrants:
                 warrants = _asst_warrants(txt, r["filingDate"][i])
+            if not wprose:
+                wprose = _asst_warrant_prose(txt, r["filingDate"][i])
         except Exception:
             got = []
         scanned += 1
@@ -1544,20 +1552,18 @@ def fetch_sata_notional(data):
         if scanned >= 40:
             break
         time.sleep(0.12)
+    warrants = _asst_resolve_warrants(warrants, wprose)
     if warrants:
-        # The tally is history once the warrants have lapsed: later filings keep
-        # printing the (now zero) row, and re-deriving from them would let ordinary
-        # ATM issuance leak into the exercise count. Keep the first final reading.
+        # Once a filing has declared the programme closed the tally is history, and
+        # later weekly tables keep printing the (now zero) row. Keep the settled one.
         held = co.get("warrants") or {}
         if held.get("final") and not warrants.get("final"):
             warrants = held
-        elif held.get("final") and warrants.get("final"):
-            warrants = held if held.get("asOf", "") <= warrants.get("asOf", "") else warrants
         co["warrants"] = warrants
         log(f"[warrants] ASST {warrants['exercised']:,} of {warrants['issued']:,} exercised "
             f"({warrants['pctExercised']}%), ${warrants['cashRaisedM']:,.1f}M cash"
-            + (f", {warrants['expired']:,} expired worthless" if warrants.get("expired")
-               else f", {warrants['outstanding']:,} live, expires {warrants['expiry']}"))
+            + (f", {warrants['expired']:,} never exercised" if warrants.get("final")
+               else f", {warrants['outstanding']:,} still outstanding"))
     if steps:
         co["sataNotionalSteps"] = [[d, n] for d, n in sorted(steps.items())]
         _SATA["steps"] = co["sataNotionalSteps"]
@@ -1711,6 +1717,7 @@ def fetch_holdings(data, max_points=60):
             cutoff92 = datetime.date.today() - datetime.timedelta(days=92)
             _sh = data.get("stockHistory") or {}
             pxmap = dict(zip(_sh.get("dates") or [], _sh.get("ASST") or []))
+            prose_buys = []
             for url, base, _filed in docs():
                 try:
                     t8 = _edgar_text(url)
@@ -1740,6 +1747,22 @@ def fetch_holdings(data, max_points=60):
                                     break
                         except Exception:
                             pass
+                    # A standalone 8-K (the Oct 14 2026 exercise/purchase notice)
+                    # states a purchase and its window but carries no position
+                    # table, so it yielded no observation and the whole entry was
+                    # dropped — leaving holdings a purchase behind until the next
+                    # Monday table. Hold it and resolve it once allobs is built;
+                    # the scan runs newest-first, so the level it builds on has
+                    # not been read yet.
+                    if ai and not obs_dates and not sn:
+                        per = _ASST_PROSE_PERIOD.search(t8)
+                        nb = _ASST_PROSE_BTC.search(t8)
+                        if per and nb:
+                            d0, d1 = _pdate(per.group(1)), _pdate(per.group(2))
+                            if d0 and d1:
+                                prose_buys.append({"start": d0, "end": d1, "items": ai,
+                                                   "btc": int(nb.group(1).replace(",", "")),
+                                                   "url": url, "filed": _filed})
                     if ai and obs_dates:
                         # carry the document the items were actually read from. Two
                         # 8-Ks can share a filing date — Oct 13 brought the weekly
@@ -1785,6 +1808,24 @@ def fetch_holdings(data, max_points=60):
             no = [x for x in (ph.get("notional") or []) if x is not None]
             pref3 = round((no[-1] - no[-64]) / 3) if len(no) > 64 else 0
             co["trail3m"] = {"prefMo": max(pref3, 0), "commonMo": round(t3c / 3)}
+            # Fold in purchases that only a prose 8-K reported. Carry the last
+            # filed level forward by the stated amount, but only when that level
+            # sits immediately before the window — a derived level is worth having
+            # for the few days before the next table, not worth guessing across a
+            # gap where an unread filing could also have moved holdings.
+            for pb in sorted(prose_buys, key=lambda x: x["end"]):
+                prior = [d for d in allobs if d < pb["end"]]
+                if not prior:
+                    continue
+                last = max(prior)
+                if (pb["start"] - last).days > 7 or pb["end"] in allobs:
+                    continue
+                allobs[pb["end"]] = allobs[last] + pb["btc"]
+                acts.append({"d": pb["end"].isoformat(), "co": "ASST", "items": pb["items"],
+                             "filed": pb["filed"], "url": pb["url"]})
+                log(f"[ASST] {pb['btc']:,} BTC from the {pb['filed']} notice "
+                    f"({pb['start']} to {pb['end']}): {allobs[last]:,} -> {allobs[pb['end']]:,}")
+
             # genesis anchor: Strive announced its bitcoin treasury pivot on
             # Sep 9, 2025 with no BTC held; lets the first buys register as deltas
             allobs.setdefault(datetime.date(2025, 9, 9), 0)
