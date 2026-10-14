@@ -42,6 +42,10 @@
     --apyx: #dc143c;
     --mstr: #ed1946;
     --asst: #4c9fff;
+    --evmnav: #ffc44d;   /* EV mNAV line: warm, so it separates from BOTH the
+                            crimson MSTR and blue ASST price lines, and from the
+                            white net line. Lighter than --btc, which never
+                            appears on these charts. */
     --red: #ed1946;
     --pos: #34d399;
     --neg: #ff7a7a;
@@ -1567,6 +1571,7 @@ function mkChart(id, cfg){
   CHARTS[id] = new Chart(el.getContext("2d"), cfg);
 }
 const GRID = "rgba(255,255,255,0.07)", AX = "#9aa0a6";
+const EV_LINE = "#ffc44d";   // keep in step with --evmnav
 const MTL = (typeof innerWidth !== "undefined" && innerWidth < 640) ? 5 : 8;  // x ticks on phones
 
 // ---------- global chart time range ----------
@@ -1759,8 +1764,8 @@ function renderCharts(){
         // EV dashed and dimmer: the same structure before debt and preferred.
         {label:"Net mNAV", data:mhnet_, yAxisID:"yM", borderColor:"rgba(255,255,255,0.9)",
           backgroundColor:"transparent", borderWidth:2, tension:.2, pointRadius:0, fill:false, order:2},
-        {label:"EV mNAV", data:mhev_, yAxisID:"yM", borderColor:"rgba(255,255,255,0.4)",
-          backgroundColor:"transparent", borderWidth:1.5, borderDash:[5,3], tension:.2,
+        {label:"EV mNAV", data:mhev_, yAxisID:"yM", borderColor:EV_LINE,
+          backgroundColor:"transparent", borderWidth:2, borderDash:[6,3], tension:.2,
           pointRadius:0, fill:false, order:3} ]},
         options: mnOpts });
     }
