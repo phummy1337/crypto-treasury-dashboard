@@ -1323,7 +1323,7 @@ def _asst_actions(text):
         # employee awards and option exercises also land in Class A, and the
         # filing nets those into the awards rows instead of breaking them out.
         issued = int(sm.group(3).replace(",", ""))
-        ex = (_asst_warrants(text, None) or {}).get("weekExercised") or 0
+        ex = _asst_warrant_exercises(text)
         if 0 < ex <= issued:
             items.append(
                 f"Issued {issued:,} Class A shares ({ex:,} warrant exercises at "
@@ -1396,28 +1396,14 @@ def _asst_sata_counts(text):
 
 
 # Strive's PIPE Traditional Warrants, from the 2025-05-26 subscription agreements.
-# The FY2025 10-K rollforward is pre-reverse-split (20 warrants = 1 share after the
-# 1-for-20 of 2026-02-06), so it converts to shares underlying for comparison with
-# the weekly 8-K line. Strike is "$1.35 per share ($27 split-adjusted)" per the Q2
-# 10-Q.
-#
-# There is deliberately no expiry constant any more. One was derived here from the
-# first anniversary of the 424B7 resale registration (2026-10-10) and used to infer
-# that whatever was still outstanding past that date had lapsed worthless. It was
-# wrong: 13,674,703 shares' worth were exercised on 2026-10-12 and 13 for $369.2M,
-# and the inference had already published "55% expired worthless" when the true
-# figure was 5.7%. A date we reasoned our way to is not evidence. Lapse is only
-# ever recorded when a filing says the warrants are gone.
-WARRANTS_ISSUED_SHARES = 555_259_256 / 20      # 27,762,963 shares underlying
+# Strike is "$1.35 per share ($27 split-adjusted)" per the Q2 10-Q, after the
+# 1-for-20 reverse split of 2026-02-06. They finished converting on 2026-10-13 —
+# 94.3% exercised, the rest never exercised — so the running tally and the
+# dashboard box that showed it are gone. What is still needed is the per-week
+# exercise count, which is the only way to tell warrant conversions apart from
+# ATM sales in the Class A issuance line.
 WARRANT_STRIKE = 27.0
 
-# "273,493,909 traditional warrants to purchase 13,674,703 shares of Class A common
-# stock were exercised for expected gross proceeds of $369.2 million" — the
-# standalone exercise 8-K, which carries no position table at all.
-_WARRANT_PROSE = re.compile(
-    r"([\d,]+)\s+traditional warrants to purchase\s+([\d,]+)\s+shares of Class A"
-    r"[^.]{0,80}?were exercised[^.]{0,60}?gross proceeds of \$\s?([\d,.]+)\s*(million|billion)?",
-    re.I)
 # "from the period of October 12, 2026 through October 13, 2026" — a standalone
 # 8-K reports its own window rather than carrying the weekly position table.
 _ASST_PROSE_PERIOD = re.compile(
@@ -1426,75 +1412,18 @@ _ASST_PROSE_PERIOD = re.compile(
 _ASST_PROSE_BTC = re.compile(
     r"purchased ([\d,]+) bitcoin at an average price", re.I)
 
-_WARRANT_NONE = re.compile(
-    r"(?:no|zero)\s+traditional warrants[^.]{0,160}?remaining outstanding", re.I)
 
+def _asst_warrant_exercises(text):
+    """Shares converted by warrant exercise over the week a Strive 8-K covers.
 
-def _asst_warrant_prose(text, filed):
-    """Exercises stated in prose rather than in the weekly position table."""
-    m = _WARRANT_PROSE.search(text)
-    if not m:
-        return None
-    gross = float(m.group(3).replace(",", "")) * (1000 if (m.group(4) or "").lower() == "billion" else 1)
-    return {"shares": int(m.group(2).replace(",", "")),
-            "grossM": round(gross, 1),
-            "noneLeft": bool(_WARRANT_NONE.search(text)),
-            "asOf": filed}
-
-
-def _asst_warrants(text, filed):
-    """Traditional-warrant position from a Strive 8-K weekly table.
-
-    Every week-on-week decline in the row is an exercise — the warrants have
-    nowhere else to go while they are live — so issued-minus-outstanding is the
-    running exercise count. What this must NOT do is decide on its own that the
-    remainder has lapsed; only a filing can establish that, and _asst_resolve
-    folds in the one that does.
+    The position table carries shares underlying at both ends of the window, and
+    while the warrants were live a decline could only be an exercise.
     """
     m = re.search(r"Traditional Warrants \(\d\)\s*([\d,]+)\s+([\d,]+)", text)
     if not m:
-        return None
-    begin, outstanding = (int(g.replace(",", "")) for g in m.groups())
-    issued = WARRANTS_ISSUED_SHARES
-    exercised = max(0.0, issued - outstanding)
-    return {
-        "outstanding": outstanding,
-        "issued": round(issued),
-        "exercised": round(exercised),
-        "pctExercised": round(exercised / issued * 100, 1),
-        "expired": 0,
-        "pctExpired": 0.0,
-        "cashRaisedM": round(exercised * WARRANT_STRIKE / 1e6, 1),
-        "lapsed": False,
-        "final": False,
-        "weekExercised": max(0, begin - outstanding),
-        "strike": WARRANT_STRIKE,
-        "asOf": filed,
-    }
-
-
-def _asst_resolve_warrants(table, prose):
-    """Combine the newest weekly table with any later prose exercise statement.
-
-    The table stops at the last week it covers; a standalone 8-K can then report
-    exercises after it and declare the programme closed. Neither alone is the
-    answer once both exist.
-    """
-    if not table:
-        return None
-    w = dict(table)
-    if prose and prose["asOf"] >= (table.get("asOf") or ""):
-        w["exercised"] = min(w["issued"], w["exercised"] + prose["shares"])
-        w["outstanding"] = 0 if prose["noneLeft"] else max(0, w["outstanding"] - prose["shares"])
-        w["cashRaisedM"] = round(w["exercised"] * WARRANT_STRIKE / 1e6, 1)
-        w["asOf"] = prose["asOf"]
-        if prose["noneLeft"]:                 # the filing, not a date, closes it out
-            w["expired"] = w["issued"] - w["exercised"]
-            w["lapsed"] = True
-            w["final"] = True
-    w["pctExercised"] = round(w["exercised"] / w["issued"] * 100, 1)
-    w["pctExpired"] = round(w["expired"] / w["issued"] * 100, 1)
-    return w
+        return 0
+    begin, end = (int(g.replace(",", "")) for g in m.groups())
+    return max(0, begin - end)
 
 
 def fetch_sata_notional(data):
@@ -1525,7 +1454,7 @@ def fetch_sata_notional(data):
         return
     r = sub["filings"]["recent"]
     docpat = re.compile(r"^(?:asst-\d{8}\.htm|.*8k.*\.htm)$", re.I)
-    scanned, warrants, wprose = 0, None, None
+    scanned = 0
     for i in range(len(r["form"])):          # EDGAR lists newest first
         if r["form"][i] != "8-K" or not docpat.match(r["primaryDocument"][i] or ""):
             continue
@@ -1535,13 +1464,6 @@ def fetch_sata_notional(data):
         try:
             txt = _edgar_text(url)
             got = _asst_sata_counts(txt)
-            # two shapes, and the newest filing may carry only one of them: the
-            # weekly table gives the position, a standalone 8-K can report later
-            # exercises and close the programme out. Take the newest of each.
-            if not warrants:
-                warrants = _asst_warrants(txt, r["filingDate"][i])
-            if not wprose:
-                wprose = _asst_warrant_prose(txt, r["filingDate"][i])
         except Exception:
             got = []
         scanned += 1
@@ -1552,18 +1474,7 @@ def fetch_sata_notional(data):
         if scanned >= 40:
             break
         time.sleep(0.12)
-    warrants = _asst_resolve_warrants(warrants, wprose)
-    if warrants:
-        # Once a filing has declared the programme closed the tally is history, and
-        # later weekly tables keep printing the (now zero) row. Keep the settled one.
-        held = co.get("warrants") or {}
-        if held.get("final") and not warrants.get("final"):
-            warrants = held
-        co["warrants"] = warrants
-        log(f"[warrants] ASST {warrants['exercised']:,} of {warrants['issued']:,} exercised "
-            f"({warrants['pctExercised']}%), ${warrants['cashRaisedM']:,.1f}M cash"
-            + (f", {warrants['expired']:,} never exercised" if warrants.get("final")
-               else f", {warrants['outstanding']:,} still outstanding"))
+    co.pop("warrants", None)     # the tracker is gone; drop any stored tally
     if steps:
         co["sataNotionalSteps"] = [[d, n] for d, n in sorted(steps.items())]
         _SATA["steps"] = co["sataNotionalSteps"]
@@ -1790,8 +1701,11 @@ def fetch_holdings(data, max_points=60):
                         if cm and sm:
                             cash_usd = round(int(cm.group(1).replace(",", "")) / 1000, 1)
                             strc_sh = int(sm.group(1).replace(",", ""))
-                except Exception:
-                    pass
+                # A bare pass here hid a NameError for a whole run: a deleted regex
+                # left the prose-purchase branch broken and 2,822 BTC quietly went
+                # missing while every other number looked right. Say something.
+                except Exception as e:
+                    log(f"[skip] ASST 8-K {_filed}: {type(e).__name__}: {e}")
                 fetched += 1
                 if fetched >= max_points: break
                 time.sleep(0.12)
