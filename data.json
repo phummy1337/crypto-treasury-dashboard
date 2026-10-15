@@ -1,7 +1,7 @@
 {
   "asOf": "2026-10-15",
   "priceAsOf": "2026-10-15",
-  "btcPriceUsd": 81582,
+  "btcPriceUsd": 81773,
   "btcSupply": 21000000,
   "btcCirculating": 20098650,
   "companies": {
@@ -12,8 +12,8 @@
       "prefTicker": "STRC",
       "asset": "BTC",
       "accent": "#ed1946",
-      "stockPrice": 143.84,
-      "dayChangePct": 0.42,
+      "stockPrice": 144.69,
+      "dayChangePct": 1.01,
       "sharesOutstanding": 422.2,
       "betaBtc": 1.51,
       "week52Low": 82.31,
@@ -4297,13 +4297,13 @@
       },
       "assumedDilutedShares": 451.8,
       "_dilOverlayM": 29.5979,
-      "netSatsPerShare": 156218,
-      "netMnavPub": 1.1268,
-      "amplificationPub": 1.2741,
-      "breakevenArrPub": 2.2415,
+      "netSatsPerShare": 156158,
+      "netMnavPub": 1.132,
+      "amplificationPub": 1.2746,
+      "breakevenArrPub": 2.2447,
       "hurdleArrPub": 10.6006,
-      "floorArrPub": -17.156,
-      "creditDurationPub": 6.295,
+      "floorArrPub": -17.131,
+      "creditDurationPub": 6.2963,
       "netDilutedShares": 426.19,
       "atm": {
         "ticker": "STRC",
@@ -4657,13 +4657,13 @@
           }
         ]
       },
-      "prevClose": 143.2384,
+      "prevClose": 143.2432,
       "priceDateET": "2026-10-15",
       "filingWatch": {
         "latestOnEdgar": "2026-10-13",
         "ingested": "2026-10-13"
       },
-      "netLeveragePub": 1.7216,
+      "netLeveragePub": 1.7241,
       "costBasisFiledM": 64000,
       "rvol": {
         "mult": 0.91,
@@ -7569,7 +7569,7 @@
       },
       "_dilOverlayM": 2.7289,
       "assumedDilutedShares": 113.12,
-      "netSatsPerShare": 17681,
+      "netSatsPerShare": 17707,
       "netDilutedShares": 113.12,
       "atm": {
         "ticker": "SATA",
