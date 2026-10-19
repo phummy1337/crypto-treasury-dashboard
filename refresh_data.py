@@ -127,6 +127,12 @@ def fetch_btc_market(data):
 # treasury.strive.com). Current metrics + real daily history for both names.
 # --------------------------------------------------------------------------- #
 TRACKER_BASE = "https://data.strategytracker.com/"
+
+# Per-row inputs behind mnavHistory, and the newest filed holdings. The history is
+# built from the tracker's daily series in fetch_strategytracker, which runs BEFORE
+# fetch_holdings reads the 8-Ks — so the series cannot see a purchase the filings
+# already know about. rebase_mnav_holdings() closes that gap afterwards.
+_MNAV_INPUTS, _FILED_HOLD = {}, {}
 # STRC notional ($mm) before the tracker's change log begins (2026-03-09), built from
 # SEC 8-Ks: IPO 28,011,111 sh × $100 stated (closed 2025-07-29), then the weekly ATM
 # "available for issuance" column (program $4,200mm). Validated: last step + the week
@@ -722,7 +728,7 @@ def fetch_strategytracker(data):
                 itm_now = sum(t["principal"] * t["convRate"] / 1000
                               for t in sched if co["stockPrice"] >= t["convPrice"])
                 opt_sh = max(0.0, net_dil - base_sh - itm_now)
-            dts_m, px_m, mnv, netv = [], [], [], []
+            dts_m, px_m, mnv, netv, meta = [], [], [], [], []
             for idx, (i, d, mc, b, bp, sp) in enumerate(rows):
                 nav = b * bp / 1e6
                 mcap = sp * shs[idx]
@@ -744,7 +750,12 @@ def fetch_strategytracker(data):
                 net_res = nav + cash_at(d, i) - otm - pref_at(d)
                 netv.append(round(sp * (shs[idx] + itm_sh + opt_sh) / net_res, 3)
                             if net_res > 0 else None)
+                meta.append({"d": d, "sp": sp, "b": b, "bp": bp, "otm": otm,
+                             "cash": cash_at(d, i), "pref": pref_at(d),
+                             "debt": debt_at(d, i), "itm": itm_sh,
+                             "shs": shs[idx], "opt": opt_sh})
             if mnv:
+                _MNAV_INPUTS[tk] = meta
                 co["mnavHistory"] = {"dates": dts_m, "px": px_m, "mnav": mnv, "net": netv}
                 log(f"{tk} mNAV history: {len(mnv)} pts, latest EV {mnv[-1]}x / net {netv[-1]}x")
         except Exception as e:
@@ -1411,6 +1422,14 @@ _ASST_PROSE_PERIOD = re.compile(
     r"\s+(?:through|to)\s+([A-Z][a-z]+ \d{1,2}, \d{4})", re.I)
 _ASST_PROSE_BTC = re.compile(
     r"purchased ([\d,]+) bitcoin at an average price", re.I)
+# "273,493,909 traditional warrants to purchase 13,674,703 shares of Class A common
+# stock were exercised for expected gross proceeds of $369.2 million". The weekly
+# table cannot source this: in the week the programme closes it reports only the
+# fall in warrants outstanding, which mixes exercises with the part that lapsed.
+_ASST_PROSE_EX = re.compile(
+    r"traditional warrants to purchase\s+([\d,]+)\s+shares of Class A"
+    r"[^.]{0,80}?were exercised[^.]{0,60}?gross proceeds of \$\s?([\d,.]+)\s*(million|billion)?",
+    re.I)
 
 
 def _asst_warrant_exercises(text):
@@ -1572,6 +1591,8 @@ def fetch_holdings(data, max_points=60):
                 "acquired": acq,
                 "holdings": [h for (_, _, _, h, _) in pts],
             }
+            if pts[-1][1]:
+                _FILED_HOLD[tk] = (pts[-1][1].isoformat(), pts[-1][3])
             cur = pts[-1][3]
             if pts[-1][4]:      # authoritative avg purchase price from the latest 8-K
                 data["companies"][tk]["avgCost"] = pts[-1][4]
@@ -1628,7 +1649,7 @@ def fetch_holdings(data, max_points=60):
             cutoff92 = datetime.date.today() - datetime.timedelta(days=92)
             _sh = data.get("stockHistory") or {}
             pxmap = dict(zip(_sh.get("dates") or [], _sh.get("ASST") or []))
-            prose_buys = []
+            prose_buys, prose_ex = [], []
             for url, base, _filed in docs():
                 try:
                     t8 = _edgar_text(url)
@@ -1668,6 +1689,15 @@ def fetch_holdings(data, max_points=60):
                     if ai and not obs_dates and not sn:
                         per = _ASST_PROSE_PERIOD.search(t8)
                         nb = _ASST_PROSE_BTC.search(t8)
+                        ex = _ASST_PROSE_EX.search(t8)
+                        if per and ex:
+                            e0, e1 = _pdate(per.group(1)), _pdate(per.group(2))
+                            if e1:
+                                g = float(ex.group(2).replace(",", "")) * (
+                                    1000 if (ex.group(3) or "").lower() == "billion" else 1)
+                                prose_ex.append({"end": e1,
+                                                 "shares": int(ex.group(1).replace(",", "")),
+                                                 "grossM": round(g, 1)})
                         if per and nb:
                             d0, d1 = _pdate(per.group(1)), _pdate(per.group(2))
                             if d0 and d1:
@@ -1722,6 +1752,32 @@ def fetch_holdings(data, max_points=60):
             no = [x for x in (ph.get("notional") or []) if x is not None]
             pref3 = round((no[-1] - no[-64]) / 3) if len(no) > 64 else 0
             co["trail3m"] = {"prefMo": max(pref3, 0), "commonMo": round(t3c / 3)}
+            # The week a warrant programme closes, the position table reports only
+            # the fall in warrants outstanding, which mixes exercises with the part
+            # that simply lapsed — so the Class A line read "13,677,703 (ATM)" for
+            # the week to Oct 16 when 13,674,703 of it was warrants converting at
+            # $27 and essentially none was ATM. The standalone notice states the
+            # exercises outright; apply it to whichever week contains it.
+            for pe in prose_ex:
+                cands = [a for a in acts if a["co"] == "ASST" and a["d"] >= pe["end"].isoformat()]
+                if not cands:
+                    continue
+                tgt = min(cands, key=lambda a: a["d"])
+                for k, it in enumerate(tgt["items"]):
+                    m = re.match(r"Issued ([\d,]+) Class A shares \(ATM\)$", it)
+                    if not m:
+                        continue
+                    tot = int(m.group(1).replace(",", ""))
+                    if not 0 < pe["shares"] <= tot:
+                        continue
+                    rest = tot - pe["shares"]
+                    tgt["items"][k] = (
+                        f"Issued {tot:,} Class A shares ({pe['shares']:,} warrant exercises "
+                        f"at ${WARRANT_STRIKE:,.0f} → ~${pe['grossM']:,.1f}M cash"
+                        + (f" · {rest:,} ATM/other)" if rest else ")"))
+                    log(f"[ASST] week to {tgt['d']}: {pe['shares']:,} of {tot:,} Class A "
+                        f"shares were warrant exercises, not ATM")
+
             # Fold in purchases that only a prose 8-K reported. Carry the last
             # filed level forward by the stated amount, but only when that level
             # sits immediately before the window — a derived level is worth having
@@ -1793,6 +1849,7 @@ def fetch_holdings(data, max_points=60):
                 "acquired": acq,
                 "holdings": holds,
             }
+            _FILED_HOLD[tk] = (items[-1][0].isoformat(), holds[-1])
             cur = holds[-1]
 
         data["companies"][tk]["holdings"] = cur
@@ -2535,6 +2592,48 @@ def fetch_lending(data):
         log(f"[skip] Morpho lending APY: {e} — keeping existing values")
 
 
+def rebase_mnav_holdings(data):
+    """Carry filed holdings into the trailing mNAV history.
+
+    The tracker's daily btc_balance goes stale between its own updates. It still
+    read 32,773 for Oct 14-18 2026 while the Oct 14 8-K had already taken Strive
+    to 35,595, and because the history is built before fetch_holdings reads the
+    filings, the series kept the stale balance while the headline tile used the
+    filed one — the same page showing net mNAV 1.69x on the chart and 1.47x on
+    the tile. The tile was the right one; a smaller BTC balance shrinks the net
+    reserve and lifts the multiple.
+
+    Past the newest filed observation the tracker cannot know better than the
+    filings, so recompute those rows on the filed figure. Only that trailing
+    stretch is touched: earlier rows are left alone, where the tracker's daily
+    balance is the finer record.
+    """
+    for tk, rows in _MNAV_INPUTS.items():
+        co = data["companies"].get(tk)
+        filed = _FILED_HOLD.get(tk)
+        hist = (co or {}).get("mnavHistory")
+        if not (co and filed and hist and rows):
+            continue
+        since, held = filed
+        touched, was = 0, None
+        for idx, m in enumerate(rows):
+            if m["d"] < since or not m["b"] or m["b"] >= held:
+                continue
+            was = m["b"] if was is None else min(was, m["b"])
+            nav = held * m["bp"] / 1e6
+            if nav <= 0:
+                continue
+            ev = (m["sp"] * m["shs"] + m["debt"] + m["pref"] - m["cash"]) / nav
+            net_res = nav + m["cash"] - m["otm"] - m["pref"]
+            hist["mnav"][idx] = round(ev, 3)
+            hist["net"][idx] = (round(m["sp"] * (m["shs"] + m["itm"] + m["opt"]) / net_res, 3)
+                                if net_res > 0 else None)
+            touched += 1
+        if touched:
+            log(f"[mnav] {tk}: {touched} trailing row(s) from {since} rebased to the filed "
+                f"{held:,} BTC (tracker had {was:,.0f}) — latest net {hist['net'][-1]}x")
+
+
 def record_filing_watermark(data):
     """Stamp the newest 8-K on EDGAR next to the newest one we actually ingested.
 
@@ -2584,6 +2683,7 @@ def main():
     fetch_short_interest(data)        # Nasdaq: days to cover (semi-monthly)
     fetch_borrow_fees(data)           # ChartExchange/IBKR: annualized cost to short
     fetch_atm(data)                   # preferred ATM issuance estimate + filing calibration
+    rebase_mnav_holdings(data)        # filings beat the tracker's stale daily BTC balance
     fetch_lending(data)               # Morpho API: apxUSD lending APYs for the banner
     # debt schedule + preferred breakdown are parsed from the 10-Q (see notes);
     # cebe / per-share / valuation are computed live in the dashboard.
