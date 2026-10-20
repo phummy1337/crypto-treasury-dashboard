@@ -325,6 +325,16 @@
     color: var(--faint); font: inherit; font-size: 12px; font-weight: 600; padding: 3px 9px; cursor: pointer; }
   .rangechips button:hover { color: var(--text); }
   .rangechips button.active { color: #fff; border-color: rgba(255,255,255,0.45); background: rgba(255,255,255,0.06); }
+  /* Strive runs two preferred series, so its two preferred cards switch between
+     them. Same vocabulary as the range chips, sized to sit inside a card heading. */
+  .serieschips { display:inline-flex; gap:4px; margin-left:10px; vertical-align:middle; }
+  .serieschips button { background:none; border:1px solid var(--border); border-radius:4px;
+    color:var(--faint); font:inherit; font-size:11px; font-weight:700; letter-spacing:.4px;
+    padding:2px 7px; cursor:pointer; }
+  .serieschips button:hover { color:var(--text); }
+  .serieschips button.active { color:#fff; border-color:rgba(255,255,255,0.45); background:rgba(255,255,255,0.06); }
+  .nodata { display:flex; align-items:center; justify-content:center; height:100%;
+    color:var(--faint); font-size:13.5px; text-align:center; padding:0 24px; line-height:1.5; }
   section { scroll-margin-top: 54px; }
   .act-filing { list-style:none; margin-left:-1em; margin-top:5px; }
   .act-src { font-size:11.5px; font-weight:600; letter-spacing:.4px; color:var(--faint);
@@ -569,7 +579,8 @@
         <div class="chartwrap"><canvas id="ch-pref-MSTR"></canvas></div>
       </div>
       <div class="chartcard">
-        <h3><span class="dot" style="background:var(--asst)"></span>SATA — Preferred Daily Close</h3>
+        <h3><span class="dot" style="background:var(--asst)"></span><span id="pref-title">SATA</span> — Preferred Daily Close<span class="serieschips" data-switch="pref">
+          <button data-series="SATA" class="active">SATA</button><button data-series="SATS">SATS</button></span></h3>
         <div class="chartwrap"><canvas id="ch-pref-ASST"></canvas></div>
       </div>
     </div>
@@ -720,7 +731,8 @@
         <div class="chartwrap"><canvas id="ch-short-STRC"></canvas></div>
       </div>
       <div class="chartcard">
-        <h3><span class="dot" style="background:var(--asst)"></span>SATA — Short Interest</h3>
+        <h3><span class="dot" style="background:var(--asst)"></span><span id="si-title">SATA</span> — Short Interest<span class="serieschips" data-switch="si">
+          <button data-series="SATA" class="active">SATA</button><button data-series="SATS">SATS</button></span></h3>
         <div class="si-chips" id="si-chips-SATA"></div>
         <div class="chartwrap"><canvas id="ch-short-SATA"></canvas></div>
       </div>
@@ -1541,6 +1553,26 @@ const MTL = (typeof innerWidth !== "undefined" && innerWidth < 640) ? 5 : 8;  //
 // ---------- global chart time range ----------
 // One window for every time-series chart, so MSTR and ASST panels stay comparable.
 let chartRange = "all";
+// Which of Strive's two preferred series each of its preferred cards is showing.
+let prefSeries = "SATA", siSeries = "SATA";
+// SATS listed 2026-10-20, so both of its series start empty and fill in: the price
+// history one session at a time, short interest at the first FINRA settlement.
+// Say which, rather than drawing a chart out of one point or none.
+function showNoData(canvasId, msg){
+  const cv = document.getElementById(canvasId); if(!cv) return false;
+  const wrap = cv.parentElement;
+  if(typeof Chart !== "undefined"){ const ex = Chart.getChart(cv); if(ex) ex.destroy(); }
+  cv.style.display = "none";
+  let el = wrap.querySelector(".nodata");
+  if(!el){ el = document.createElement("div"); el.className = "nodata"; wrap.appendChild(el); }
+  el.textContent = msg;
+  return true;
+}
+function clearNoData(canvasId){
+  const cv = document.getElementById(canvasId); if(!cv) return;
+  cv.style.display = "";
+  const el = cv.parentElement.querySelector(".nodata"); if(el) el.remove();
+}
 const RANGE_MO = {"3m":3, "6m":6, "1y":12, "all":null};
 // clip parallel arrays to the trailing window; ppm = points per month for this cadence
 function clip(ppm, ...arrs){
@@ -1675,10 +1707,19 @@ function renderCharts(){
       }
     }
 
-    // 4. Preferred price + shares outstanding (STRC / SATA); shares = notional / $100 par
-    const ph = DATA.companies[co].prefHistory;
-    if(ph){
-      const pt = DATA.companies[co].prefTicker;
+    // 4. Preferred price + shares outstanding (STRC / SATA / SATS); shares = notional / $100 par
+    const useSats = (co === "ASST" && prefSeries === "SATS");
+    const ph = useSats ? DATA.companies[co].pref2History : DATA.companies[co].prefHistory;
+    if(co === "ASST"){
+      const t = document.getElementById("pref-title"); if(t) t.textContent = prefSeries;
+      if(useSats && (!ph || (ph.px || []).filter(v=>v!=null).length < 2)){
+        showNoData("ch-pref-ASST",
+          `SATS listed 20 Oct 2026. Its daily close builds here one session at a time — `
+          + `${(ph && ph.px ? ph.px.length : 0)} so far.`);
+      } else clearNoData("ch-pref-ASST");
+    }
+    if(ph && !(useSats && (ph.px || []).filter(v=>v!=null).length < 2)){
+      const pt = useSats ? "SATS" : DATA.companies[co].prefTicker;
       const [phd_, phpx_, phn_] = clip(PPM_DAY, ph.dates, ph.px, ph.notional);
       const shOut = phn_.map(n => n ? n/100 : null);              // $M notional -> M shares
       const prefOpts = baseOpts({ scales:{
@@ -1740,11 +1781,28 @@ function renderCharts(){
     ["MSTR", DATA.companies.MSTR.shortInterest,     acc.MSTR, DATA.companies.MSTR.borrowFee],
     ["ASST", DATA.companies.ASST.shortInterest,     acc.ASST, DATA.companies.ASST.borrowFee],
     ["STRC", DATA.companies.MSTR.prefShortInterest, acc.MSTR, DATA.companies.MSTR.prefBorrowFee],
-    ["SATA", DATA.companies.ASST.prefShortInterest, acc.ASST, DATA.companies.ASST.prefBorrowFee],
+    ["SATA", siSeries === "SATS" ? DATA.companies.ASST.pref2ShortInterest
+                                 : DATA.companies.ASST.prefShortInterest,
+             acc.ASST, siSeries === "SATS" ? DATA.companies.ASST.pref2BorrowFee
+                                           : DATA.companies.ASST.prefBorrowFee],
   ];
+  // The SATA card doubles as the SATS card. FINRA settles twice a month and
+  // publishes about a week later, so a listing from 20 Oct has nothing to show
+  // until mid-November — an empty card would just look broken.
+  {
+    const t = document.getElementById("si-title"); if(t) t.textContent = siSeries;
+    const s2 = DATA.companies.ASST.pref2ShortInterest;
+    if(siSeries === "SATS" && !(s2 && s2.pctFloat)){
+      const chips = document.getElementById("si-chips-SATA"); if(chips) chips.innerHTML = "";
+      showNoData("ch-short-SATA",
+        "SATS listed 20 Oct 2026. FINRA settles short interest twice a month and "
+        + "publishes about a week later, so the first reading is due mid-November.");
+    } else clearNoData("ch-short-SATA");
+  }
   let anyShorts = false;
   shortSpecs.forEach(([sym, si, ac, fee]) => {
     if(!si || !si.pctFloat) return;
+    if(sym === "SATA" && siSeries === "SATS" && !(DATA.companies.ASST.pref2ShortInterest || {}).pctFloat) return;
     anyShorts = true;
     const chips = document.getElementById("si-chips-"+sym);
     if(chips){
@@ -2831,6 +2889,13 @@ async function repollData(){
   addEventListener("scroll", () => { if(!queued){ queued = true; requestAnimationFrame(setHere); } },
                    {passive:true});
   setHere();
+  document.addEventListener("click", e => {
+    const b = e.target.closest(".serieschips button[data-series]"); if(!b) return;
+    const which = b.closest(".serieschips").dataset.switch;
+    if(which === "pref") prefSeries = b.dataset.series; else siSeries = b.dataset.series;
+    [...b.parentElement.children].forEach(x => x.classList.toggle("active", x === b));
+    renderCharts();
+  });
   document.getElementById("rangechips").addEventListener("click", e => {
     const b = e.target.closest("button[data-range]"); if(!b) return;
     chartRange = b.dataset.range;

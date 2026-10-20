@@ -508,6 +508,20 @@ def fetch_strategytracker(data):
             co["pref2"] = {"ticker": "SATS", "price": px, "rate": SATS["rate"],
                            "stated": SATS["stated"],
                            "notional": round(SATS["shares"] * SATS["stated"] / 1e6)}
+            # No feed carries a SATS price series yet, so build one a session at a
+            # time and keep it in data.json. Re-running within a session updates
+            # that day's point rather than adding another.
+            if px:
+                h2 = co.get("pref2History") or {"dates": [], "iso": [], "px": [], "notional": []}
+                nM = round(SATS["shares"] * SATS["stated"] / 1e6)
+                if h2["iso"] and h2["iso"][-1] == tracker_date:
+                    h2["px"][-1], h2["notional"][-1] = px, nM
+                else:
+                    h2["iso"].append(tracker_date)
+                    h2["dates"].append(_iso_lbl(tracker_date, "%b %-d"))
+                    h2["px"].append(px)
+                    h2["notional"].append(nM)
+                co["pref2History"] = h2
             log(f"[SATS] not in the feed yet — carrying {SATS['shares']:,} sh "
                 f"x ${SATS['stated']:,.0f} = ${SATS['shares']*SATS['stated']/1e6:,.0f}M at "
                 f"{SATS['rate']}%" + (f", last ${px:,.2f}" if px else ", no quote"))
