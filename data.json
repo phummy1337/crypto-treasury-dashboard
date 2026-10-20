@@ -12,9 +12,9 @@
       "prefTicker": "STRC",
       "asset": "BTC",
       "accent": "#ed1946",
-      "stockPrice": 143.89,
-      "dayChangePct": 5.79,
-      "sharesOutstanding": 422.35,
+      "stockPrice": 144.12,
+      "dayChangePct": 5.96,
+      "sharesOutstanding": 422.36,
       "betaBtc": 1.51,
       "week52Low": 82.31,
       "week52High": 301.91,
@@ -25,7 +25,7 @@
       "btcPerDay": 1042,
       "btcPerWeek": 7300,
       "avgCost": 75446,
-      "satsPerShareBasic": 200904,
+      "satsPerShareBasic": 200899,
       "satsPerShareDiluted": 187753,
       "btcYieldYtd": -3.7,
       "btcYieldQtd": 0.0,
@@ -36,7 +36,7 @@
       "satsPer100": 119000,
       "mnav": 1.01,
       "cebeMnav": 1.28,
-      "cash": 5280,
+      "cash": 5281,
       "seniorDebt": 6714,
       "prefNotional": 13557,
       "annualObligations": 1534,
@@ -3376,7 +3376,7 @@
         ],
         "net": [
           1.621,
-          1.656,
+          1.655,
           1.625,
           1.623,
           1.607,
@@ -3431,13 +3431,13 @@
           1.226,
           1.259,
           1.229,
-          1.195,
+          1.194,
           1.18,
           1.197,
           1.199,
           1.207,
           1.236,
-          1.214,
+          1.213,
           1.219,
           1.226,
           1.232,
@@ -3512,7 +3512,7 @@
           1.257,
           1.295,
           1.27,
-          1.296,
+          1.295,
           1.297,
           1.279,
           1.273,
@@ -3553,7 +3553,7 @@
           1.268,
           1.275,
           1.274,
-          1.275,
+          1.274,
           1.285,
           1.217,
           1.215,
@@ -3561,11 +3561,11 @@
           1.2,
           1.199,
           1.19,
-          1.148,
+          1.147,
           1.22,
           1.111,
           1.171,
-          1.17,
+          1.169,
           1.14,
           1.138,
           1.192,
@@ -3626,7 +3626,7 @@
           1.429,
           1.333,
           1.419,
-          1.355,
+          1.354,
           1.344,
           1.323,
           1.366,
@@ -3647,7 +3647,7 @@
           0.996,
           0.971,
           1.073,
-          1.099,
+          1.098,
           1.134,
           1.174,
           1.143,
@@ -3672,7 +3672,7 @@
           1.021,
           0.979,
           0.966,
-          0.963,
+          0.962,
           0.939,
           1.051,
           1.02,
@@ -3927,7 +3927,7 @@
         "prefMo": 0,
         "commonMo": 1579
       },
-      "floatSharesM": 402.71,
+      "floatSharesM": 402.72,
       "prefShortInterest": {
         "dates": [
           "Oct 15",
@@ -4333,14 +4333,14 @@
           1.11
         ]
       },
-      "assumedDilutedShares": 451.93,
+      "assumedDilutedShares": 451.94,
       "_dilOverlayM": 29.5801,
-      "netSatsPerShare": 156301,
-      "netMnavPub": 1.118,
-      "amplificationPub": 1.2734,
-      "breakevenArrPub": 2.1972,
+      "netSatsPerShare": 156321,
+      "netMnavPub": 1.1188,
+      "amplificationPub": 1.2732,
+      "breakevenArrPub": 2.1962,
       "hurdleArrPub": 10.5783,
-      "floorArrPub": -17.4293,
+      "floorArrPub": -17.4363,
       "creditDurationPub": 6.2413,
       "netDilutedShares": 426.32,
       "atm": {
@@ -4695,13 +4695,13 @@
           }
         ]
       },
-      "prevClose": 136.0147,
+      "prevClose": 136.0136,
       "priceDateET": "2026-10-20",
       "filingWatch": {
         "latestOnEdgar": "2026-10-19",
         "ingested": "2026-10-19"
       },
-      "netLeveragePub": 2.0538,
+      "netLeveragePub": 2.0528,
       "costBasisFiledM": 64020,
       "rvol": {
         "mult": 0.5,
@@ -4747,10 +4747,10 @@
       "satsPer100": 81000,
       "mnav": 1.18,
       "cebeMnav": 1.88,
-      "cash": 367,
+      "cash": 975,
       "seniorDebt": 0,
-      "prefNotional": 1403,
-      "annualObligations": 182,
+      "prefNotional": 2103,
+      "annualObligations": 287,
       "staking": 0,
       "prefChangePct": 0.46,
       "yearEnd": {
@@ -4761,6 +4761,11 @@
           "SATA",
           "Strive pref \u00b7 13%",
           1403
+        ],
+        [
+          "SATS",
+          "Strive pref \u00b7 15% (jr)",
+          700
         ]
       ],
       "debtSchedule": [],
@@ -5090,7 +5095,7 @@
         "dtcLive": 2.22
       },
       "daysToCover": 2.62,
-      "prefMarket": 1378,
+      "prefMarket": 2040,
       "prefHistory": {
         "dates": [
           "Nov 6",
@@ -6941,7 +6946,7 @@
           1.343,
           1.333,
           1.395,
-          1.443
+          1.473
         ],
         "net": [
           1.288,
@@ -7236,7 +7241,7 @@
           1.558,
           1.54,
           1.638,
-          1.707
+          1.789
         ]
       },
       "cashUsd": 317.5,
@@ -7641,7 +7646,7 @@
       },
       "_dilOverlayM": 2.7259,
       "assumedDilutedShares": 126.79,
-      "netSatsPerShare": 19138,
+      "netSatsPerShare": 12448,
       "netDilutedShares": 126.79,
       "atm": {
         "ticker": "SATA",
@@ -8086,6 +8091,13 @@
         "sessionUsd": 31483865,
         "avg30Usd": 61226962,
         "asOf": "2026-10-19"
+      },
+      "pref2": {
+        "ticker": "SATS",
+        "price": 94.66,
+        "rate": 15.0,
+        "stated": 100.0,
+        "notional": 700
       }
     }
   },

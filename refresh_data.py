@@ -238,8 +238,35 @@ _PREF_DVOL = {}
 # action in the log link back to the filing that disclosed it
 _FILINGS = {}
 
+def _cboe_last(sym):
+    """Delayed last trade from Cboe, for a listing no other source here carries yet."""
+    try:
+        req = urllib.request.Request(
+            f"https://cdn.cboe.com/api/global/delayed_quotes/quotes/{sym}.json",
+            headers={"User-Agent": "treasurytracker pete@defidevcorp.com"})
+        d = json.loads(urllib.request.urlopen(req, timeout=20, context=_SSL_CTX).read())["data"]
+        px = d.get("current_price") or d.get("close")
+        return round(float(px), 2) if px else None
+    except Exception as e:
+        log(f"[skip] Cboe {sym}: {e}")
+        return None
+
+
 PREF_LABEL = {"STRC": "Stretch · {r}% var", "STRK": "Strike · {r}%", "STRF": "Strife · {r}%",
-              "STRD": "Stride · {r}%", "STRE": "STRE · {r}% (EUR)", "SATA": "Strive pref · {r}%"}
+              "STRD": "Stride · {r}%", "STRE": "STRE · {r}% (EUR)", "SATA": "Strive pref · {r}%",
+              "SATS": "Strive pref · {r}% (jr)"}
+
+# Strive's SATS closed 2026-10-20: 7,000,000 shares at a $100 stated amount, 15.00%,
+# sold at $90 for $630M gross and ~$608.15M net (8-K and 424B5 of 2026-10-16, closing
+# 8-K of 2026-10-20). The tracker's preferred list still carries SATA alone and the
+# weekly 8-K table will not show SATS until the next filing, so inject it from the
+# filed terms. $700M of claim ranking ahead of common is not something to leave out
+# of the net reserve for a week — but the cash that came in against it has to land
+# at the same time, or the stack reads $608M poorer than it is.
+#
+# SATS is JUNIOR to SATA and senior to both common classes (closing 8-K, Item 3.03).
+SATS = {"ticker": "SATS", "shares": 7_000_000, "stated": 100.0, "rate": 15.0,
+        "netProceedsM": 608.15, "closed": "2026-10-20"}
 
 def _iso_lbl(iso, fmt):
     y, m, d = iso.split("-")
@@ -471,7 +498,19 @@ def fetch_strategytracker(data):
         if pm.get("latestUseEv") and tk != "MSTR":
             co["cash"] = round(pm["latestCashBalance"] / 1e6)
         # preferred: live per-series notionals, prices, and the implied annual dividend
-        ps = pm.get("preferredStocks") or []
+        ps = list(pm.get("preferredStocks") or [])
+        if tk == "ASST" and not any(p.get("ticker") == "SATS" for p in ps) \
+                and str(tracker_date) >= SATS["closed"]:
+            px = _cboe_last("SATS")
+            ps.append({"ticker": "SATS", "dividendRate": SATS["rate"],
+                       "notionalMillions": SATS["shares"] * SATS["stated"] / 1e6,
+                       "price": px, "priceChangePercent": 0})
+            co["pref2"] = {"ticker": "SATS", "price": px, "rate": SATS["rate"],
+                           "stated": SATS["stated"],
+                           "notional": round(SATS["shares"] * SATS["stated"] / 1e6)}
+            log(f"[SATS] not in the feed yet — carrying {SATS['shares']:,} sh "
+                f"x ${SATS['stated']:,.0f} = ${SATS['shares']*SATS['stated']/1e6:,.0f}M at "
+                f"{SATS['rate']}%" + (f", last ${px:,.2f}" if px else ", no quote"))
         if ps:
             bd = []
             mkt = 0.0
@@ -2592,6 +2631,34 @@ def fetch_lending(data):
         log(f"[skip] Morpho lending APY: {e} — keeping existing values")
 
 
+def apply_sats_proceeds(data):
+    """Put the SATS cash next to the SATS claim.
+
+    fetch_strategytracker adds the $700M stated claim to the preferred stack, but
+    fetch_holdings runs afterwards and resets cash from the weekly 8-K — which is
+    as of a date before the offering closed. Left there the page would carry the
+    claim without the ~$608.15M of net proceeds that came in against it and read
+    the net reserve $608M poorer than it is. Add the cash once the filings have
+    the claim, and stop as soon as a filing covers the closing date and reports
+    the balance itself.
+    """
+    co = data["companies"].get("ASST")
+    if not co or not any(r[0] == "SATS" for r in (co.get("prefBreakdown") or [])):
+        return
+    filed_through = (_FILED_HOLD.get("ASST") or ("", 0))[0]
+    if filed_through >= SATS["closed"]:
+        log(f"[SATS] filings now cover {filed_through} — using the reported cash")
+        return
+    co["cash"] = round((co.get("cash") or 0) + SATS["netProceedsM"])
+    for m in _MNAV_INPUTS.get("ASST") or []:
+        if m["d"] >= SATS["closed"]:
+            m["pref"] += SATS["shares"] * SATS["stated"] / 1e6
+            m["cash"] += SATS["netProceedsM"]
+            m["dirty"] = True
+    log(f"[SATS] +${SATS['netProceedsM']:,.0f}M net proceeds to cash "
+        f"(filings only run to {filed_through or 'n/a'})")
+
+
 def rebase_mnav_holdings(data):
     """Carry filed holdings into the trailing mNAV history.
 
@@ -2617,10 +2684,12 @@ def rebase_mnav_holdings(data):
         since, held = filed
         touched, was = 0, None
         for idx, m in enumerate(rows):
-            if m["d"] < since or not m["b"] or m["b"] >= held:
+            stale = m["d"] >= since and m["b"] and m["b"] < held
+            if not (stale or m.get("dirty")):
                 continue
-            was = m["b"] if was is None else min(was, m["b"])
-            nav = held * m["bp"] / 1e6
+            if stale:
+                was = m["b"] if was is None else min(was, m["b"])
+            nav = (held if stale else m["b"]) * m["bp"] / 1e6
             if nav <= 0:
                 continue
             ev = (m["sp"] * m["shs"] + m["debt"] + m["pref"] - m["cash"]) / nav
@@ -2631,7 +2700,8 @@ def rebase_mnav_holdings(data):
             touched += 1
         if touched:
             log(f"[mnav] {tk}: {touched} trailing row(s) from {since} rebased to the filed "
-                f"{held:,} BTC (tracker had {was:,.0f}) — latest net {hist['net'][-1]}x")
+                f"{held:,} BTC (tracker had {was:,.0f})" if was else
+                f"[mnav] {tk}: {touched} row(s) recomputed")
 
 
 def record_filing_watermark(data):
@@ -2683,6 +2753,7 @@ def main():
     fetch_short_interest(data)        # Nasdaq: days to cover (semi-monthly)
     fetch_borrow_fees(data)           # ChartExchange/IBKR: annualized cost to short
     fetch_atm(data)                   # preferred ATM issuance estimate + filing calibration
+    apply_sats_proceeds(data)         # SATS cash belongs with the SATS claim
     rebase_mnav_holdings(data)        # filings beat the tracker's stale daily BTC balance
     fetch_lending(data)               # Morpho API: apxUSD lending APYs for the banner
     # debt schedule + preferred breakdown are parsed from the 10-Q (see notes);

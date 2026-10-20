@@ -26,7 +26,7 @@
  */
 
 const UPSTREAM = 'https://cdn.cboe.com/api/global/delayed_quotes/quotes/';
-const SYMBOLS = ['MSTR', 'STRC', 'ASST', 'SATA'];      // allowlist — do not make dynamic
+const SYMBOLS = ['MSTR', 'STRC', 'ASST', 'SATA', 'SATS'];   // allowlist — do not make dynamic
 const ALLOWED_ORIGINS = [
   'https://treasurytracker.net',
   'https://www.treasurytracker.net',

@@ -4,23 +4,23 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>TreasuryTracker.NET — Real-Time BTC Treasury &amp; Digital Credit Tracking</title>
-<meta name="description" content="Live analytics on Strategy (MSTR · STRC) and Strive (ASST · SATA): mNAV, CEBE, accumulation, capital structure, and implied price models. Powered by APYX.">
+<meta name="description" content="Live analytics on Strategy (MSTR · STRC) and Strive (ASST · SATA · SATS): mNAV, CEBE, accumulation, capital structure, and implied price models. Powered by APYX.">
 <link rel="canonical" href="https://treasurytracker.net/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="TreasuryTracker.NET">
 <meta property="og:title" content="TreasuryTracker.NET — Real-Time BTC Treasury &amp; Digital Credit Tracking">
-<meta property="og:description" content="Live analytics on Strategy (MSTR · STRC) and Strive (ASST · SATA): mNAV, CEBE, accumulation, capital structure, and implied price models. Powered by APYX.">
+<meta property="og:description" content="Live analytics on Strategy (MSTR · STRC) and Strive (ASST · SATA · SATS): mNAV, CEBE, accumulation, capital structure, and implied price models. Powered by APYX.">
 <meta property="og:url" content="https://treasurytracker.net/">
 <meta property="og:image" content="https://treasurytracker.net/og-card-v2.jpg">
   <meta property="og:image:type" content="image/jpeg">
-  <meta property="og:image:alt" content="TreasuryTracker.NET — live MSTR, STRC, ASST and SATA analytics">
+  <meta property="og:image:alt" content="TreasuryTracker.NET — live MSTR, STRC, ASST, SATA and SATS analytics">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="TreasuryTracker.NET — Real-Time BTC Treasury &amp; Digital Credit Tracking">
-<meta name="twitter:description" content="Live MSTR · STRC · ASST · SATA analytics — mNAV, CEBE, accumulation, capital structure, implied price models. Powered by APYX.">
+<meta name="twitter:description" content="Live MSTR · STRC · ASST · SATA · SATS analytics — mNAV, CEBE, accumulation, capital structure, implied price models. Powered by APYX.">
 <meta name="twitter:image" content="https://treasurytracker.net/og-card-v2.jpg">
-  <meta name="twitter:image:alt" content="TreasuryTracker.NET — live MSTR, STRC, ASST and SATA analytics">
+  <meta name="twitter:image:alt" content="TreasuryTracker.NET — live MSTR, STRC, ASST, SATA and SATS analytics">
 <link rel="icon" href="apyx-logo.svg" type="image/svg+xml">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -103,6 +103,12 @@
   .statgroup::before { content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--bx); }
   .sg-head { font-size:11.5px; text-transform:uppercase; letter-spacing:1.4px; font-weight:700; margin-bottom:6px; }
   .sg-items { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
+  /* Strive carries two preferred series since SATS listed 2026-10-20. Four tiles in
+     the same single row keeps both cards the same height; the value size steps down
+     just enough that a $100-par price still fits the narrower column. */
+  .sg-items.four { grid-template-columns:repeat(4,1fr); gap:10px; }
+  .sg-items.four .sg-item .val { font-size:20px; }
+  .sg-items.four .sg-item .lbl { letter-spacing:.6px; }
   .sg-item .lbl { font-size:11.5px; text-transform:uppercase; letter-spacing:1px; color:var(--muted); white-space:nowrap; }
   .sg-item .val { font-size:23px; font-weight:700; font-style:italic; margin-top:2px;
     color:var(--bx); font-variant-numeric:tabular-nums; }
@@ -425,6 +431,10 @@
     .statbox { padding: 10px 12px; }
     .statgroup { padding: 9px 12px 11px; }
     .sg-items { gap: 8px; }
+    /* four tiles across a phone would leave ~75px a column, so Strive's second
+       preferred wraps to a 2x2 instead; the card is full width here anyway */
+    .sg-items.four { grid-template-columns: repeat(2, 1fr); gap: 8px 12px; }
+    .sg-items.four .sg-item .val { font-size: 17px; }
     .sg-item .val { font-size: 17px; }
     .sg-item .lbl, .sg-item .sub { font-size: 10.5px; letter-spacing: .6px; }
     /* .sg-items stays repeat(3, 1fr) here, so the sub-line has a third of the width
@@ -454,7 +464,7 @@
         <p>Real-Time BTC Treasury &amp; Digital Credit Tracking</p>
         <div class="legend">
           <span><span class="dot" style="background:var(--mstr)"></span>Strategy — <b>MSTR</b> common · <b>STRC</b> preferred</span>
-          <span><span class="dot" style="background:var(--asst)"></span>Strive — <b>ASST</b> common · <b>SATA</b> preferred</span>
+          <span><span class="dot" style="background:var(--asst)"></span>Strive — <b>ASST</b> common · <b>SATA</b> + <b>SATS</b> preferred</span>
         </div>
       </div>
       <a href="https://apyx.fi" target="_blank" rel="noopener" class="poweredby">
@@ -481,13 +491,16 @@
       </div>
       <div class="statgroup" style="--bx:var(--asst)">
         <div class="sg-head" style="color:var(--asst)">Strive</div>
-        <div class="sg-items">
+        <div class="sg-items" id="sg-items-ASST">
           <div class="sg-item"><div class="lbl">ASST</div><div class="val" id="hdr-px-ASST">—</div>
             <div class="sub" id="hdr-px-ASST-sub">common</div></div>
           <div class="sg-item"><div class="lbl">Net mNAV<span class="defhint" data-def="Net mNAV" aria-label="About this metric">&#9432;</span></div>
             <div class="val" id="hdr-mnav-ASST">—</div><div class="sub">mcap ÷ net reserve</div></div>
           <div class="sg-item"><div class="lbl">SATA</div><div class="val" id="hdr-sata">—</div>
             <div class="sub" id="hdr-sata-sub">preferred</div></div>
+          <div class="sg-item" id="hdr-sats-item" hidden><div class="lbl">SATS</div>
+            <div class="val" id="hdr-sats">—</div>
+            <div class="sub" id="hdr-sats-sub">preferred</div></div>
         </div>
       </div>
     </div>
@@ -729,7 +742,7 @@
       <li>Weekly accumulation, debt schedule, historical preferred &amp; cash: SEC EDGAR filings (8-K, 10-Q, XBRL)</li>
       <li>Days to cover / short interest: Nasdaq (semi-monthly settlement data)</li>
       <li>Live BTC price: CoinGecko API</li>
-      <li>Live preferred quotes: strategy.com API (STRC, real-time) · Cboe delayed quotes (SATA, ~15 min)</li>
+      <li>Live preferred quotes: strategy.com API (STRC, real-time) · Cboe delayed quotes (SATA, SATS, ~15 min)</li>
     </ul>
     <div style="margin-top:8px;color:var(--faint)">Not investment advice. Confirm against each issuer's latest filing before relying on the ratios.</div>
   </div>
@@ -905,7 +918,7 @@ const METRIC_DEFS = {
     m:"What it would cost to own the entire company: the equity plus every claim ahead of it, net of the cash on hand."},
   "Beta to BTC": {c:"Slope of daily stock returns regressed against BTC returns over the past year.",
     m:"Sensitivity to bitcoin: a beta of 1.5 means the stock has tended to move 1.5% for every 1% move in BTC."},
-  "Preferred Price": {c:"Last trade of the flagship preferred (STRC / SATA), against a $100 stated value.",
+  "Preferred Price": {c:"Last trade of the flagship preferred (STRC / SATA), against a $100 stated value. Strive's second series, SATS, is junior to SATA and shown in the header and in the preferred breakdown.",
     m:"Below $100, the market demands more yield than the coupon pays — the discount is the market's live read on issuer risk."},
   "Crypto Holdings": {c:"Total bitcoin held, per the latest weekly 8-K filing.",
     m:"The treasury itself — the asset backing everything else on this page."},
@@ -1245,7 +1258,7 @@ const CAP_INPUTS = [
   {k:"holdings", label:"Crypto Holdings", unit:"₿", sub:"BTC", d:0},
   {k:"cash", label:"Cash & Cash Equivalents", unit:"$", sub:"USD", d:0},
   {k:"seniorDebt", label:"Senior Debt", unit:"$", sub:"convertible notes · hover for schedule", d:0},
-  {k:"prefNotional", label:"Preferred Equity Notional", unit:"$", sub:"USD (STRC / SATA)", d:0},
+  {k:"prefNotional", label:"Preferred Equity Notional", unit:"$", sub:"all series · hover to split", d:0},
   {k:"annualObligations", label:"Annual Obligations", unit:"$", sub:"USD (mostly pref dividends)", d:0},
 ];
 
@@ -1303,6 +1316,19 @@ function renderPriceHeader(){
   set("hdr-mnav-ASST", fmt(netMnav(A),2)+"x");
   set("hdr-strc", usd(M.prefPrice,2));
   set("hdr-sata", usd(A.prefPrice,2));
+  // SATS listed 2026-10-20 as Strive's second, junior preferred. The tile only
+  // appears once there is a quote, so a feed without it renders exactly as before.
+  const p2 = A.pref2, sats = document.getElementById("hdr-sats-item"),
+        grid = document.getElementById("sg-items-ASST");
+  if(sats && grid){
+    const on = !!(p2 && p2.price > 0);
+    sats.hidden = !on;
+    grid.classList.toggle("four", on);
+    if(on){
+      set("hdr-sats", usd(p2.price,2));
+      set("hdr-sats-sub", `${fmt(p2.rate,0)}% · $${fmt(p2.stated,0)} par`);
+    }
+  }
   const chg = v => (v==null||isNaN(v)) ? "" : `<span class="${v>=0?'pos':'neg'}">${sig(v)}${fmt(v,2)}%</span>`;
   // Relative volume is the last SETTLED session's (refresh_data.py leaves the running
   // one out), so from the open until the evening refresh it describes the previous
@@ -2625,6 +2651,12 @@ async function fetchCboe(){
   }
   apply(A, "stockPrice", "dayChangePct",  "_preClose",     "ASST");
   apply(A, "prefPrice",  "prefChangePct", "_prefPreClose", "SATA");
+  // SATS lives on its own object rather than a prefPrice field, since ASST's
+  // flagship preferred is still SATA
+  if(A.pref2 && q.SATS){
+    const s = q.SATS, px = (closed && s.close > 0) ? s.close : s.last;
+    if(px > 0 && Math.abs(px - (A.pref2.price ?? 0)) > 0.005){ A.pref2.price = Math.round(px*100)/100; changed = true; }
+  }
   if(changed){ renderAll(); markFresh(); }
 }
 async function fetchStrategyLive(){
