@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-refresh_data.py — repopulate data.json for the BTC Treasury Tracker.
+refresh_data.py — repopulate data.json for TreasuryTracker.NET.
 
 The dashboard (index.html) reads ./data.json on load. Run this script (or
 schedule it) to refresh the numbers without editing the HTML.

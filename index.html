@@ -3,24 +3,24 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>TreasuryTracker.NET — Real-Time BTC Treasury &amp; Digital Credit Tracking</title>
-<meta name="description" content="Live analytics on Strategy (MSTR · STRC) and Strive (ASST · SATA · SATS): mNAV, CEBE, accumulation, capital structure, and implied price models. Powered by APYX.">
+<title>TreasuryTracker.NET — Real-Time Treasury &amp; Digital Credit Tracking</title>
+<meta name="description" content="Live analytics on Strategy (MSTR · STRC), Strive (ASST · SATA · SATS) and DeFi Development (DFDV · CHAD): mNAV, CEBE, accumulation, capital structure, and implied price models. Powered by APYX.">
 <link rel="canonical" href="https://treasurytracker.net/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="TreasuryTracker.NET">
-<meta property="og:title" content="TreasuryTracker.NET — Real-Time BTC Treasury &amp; Digital Credit Tracking">
-<meta property="og:description" content="Live analytics on Strategy (MSTR · STRC) and Strive (ASST · SATA · SATS): mNAV, CEBE, accumulation, capital structure, and implied price models. Powered by APYX.">
+<meta property="og:title" content="TreasuryTracker.NET — Real-Time Treasury &amp; Digital Credit Tracking">
+<meta property="og:description" content="Live analytics on Strategy (MSTR · STRC), Strive (ASST · SATA · SATS) and DeFi Development (DFDV · CHAD): mNAV, CEBE, accumulation, capital structure, and implied price models. Powered by APYX.">
 <meta property="og:url" content="https://treasurytracker.net/">
 <meta property="og:image" content="https://treasurytracker.net/og-card-v2.jpg">
   <meta property="og:image:type" content="image/jpeg">
-  <meta property="og:image:alt" content="TreasuryTracker.NET — live MSTR, STRC, ASST, SATA and SATS analytics">
+  <meta property="og:image:alt" content="TreasuryTracker.NET — live MSTR, STRC, ASST, SATA, SATS, DFDV and CHAD analytics">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="TreasuryTracker.NET — Real-Time BTC Treasury &amp; Digital Credit Tracking">
-<meta name="twitter:description" content="Live MSTR · STRC · ASST · SATA · SATS analytics — mNAV, CEBE, accumulation, capital structure, implied price models. Powered by APYX.">
+<meta name="twitter:title" content="TreasuryTracker.NET — Real-Time Treasury &amp; Digital Credit Tracking">
+<meta name="twitter:description" content="Live MSTR · STRC · ASST · SATA · SATS · DFDV · CHAD analytics — mNAV, CEBE, accumulation, capital structure, implied price models. Powered by APYX.">
 <meta name="twitter:image" content="https://treasurytracker.net/og-card-v2.jpg">
-  <meta name="twitter:image:alt" content="TreasuryTracker.NET — live MSTR, STRC, ASST, SATA and SATS analytics">
+  <meta name="twitter:image:alt" content="TreasuryTracker.NET — live MSTR, STRC, ASST, SATA, SATS, DFDV and CHAD analytics">
 <link rel="icon" href="apyx-logo.svg" type="image/svg+xml">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -489,7 +489,7 @@
     <div class="masthead">
       <div class="title">
         <h1>TreasuryTracker<span class="hl">.NET</span></h1>
-        <p>Real-Time BTC Treasury &amp; Digital Credit Tracking</p>
+        <p>Real-Time Treasury &amp; Digital Credit Tracking</p>
         <div class="legend">
           <span><span class="dot" style="background:var(--mstr)"></span>Strategy — <b>MSTR</b> common · <b>STRC</b> preferred</span>
           <span><span class="dot" style="background:var(--asst)"></span>Strive — <b>ASST</b> common · <b>SATA</b> + <b>SATS</b> preferred</span>
@@ -637,7 +637,7 @@
   <!-- 1. Accumulation & Holdings -->
   <section id="holdings">
     <div class="sec-head"><h2>Accumulation &amp; Holdings</h2><span class="tag stub" id="tag-holdings">seed data</span></div>
-    <p class="sec-note">How big each bitcoin treasury is and how fast it's growing.</p>
+    <p class="sec-note">How big each treasury is and how fast it's growing.</p>
     <div class="grid" id="grid-holdings"></div>
     <div class="charts">
       <div class="chartcard">
@@ -662,7 +662,7 @@
   <!-- 2. Cost & Efficiency -->
   <section id="cost">
     <div class="sec-head"><h2>Cost &amp; Efficiency</h2></div>
-    <p class="sec-note">How well the bitcoin was bought — each company's entry price versus today's market.</p>
+    <p class="sec-note">How well the treasury was bought — each company's entry price versus today's market.</p>
     <div class="grid" id="grid-cost"></div>
   </section>
 
@@ -694,7 +694,7 @@
   <!-- 4. Valuation & Premium (incl. CEBE) -->
   <section id="valuation">
     <div class="sec-head"><h2>Valuation &amp; Premium</h2><span class="tag stub" id="tag-valuation">seed data</span></div>
-    <p class="sec-note">Whether the market is pricing each company above or below the bitcoin behind it — for the structure as a whole, and for common shareholders after debt and preferred take their cut.</p>
+    <p class="sec-note">Whether the market is pricing each company above or below the treasury behind it — for the structure as a whole, and for common shareholders after debt and preferred take their cut.</p>
     <div class="charts">
       <div class="chartcard">
         <h3><span class="dot" style="background:var(--mstr)"></span>MSTR — Price vs. mNAV</h3>
@@ -2268,7 +2268,7 @@ function runCalc(){
 }
 // ---------- image export: the share card, and a PNG of any registered chart ----------
 const EXPORT_SCALE = 2;                 // 2x, so axis labels survive being reposted
-const APYX_EYEBROW = "APYX  ·  BTC TREASURY & DIGITAL CREDIT TRACKER";
+const APYX_EYEBROW = "APYX  ·  TREASURY & DIGITAL CREDIT TRACKER";
 const EXPORT_FONT = w => `${w} 'Google Sans Flex','Google Sans',sans-serif`;
 
 // Copy plain objects and arrays; pass everything else through by reference. That
