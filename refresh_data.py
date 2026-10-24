@@ -9,7 +9,7 @@ schedule it) to refresh the numbers without editing the HTML.
   python3 refresh_data.py --dry-run  # print what would change, write nothing
 
 WHAT WORKS OUT OF THE BOX
-  - Live BTC price + circulating supply  -> CoinGecko public API (no key)
+  - Live BTC + SOL price and circulating supply -> CoinGecko public API (no key)
 
   - Stock price, day change, 52-week range, 1-year price history, beta-to-BTC,
     relative volume -> strategytracker (no key). See fetch_strategytracker().
@@ -96,26 +96,31 @@ def log(msg):
 
 
 # --------------------------------------------------------------------------- #
-# WORKING: BTC price + supply (CoinGecko)
+# WORKING: BTC + SOL price and supply (CoinGecko)
 # --------------------------------------------------------------------------- #
-def fetch_btc_market(data):
+def fetch_crypto_market(data):
     try:
-        j = get_json(
-            "https://api.coingecko.com/api/v3/coins/bitcoin"
-            "?localization=false&tickers=false&market_data=true"
-            "&community_data=false&developer_data=false"
-        )
-        price = j["market_data"]["current_price"]["usd"]
-        circ = j["market_data"]["circulating_supply"]
-        data["btcPriceUsd"] = round(price, 2)
-        _BTC_PX["usd"] = price
+        coins = {c["id"]: c for c in get_json(
+            "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=bitcoin,solana")}
+        btc = coins["bitcoin"]
+        data["btcPriceUsd"] = round(btc["current_price"], 2)
+        _BTC_PX["usd"] = btc["current_price"]
         data["priceAsOf"] = datetime.date.today().isoformat()
-        if circ:
-            data["btcCirculating"] = int(circ)
-        log(f"BTC price = ${price:,.0f}  (circulating {circ:,.0f})")
-        # recompute % of 21M supply from current holdings
+        if btc.get("circulating_supply"):
+            data["btcCirculating"] = int(btc["circulating_supply"])
+        log(f"BTC price = ${btc['current_price']:,.0f}  (circulating {btc.get('circulating_supply') or 0:,.0f})")
+        sol = coins.get("solana")
+        if sol and sol.get("current_price"):
+            data["solPriceUsd"] = round(sol["current_price"], 2)
+            if sol.get("circulating_supply"):
+                data["solCirculating"] = int(sol["circulating_supply"])
+            log(f"SOL price = ${sol['current_price']:,.2f}  (circulating {sol.get('circulating_supply') or 0:,.0f})")
+        # % of supply against each treasury's own asset: BTC's 21M cap, SOL's
+        # circulating supply (SOL has no cap)
         for t, c in data["companies"].items():
-            c["pctSupply"] = round(c["holdings"] / data["btcSupply"] * 100, 4)
+            base = data.get("solCirculating") if c.get("asset") == "SOL" else data["btcSupply"]
+            if base and c.get("holdings"):
+                c["pctSupply"] = round(c["holdings"] / base * 100, 4)
         return True
     except Exception as e:
         log(f"[skip] CoinGecko failed: {e}")
@@ -188,7 +193,7 @@ MSTR_CASH_STEPS = [("2025-06-30", 50.1), ("2025-09-30", 54.3),
 # were repurchased and cancelled 2026-05-19 (Q2 10-Q). Live steps take strategy.com's
 # figure after that.
 MSTR_DEBT_STEPS = [("2025-02-21", 8213.75), ("2026-05-19", 6713.75)]
-MNAV_START = {"MSTR": "2025-10-01", "ASST": "2026-01-01"}   # chart windows
+MNAV_START = {"MSTR": "2025-10-01", "ASST": "2026-01-01", "DFDV": "2026-01-01"}   # chart windows
 
 
 def _step(steps, iso):
@@ -254,7 +259,7 @@ def _cboe_last(sym):
 
 PREF_LABEL = {"STRC": "Stretch · {r}% var", "STRK": "Strike · {r}%", "STRF": "Strife · {r}%",
               "STRD": "Stride · {r}%", "STRE": "STRE · {r}% (EUR)", "SATA": "Strive pref · {r}%",
-              "SATS": "Strive pref · {r}% (jr)"}
+              "SATS": "Strive pref · {r}% (jr)", "CHAD": "CHAD · {r}% var"}
 
 # Strive's SATS closed 2026-10-20: 7,000,000 shares at a $100 stated amount, 15.00%,
 # sold at $90 for $630M gross and ~$608.15M net (8-K and 424B5 of 2026-10-16, closing
@@ -547,7 +552,7 @@ def fetch_strategytracker(data):
                     notM = filed
                 rate = p.get("dividendRate")
                 lab = PREF_LABEL.get(t, "{r}%").format(r=("%g" % rate) if rate is not None else "?")
-                bd.append([t, lab, round(notM)])
+                bd.append([t, lab, round(notM), rate])     # rate: the calculator's per-series default
                 # market value of the series: notional scaled by price/par
                 # (par $100 for USD series; STRE is EUR-denominated with a €10 par)
                 par = 10 if t == "STRE" else 100
@@ -1690,7 +1695,8 @@ def fetch_holdings(data, max_points=60):
                 for row in bd:
                     if row[0] == "STRC":
                         row[1] = f"Stretch · {strc_rate:g}% var"
-                    pref_div += row[2] * fixed.get(row[0], 10.0) / 100
+                    row[3:] = [fixed.get(row[0], 10.0)]
+                    pref_div += row[2] * row[3] / 100
                 coup = sum(x["principal"] * x["coupon"] / 100 for x in (co.get("debtSchedule") or []))
                 co["annualObligations"] = round(pref_div + coup)
                 log(f"MSTR STRC rate from 8-K: {strc_rate}% -> annualObligations {co['annualObligations']}")
@@ -1913,6 +1919,10 @@ def fetch_holdings(data, max_points=60):
         log(f"{tk}: {len(weekly[tk]['dates'])} points via EDGAR ({weekly[tk]['dates'][0]} -> "
             f"{weekly[tk]['dates'][-1]}), latest {cur:,} BTC")
     if "MSTR" in weekly or "ASST" in weekly:
+        # DFDV's series comes from fetch_dfdv, not EDGAR: carry it over so a run where
+        # DFDV's API fails keeps the last one rather than dropping it here
+        weekly.update({k: v for k, v in (data.get("weekly") or {}).items()
+                       if k not in weekly and k not in CIK and k != "illustrative"})
         data["weekly"] = weekly
     if acts:    # merge with previously stored actions so old weeks never drop off
         # link each action to its source filing: the earliest 8-K filed on or after
@@ -1963,20 +1973,38 @@ NASDAQ_UA = {"User-Agent": UA["User-Agent"], "Accept": "application/json",
              "Origin": "https://www.nasdaq.com", "Referer": "https://www.nasdaq.com/"}
 
 
-def _nasdaq_vol(sym, days=420):
-    """Daily share volume [(iso date, volume), ...] from Nasdaq (split-adjusted)."""
+def _nasdaq_rows(sym, days=420):
+    """Nasdaq's daily history rows for sym, newest first (split-adjusted)."""
     frm = (datetime.date.today() - datetime.timedelta(days=days)).isoformat()
     url = (f"https://api.nasdaq.com/api/quote/{sym}/historical?assetclass=stocks"
            f"&limit=9999&fromdate={frm}&todate={datetime.date.today().isoformat()}")
     req = urllib.request.Request(url, headers=NASDAQ_UA)
     raw = urllib.request.urlopen(req, timeout=25, context=_SSL_CTX).read().decode("utf-8", "ignore")
-    rows = ((json.loads(raw)["data"] or {}).get("tradesTable") or {}).get("rows") or []
+    return ((json.loads(raw)["data"] or {}).get("tradesTable") or {}).get("rows") or []
+
+
+def _nasdaq_vol(sym, days=420):
+    """Daily share volume [(iso date, volume), ...] from Nasdaq (split-adjusted)."""
     out = []
-    for r in rows:
+    for r in _nasdaq_rows(sym, days):
         d = datetime.datetime.strptime(r["date"], "%m/%d/%Y").date().isoformat()
         v = str(r.get("volume") or "").replace(",", "")
         if v.isdigit() and int(v):
             out.append((d, int(v)))
+    return sorted(out)
+
+
+def _nasdaq_closes(sym, days=420):
+    """Daily [(iso date, close, volume), ...] from Nasdaq, oldest first."""
+    out = []
+    for r in _nasdaq_rows(sym, days):
+        try:
+            d = datetime.datetime.strptime(r["date"], "%m/%d/%Y").date().isoformat()
+            c = float(str(r.get("close") or "").replace("$", "").replace(",", ""))
+            v = int(str(r.get("volume") or "0").replace(",", "") or 0)
+        except ValueError:
+            continue
+        out.append((d, c, v))
     return sorted(out)
 
 
@@ -2066,13 +2094,15 @@ def fetch_short_interest(data):
             try:
                 sih = _nasdaq_si(pref)
                 if sih:
-                    # % of float: preferred float = notional outstanding / $100 par
+                    # % of float: preferred float = notional outstanding / stated amount
+                    # ($100 for STRC and SATA, $10 for CHAD)
                     ph = co.get("prefHistory") or {}
+                    stated = co.get("prefStated") or 100
                     steps = [(d, n) for d, n in zip(ph.get("iso") or [], ph.get("notional") or []) if n]
                     pct = []
                     for iso, s in zip(sih["iso"], sih["si"]):
                         ns = [n for d2, n in steps if d2 <= iso]
-                        pct.append(round(s / (ns[-1] * 1e4) * 100, 2) if ns else None)
+                        pct.append(round(s / (ns[-1] * 1e6 / stated) * 100, 2) if ns else None)
                     sih["pctFloat"] = pct
                     if pref in _VOL_HIST:
                         sih["dtc10"] = _dtc10(sih, _VOL_HIST[pref])
@@ -2645,6 +2675,243 @@ def fetch_lending(data):
         log(f"[skip] Morpho lending APY: {e} — keeping existing values")
 
 
+# --------------------------------------------------------------------------- #
+# DFDV: DeFi Development Corp, a SOL treasury, and its CHAD preferred
+# --------------------------------------------------------------------------- #
+# DFDV's own dashboard API (defidevcorp.com/dashboard) is the primary source. It
+# sends no CORS header, so only this script can read it; between runs the page ticks
+# DFDV and CHAD quotes through the Cboe relay instead. Routes usually answer in a
+# second or two but stall for 10-30s at times, so each gets a long timeout and a
+# retry, and a figure whose route fails keeps the previous run's value. The API has
+# no stock price history, so DFDV's daily closes come from Nasdaq.
+DFDV_API = "https://defidevcorp.com/api/dashboard/"
+
+# CHAD terms the API doesn't serve (DFDV's own CHAD page hard-codes them). The rate
+# is variable and declared monthly by 8-K, so each new rate needs a row here; a month
+# without one is logged [stale]. $10 stated and 13.00% at the Sep 8 2026 IPO (424B5
+# dated 2026-09-03); 14.00% for periods from Nov 1 2026 (8-K filed 2026-10-15).
+# The notional steps date the IPO close (1,375,000 sh) and the over-allotment
+# (206,250 sh, press release 2026-09-21); /chad/notional carries the latest.
+CHAD = {"stated": 10.0,
+        "rates": [("2026-09-08", 13.0), ("2026-11-01", 14.0)],
+        "notional": [("2026-09-08", 13.75), ("2026-09-20", 15.8125)]}
+
+# Not in the API either: the Q2 2026 shareholder letter puts operating costs at about
+# $17M a year, before roughly $10M of interest. The calculator's default for DFDV.
+DFDV_OPEX_M = 17.0
+
+
+def _dfdv(route, timeout=30, tries=2):
+    """`data` from one DFDV dashboard route, or None once every try has failed."""
+    err = None
+    for _ in range(tries):
+        try:
+            j = get_json(DFDV_API + route, timeout=timeout)
+            if j.get("success"):
+                return j.get("data")
+            err = "success=false"
+        except Exception as e:
+            err = e
+    log(f"[skip] DFDV {route}: {err} — keeping existing values")
+    return None
+
+
+def _last_weekday(iso):
+    """iso itself on a weekday, else the Friday before it (no holiday calendar)."""
+    d = datetime.date.fromisoformat(iso)
+    while d.weekday() >= 5:
+        d -= datetime.timedelta(days=1)
+    return d.isoformat()
+
+
+def fetch_dfdv(data):
+    """DFDV + CHAD from DFDV's dashboard API, written in the shape the page reads for
+    MSTR and ASST. SOL-denominated loans are marked at the live SOL price, matching
+    the net debt DFDV publishes."""
+    co = data["companies"].setdefault("DFDV", {})
+    co.update({"name": "DeFi Development", "ticker": "DFDV", "prefName": "DFDV Preferred",
+               "prefTicker": "CHAD", "asset": "SOL", "accent": "#a970ff",
+               "prefStated": CHAD["stated"], "opexYr": DFDV_OPEX_M})
+    co.setdefault("trail3m", {"prefMo": 0, "commonMo": 0})
+    today = datetime.date.today().isoformat()
+    year = int(today[:4])
+    snap_et = datetime.datetime.now(ET)
+    sol_px = data.get("solPriceUsd")
+
+    d = _dfdv("dfdv")
+    if d and d.get("price") and d.get("shares_outstanding") and d.get("sol_count"):
+        stamp = datetime.datetime.fromisoformat(d["updated_at"].replace("Z", "+00:00"))
+        co["stockPrice"] = round(d["price"], 2)
+        _stamp_price(co, co["stockPrice"], round(d.get("price_change_percent") or 0, 2),
+                     _last_weekday(_et_date(stamp)))
+        co["sharesOutstanding"] = round(d["shares_outstanding"] / 1e6, 2)
+        co["holdings"] = int(d["sol_count"])
+        if data.get("solCirculating"):
+            co["pctSupply"] = round(co["holdings"] / data["solCirculating"] * 100, 4)
+    si = _dfdv("investor-relations/stock-info")
+    if si and si.get("week_52_low") and si.get("week_52_high"):
+        co["week52Low"], co["week52High"] = round(si["week_52_low"], 2), round(si["week_52_high"], 2)
+    nav = _dfdv("nav")
+    if nav and nav.get("total_cash_including_eloc") is not None:
+        co["cash"] = round(nav["total_cash_including_eloc"] / 1e6, 2)
+
+    # debt: two converts (put/maturity, conversion price) and three loans, two of
+    # them in SOL. Straight debt carries no convPrice.
+    debt = _dfdv("debt")
+    if debt and sol_px:
+        sched = []
+        for r in debt:
+            sol_amt, conv, mat = r.get("sol_amount"), r.get("conversion_price"), r.get("maturity_date")
+            t = {"note": r.get("name"), "coupon": r.get("coupon_rate") or 0,
+                 "maturity": mat if re.fullmatch(r"\d{4}-\d{2}-\d{2}", mat or "") else None,
+                 "put": r.get("put_date"),
+                 "principal": round((sol_amt * sol_px if sol_amt else r.get("notional_amount") or 0) / 1e6, 3),
+                 "convPrice": conv, "convRate": round(1000 / conv, 4) if conv else None}
+            if sol_amt:
+                t["solAmount"] = sol_amt
+            sched.append(t)
+        co["debtSchedule"] = sched
+        co["seniorDebt"] = round(sum(t["principal"] for t in sched), 2)
+        co["capStructAsOf"] = f"{today} (DFDV dashboard)"
+
+    # CHAD: stated notional, quote, daily closes
+    rate = _step(CHAD["rates"], today)
+    if CHAD["rates"][-1][0][:7] < today[:7]:
+        log(f"[stale] CHAD rate table ends {CHAD['rates'][-1][0]} — add this month's declared rate")
+    steps = list(CHAD["notional"])
+    cn = _dfdv("chad/notional")
+    if cn and cn.get("notional_usd"):
+        n = round(cn["notional_usd"] / 1e6, 4)
+        if abs(steps[-1][1] - n) > 0.001:
+            steps.append((cn.get("as_of_date") or today, n))
+    notional = steps[-1][1]
+    co["prefNotional"] = round(notional, 2)
+    co["prefBreakdown"] = [["CHAD", PREF_LABEL["CHAD"].format(r="%g" % rate), round(notional, 2), rate]]
+    interest = sum(t["principal"] * t["coupon"] / 100 for t in co.get("debtSchedule") or [])
+    co["annualObligations"] = round(notional * rate / 100 + interest, 2)
+    q = _dfdv("chad/quote", timeout=20)
+    if q and q.get("price"):
+        co["prefPrice"] = round(q["price"], 2)
+        co["prefChangePct"] = round(q.get("price_change_percent") or 0, 2)
+    ch = _dfdv("chad/history", timeout=40, tries=3)
+    if ch:
+        rows = sorted((r for r in ch if r.get("date") and r.get("close")), key=lambda r: r["date"])
+        co["prefHistory"] = {"dates": [_iso_lbl(r["date"], "%b %-d") for r in rows],
+                             "iso": [r["date"] for r in rows],
+                             "px": [round(r["close"], 2) for r in rows],
+                             "notional": [_step(steps, r["date"]) for r in rows]}
+        _VOL_HIST["CHAD"] = [(r["date"], r.get("volume") or 0) for r in rows]
+        rv = _rvol([(r["date"], (r.get("volume") or 0) * r["close"]) for r in rows], snap_et)
+        if rv:
+            co["prefRvol"] = rv
+
+    # holdings path: weekly accumulation, year-end, and the date of the latest update
+    h = _dfdv("history", timeout=40)
+    held = sorted((r["date"], r["total_sol_holdings"]) for r in h or [] if r.get("total_sol_holdings"))
+    sol_hist = sorted((r["date"], r["sol_price"]) for r in h or [] if r.get("sol_price"))
+    if held:
+        i = len(held) - 1
+        while i > 0 and held[i - 1][1] == held[-1][1]:
+            i -= 1
+        co["treasuryDate"] = held[i][0]
+        ye = _step(held, f"{year - 1}-12-31")
+        if ye:
+            co["yearEnd"] = {str(year - 1): ye}
+            co["netChangeYtd"] = co.get("holdings", held[-1][1]) - ye
+        # from Jan 1, like the EDGAR series: each week's last reading, the change since
+        # the week before (the first week's since year-end). DFDV publishes a daily SOL
+        # balance, so a week's change includes staking rewards and loans, not only buys.
+        weeks = {}                                     # Monday -> the week's last reading
+        for day, v in held:
+            if day > f"{year - 1}-12-31":
+                dt = datetime.date.fromisoformat(day)
+                weeks[dt - datetime.timedelta(days=dt.weekday())] = (day, v)
+        jan1 = datetime.date(year, 1, 1)
+        wk = {"dates": [], "ranges": [], "acquired": [], "holdings": []}
+        prev = ye or 0
+        for mon in sorted(weeks):
+            day, v = weeks[mon]
+            wk["dates"].append(_iso_lbl(day, "%b %-d"))
+            wk["ranges"].append(f"{_iso_lbl(max(mon, jan1).isoformat(), '%b %-d')} – {_iso_lbl(day, '%b %-d')}")
+            wk["acquired"].append(v - prev)
+            wk["holdings"].append(v)
+            prev = v
+        if wk["dates"]:
+            data.setdefault("weekly", {})["DFDV"] = wk
+
+    # SOL per share (DFDV's headline, basic shares) and its growth since Jan 1
+    sps = _dfdv("nav/sps-daily", timeout=40)
+    pts = sorted((r["date"], r["headline_sps"]) for r in sps or [] if r.get("headline_sps"))
+    if pts:
+        idx = sorted(set(range(0, len(pts), 7)) | {len(pts) - 1})
+        co["bpsHistory"] = {"dates": [_iso_lbl(pts[i][0], "%b '%y") for i in idx],
+                            "sol": [round(pts[i][1], 5) for i in idx], "basis": "basic"}
+        base = _step(pts, f"{year - 1}-12-31")
+        if base:
+            co["assetYieldYtd"] = round((pts[-1][1] / base - 1) * 100, 1)
+
+    # realized staking yield: dfdvSOL's exchange rate to SOL over the trailing ~90 days
+    rt = _dfdv("dfdvsol/rate")
+    rates = sorted((r["epoch_date"], r["dfdvsol_sol_rate"]) for r in rt or [] if r.get("dfdvsol_sol_rate"))
+    if rates:
+        end_d, end_r = rates[-1]
+        frm = (datetime.date.fromisoformat(end_d) - datetime.timedelta(days=90)).isoformat()
+        past = [x for x in rates if x[0] <= frm]
+        if past:
+            days = (datetime.date.fromisoformat(end_d) - datetime.date.fromisoformat(past[-1][0])).days
+            co["organicYield"] = round(((end_r / past[-1][1]) ** (365 / days) - 1) * 100, 2)
+
+    shs = _dfdv("shares")
+    if shs:      # share count per date, for short interest's % of float
+        _SHARES_HIST["DFDV"] = sorted((r["date"], r["shares_outstanding"] / 1e6)
+                                      for r in shs if r.get("shares_outstanding"))
+
+    # daily closes: stockHistory's calendar axis, beta to SOL, relative volume, and the
+    # price beside DFDV's own EV series. That series leaves CHAD out of EV; it goes back
+    # in here, as preferred does for MSTR and ASST.
+    try:
+        closes = _nasdaq_closes("DFDV")
+    except Exception as e:
+        log(f"[skip] DFDV closes: {e} — keeping existing series")
+        closes = []
+    if closes:
+        sh = data.get("stockHistory") or {}
+        if sh.get("iso"):
+            out, last, j = [], None, 0
+            for iso in sh["iso"]:
+                while j < len(closes) and closes[j][0] <= iso:
+                    last = closes[j][1]
+                    j += 1
+                out.append(round(last, 2) if last is not None else None)
+            sh["DFDV"] = out
+        settled = _settled_sessions([(day, c) for day, c, _v in closes], snap_et)
+        beta = _beta(settled[-253:], sol_hist)
+        if beta is not None:
+            co["betaAsset"] = round(beta, 2)
+        rv = _rvol([(day, c * v) for day, c, v in closes], snap_et)
+        if rv:
+            co["rvol"] = rv
+        mn = _dfdv("nav/mnav-enterprise", timeout=40)
+        if mn:
+            cl = [(day, c) for day, c, _v in closes]
+            dts, px, ev = [], [], []
+            for r in mn:
+                last = _step(cl, r["date"])
+                if r["date"] < MNAV_START["DFDV"] or last is None or not r.get("solNav"):
+                    continue
+                dts.append(_iso_lbl(r["date"], "%b %-d"))
+                px.append(round(last, 2))
+                ev.append(round((r["enterpriseValue"] / 1e6 + (_step(steps, r["date"]) or 0))
+                                / (r["solNav"] / 1e6), 3))
+            if ev:
+                co["mnavHistory"] = {"dates": dts, "px": px, "mnav": ev}
+
+    if co.get("holdings") and co.get("stockPrice"):
+        log(f"DFDV via its dashboard: {co['holdings']:,} SOL, ${co['stockPrice']} "
+            f"({co.get('dayChangePct', 0):+.2f}%), debt ${co.get('seniorDebt', 0):,.1f}M, "
+            f"cash ${co.get('cash', 0):,.1f}M, CHAD ${co['prefNotional']:,.2f}M at {rate:g}%")
+
+
 def apply_sats_proceeds(data):
     """Put the SATS cash next to the SATS claim.
 
@@ -2758,12 +3025,13 @@ def main():
     before = json.dumps(data, sort_keys=True)
 
     print("Refreshing treasury data…")
-    fetch_btc_market(data)            # CoinGecko: BTC price + supply
+    fetch_crypto_market(data)         # CoinGecko: BTC + SOL price and supply
     fetch_strategy_kpi(data)          # strategy.com API: shares, debt, USD reserve (MSTR)
     fetch_sata_notional(data)         # SEC EDGAR: filed SATA count (the tracker's stalls)
     fetch_strategytracker(data)       # PRIMARY: current metrics + real history (both names)
     fetch_holdings(data)             # SEC EDGAR: weekly accumulation (8-K period ranges)
     fetch_strategy_kpi(data)          # re-apply: holdings sets cash from the 8-K balances; live wins
+    fetch_dfdv(data)                  # DFDV dashboard API: the SOL treasury and CHAD
     fetch_short_interest(data)        # Nasdaq: days to cover (semi-monthly)
     fetch_borrow_fees(data)           # ChartExchange/IBKR: annualized cost to short
     fetch_atm(data)                   # preferred ATM issuance estimate + filing calibration
