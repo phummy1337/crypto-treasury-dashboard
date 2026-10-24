@@ -2716,6 +2716,22 @@ def _dfdv(route, timeout=30, tries=2):
     return None
 
 
+# DFDV's API is a third party, and some of what it sends reaches the page as HTML, so
+# every string it supplies is checked against a narrow shape before it is stored.
+def _iso(v):
+    """v if it is an ISO date (yyyy-mm-dd), else None."""
+    return v if isinstance(v, str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", v) else None
+
+
+def _guard(what, fn, *args):
+    """fn(*args), logging and swallowing any error, so one bad route can't end the run."""
+    try:
+        return fn(*args)
+    except Exception as e:
+        log(f"[skip] {what}: {e} — keeping existing values")
+        return None
+
+
 def _last_weekday(iso):
     """iso itself on a weekday, else the Friday before it (no holiday calendar)."""
     d = datetime.date.fromisoformat(iso)
@@ -2724,66 +2740,61 @@ def _last_weekday(iso):
     return d.isoformat()
 
 
-def fetch_dfdv(data):
-    """DFDV + CHAD from DFDV's dashboard API, written in the shape the page reads for
-    MSTR and ASST. SOL-denominated loans are marked at the live SOL price, matching
-    the net debt DFDV publishes."""
-    co = data["companies"].setdefault("DFDV", {})
-    co.update({"name": "DeFi Development", "ticker": "DFDV", "prefName": "DFDV Preferred",
-               "prefTicker": "CHAD", "asset": "SOL", "accent": "#a970ff",
-               "prefStated": CHAD["stated"], "opexYr": DFDV_OPEX_M})
-    co.setdefault("trail3m", {"prefMo": 0, "commonMo": 0})
-    today = datetime.date.today().isoformat()
-    year = int(today[:4])
-    snap_et = datetime.datetime.now(ET)
-    sol_px = data.get("solPriceUsd")
+def _dfdv_balance_sheet(co, data):
+    """Price, shares, SOL held, 52-week range, cash, and the debt schedule.
 
+    Two converts (put/maturity, conversion price) and three loans, two of them in
+    SOL; SOL loans are marked at the live SOL price, matching the net debt DFDV
+    publishes. Straight debt carries no convPrice."""
     d = _dfdv("dfdv")
     if d and d.get("price") and d.get("shares_outstanding") and d.get("sol_count"):
-        stamp = datetime.datetime.fromisoformat(d["updated_at"].replace("Z", "+00:00"))
-        co["stockPrice"] = round(d["price"], 2)
-        _stamp_price(co, co["stockPrice"], round(d.get("price_change_percent") or 0, 2),
+        stamp = datetime.datetime.fromisoformat(str(d["updated_at"]).replace("Z", "+00:00"))
+        co["stockPrice"] = round(float(d["price"]), 2)
+        _stamp_price(co, co["stockPrice"], round(float(d.get("price_change_percent") or 0), 2),
                      _last_weekday(_et_date(stamp)))
-        co["sharesOutstanding"] = round(d["shares_outstanding"] / 1e6, 2)
+        co["sharesOutstanding"] = round(float(d["shares_outstanding"]) / 1e6, 2)
         co["holdings"] = int(d["sol_count"])
         if data.get("solCirculating"):
             co["pctSupply"] = round(co["holdings"] / data["solCirculating"] * 100, 4)
     si = _dfdv("investor-relations/stock-info")
     if si and si.get("week_52_low") and si.get("week_52_high"):
-        co["week52Low"], co["week52High"] = round(si["week_52_low"], 2), round(si["week_52_high"], 2)
+        co["week52Low"] = round(float(si["week_52_low"]), 2)
+        co["week52High"] = round(float(si["week_52_high"]), 2)
     nav = _dfdv("nav")
     if nav and nav.get("total_cash_including_eloc") is not None:
-        co["cash"] = round(nav["total_cash_including_eloc"] / 1e6, 2)
-
-    # debt: two converts (put/maturity, conversion price) and three loans, two of
-    # them in SOL. Straight debt carries no convPrice.
-    debt = _dfdv("debt")
+        co["cash"] = round(float(nav["total_cash_including_eloc"]) / 1e6, 2)
+    debt, sol_px = _dfdv("debt"), data.get("solPriceUsd")
     if debt and sol_px:
         sched = []
         for r in debt:
-            sol_amt, conv, mat = r.get("sol_amount"), r.get("conversion_price"), r.get("maturity_date")
-            t = {"note": r.get("name"), "coupon": r.get("coupon_rate") or 0,
-                 "maturity": mat if re.fullmatch(r"\d{4}-\d{2}-\d{2}", mat or "") else None,
-                 "put": r.get("put_date"),
-                 "principal": round((sol_amt * sol_px if sol_amt else r.get("notional_amount") or 0) / 1e6, 3),
+            name = r.get("name") if re.fullmatch(r"[\w .%$/()&-]{1,60}", str(r.get("name") or "")) else "Debt"
+            sol_amt = float(r["sol_amount"]) if r.get("sol_amount") else None
+            conv = float(r["conversion_price"]) if r.get("conversion_price") else None
+            t = {"note": name, "coupon": float(r.get("coupon_rate") or 0),
+                 "maturity": _iso(r.get("maturity_date")), "put": _iso(r.get("put_date")),
+                 "principal": round((sol_amt * sol_px if sol_amt else float(r.get("notional_amount") or 0)) / 1e6, 3),
                  "convPrice": conv, "convRate": round(1000 / conv, 4) if conv else None}
             if sol_amt:
                 t["solAmount"] = sol_amt
             sched.append(t)
         co["debtSchedule"] = sched
         co["seniorDebt"] = round(sum(t["principal"] for t in sched), 2)
-        co["capStructAsOf"] = f"{today} (DFDV dashboard)"
+        co["capStructAsOf"] = f"{datetime.date.today().isoformat()} (DFDV dashboard)"
 
-    # CHAD: stated notional, quote, daily closes
+
+def _dfdv_chad(co):
+    """CHAD's notional, rate, quote and daily closes, plus annual obligations.
+    Returns the notional steps, which the mNAV history needs."""
+    today = datetime.date.today().isoformat()
     rate = _step(CHAD["rates"], today)
     if CHAD["rates"][-1][0][:7] < today[:7]:
         log(f"[stale] CHAD rate table ends {CHAD['rates'][-1][0]} — add this month's declared rate")
     steps = list(CHAD["notional"])
     cn = _dfdv("chad/notional")
     if cn and cn.get("notional_usd"):
-        n = round(cn["notional_usd"] / 1e6, 4)
+        n = round(float(cn["notional_usd"]) / 1e6, 4)
         if abs(steps[-1][1] - n) > 0.001:
-            steps.append((cn.get("as_of_date") or today, n))
+            steps.append((_iso(cn.get("as_of_date")) or today, n))
     notional = steps[-1][1]
     co["prefNotional"] = round(notional, 2)
     co["prefBreakdown"] = [["CHAD", PREF_LABEL["CHAD"].format(r="%g" % rate), round(notional, 2), rate]]
@@ -2791,57 +2802,72 @@ def fetch_dfdv(data):
     co["annualObligations"] = round(notional * rate / 100 + interest, 2)
     q = _dfdv("chad/quote", timeout=20)
     if q and q.get("price"):
-        co["prefPrice"] = round(q["price"], 2)
-        co["prefChangePct"] = round(q.get("price_change_percent") or 0, 2)
+        co["prefPrice"] = round(float(q["price"]), 2)
+        co["prefChangePct"] = round(float(q.get("price_change_percent") or 0), 2)
     ch = _dfdv("chad/history", timeout=40, tries=3)
-    if ch:
-        rows = sorted((r for r in ch if r.get("date") and r.get("close")), key=lambda r: r["date"])
-        co["prefHistory"] = {"dates": [_iso_lbl(r["date"], "%b %-d") for r in rows],
-                             "iso": [r["date"] for r in rows],
-                             "px": [round(r["close"], 2) for r in rows],
-                             "notional": [_step(steps, r["date"]) for r in rows]}
-        _VOL_HIST["CHAD"] = [(r["date"], r.get("volume") or 0) for r in rows]
-        rv = _rvol([(r["date"], (r.get("volume") or 0) * r["close"]) for r in rows], snap_et)
+    rows = sorted(((r["date"], float(r["close"]), float(r.get("volume") or 0))
+                   for r in ch or [] if _iso(r.get("date")) and r.get("close")))
+    if rows:
+        co["prefHistory"] = {"dates": [_iso_lbl(d, "%b %-d") for d, _c, _v in rows],
+                             "iso": [d for d, _c, _v in rows],
+                             "px": [round(c, 2) for _d, c, _v in rows],
+                             "notional": [_step(steps, d) for d, _c, _v in rows]}
+        _VOL_HIST["CHAD"] = [(d, v) for d, _c, v in rows]
+        rv = _rvol([(d, v * c) for d, c, v in rows], datetime.datetime.now(ET))
         if rv:
             co["prefRvol"] = rv
+    return steps
 
-    # holdings path: weekly accumulation, year-end, and the date of the latest update
-    h = _dfdv("history", timeout=40)
-    held = sorted((r["date"], r["total_sol_holdings"]) for r in h or [] if r.get("total_sol_holdings"))
-    sol_hist = sorted((r["date"], r["sol_price"]) for r in h or [] if r.get("sol_price"))
-    if held:
-        i = len(held) - 1
-        while i > 0 and held[i - 1][1] == held[-1][1]:
-            i -= 1
-        co["treasuryDate"] = held[i][0]
-        ye = _step(held, f"{year - 1}-12-31")
-        if ye:
-            co["yearEnd"] = {str(year - 1): ye}
-            co["netChangeYtd"] = co.get("holdings", held[-1][1]) - ye
-        # from Jan 1, like the EDGAR series: each week's last reading, the change since
-        # the week before (the first week's since year-end). DFDV publishes a daily SOL
-        # balance, so a week's change includes staking rewards and loans, not only buys.
-        weeks = {}                                     # Monday -> the week's last reading
-        for day, v in held:
-            if day > f"{year - 1}-12-31":
-                dt = datetime.date.fromisoformat(day)
-                weeks[dt - datetime.timedelta(days=dt.weekday())] = (day, v)
-        jan1 = datetime.date(year, 1, 1)
-        wk = {"dates": [], "ranges": [], "acquired": [], "holdings": []}
-        prev = ye or 0
-        for mon in sorted(weeks):
-            day, v = weeks[mon]
-            wk["dates"].append(_iso_lbl(day, "%b %-d"))
-            wk["ranges"].append(f"{_iso_lbl(max(mon, jan1).isoformat(), '%b %-d')} – {_iso_lbl(day, '%b %-d')}")
-            wk["acquired"].append(v - prev)
-            wk["holdings"].append(v)
-            prev = v
-        if wk["dates"]:
-            data.setdefault("weekly", {})["DFDV"] = wk
 
-    # SOL per share (DFDV's headline, basic shares) and its growth since Jan 1
+def _dfdv_holdings(co, data):
+    """Date of the latest SOL update, year-end balance, YTD change and the weekly
+    accumulation series. Returns DFDV's daily SOL prices, for beta."""
+    year = datetime.date.today().year
+    h = _dfdv("history", timeout=40) or []
+    held = sorted((r["date"], int(r["total_sol_holdings"])) for r in h
+                  if _iso(r.get("date")) and r.get("total_sol_holdings"))
+    sol_hist = sorted((r["date"], float(r["sol_price"])) for r in h
+                      if _iso(r.get("date")) and r.get("sol_price"))
+    if not held:
+        return sol_hist
+    i = len(held) - 1
+    while i > 0 and held[i - 1][1] == held[-1][1]:
+        i -= 1
+    co["treasuryDate"] = held[i][0]
+    ye = _step(held, f"{year - 1}-12-31")
+    if ye:
+        co["yearEnd"] = {str(year - 1): ye}
+        co["netChangeYtd"] = co.get("holdings", held[-1][1]) - ye
+    # from Jan 1, like the EDGAR series: each week's last reading, the change since
+    # the week before (the first week's since year-end). DFDV publishes a daily SOL
+    # balance, so a week's change includes staking rewards and loans, not only buys.
+    weeks = {}                                     # Monday -> the week's last reading
+    for day, v in held:
+        if day > f"{year - 1}-12-31":
+            dt = datetime.date.fromisoformat(day)
+            weeks[dt - datetime.timedelta(days=dt.weekday())] = (day, v)
+    jan1 = datetime.date(year, 1, 1)
+    wk = {"dates": [], "ranges": [], "acquired": [], "holdings": []}
+    prev = ye or 0
+    for mon in sorted(weeks):
+        day, v = weeks[mon]
+        wk["dates"].append(_iso_lbl(day, "%b %-d"))
+        wk["ranges"].append(f"{_iso_lbl(max(mon, jan1).isoformat(), '%b %-d')} – {_iso_lbl(day, '%b %-d')}")
+        wk["acquired"].append(v - prev)
+        wk["holdings"].append(v)
+        prev = v
+    if wk["dates"]:
+        data.setdefault("weekly", {})["DFDV"] = wk
+    return sol_hist
+
+
+def _dfdv_per_share(co):
+    """SOL per share (DFDV's headline, basic shares) and its growth since Jan 1, the
+    realized staking yield, and the share count per date for short interest."""
+    year = datetime.date.today().year
     sps = _dfdv("nav/sps-daily", timeout=40)
-    pts = sorted((r["date"], r["headline_sps"]) for r in sps or [] if r.get("headline_sps"))
+    pts = sorted((r["date"], float(r["headline_sps"])) for r in sps or []
+                 if _iso(r.get("date")) and r.get("headline_sps"))
     if pts:
         idx = sorted(set(range(0, len(pts), 7)) | {len(pts) - 1})
         co["bpsHistory"] = {"dates": [_iso_lbl(pts[i][0], "%b '%y") for i in idx],
@@ -2849,10 +2875,10 @@ def fetch_dfdv(data):
         base = _step(pts, f"{year - 1}-12-31")
         if base:
             co["assetYieldYtd"] = round((pts[-1][1] / base - 1) * 100, 1)
-
     # realized staking yield: dfdvSOL's exchange rate to SOL over the trailing ~90 days
     rt = _dfdv("dfdvsol/rate")
-    rates = sorted((r["epoch_date"], r["dfdvsol_sol_rate"]) for r in rt or [] if r.get("dfdvsol_sol_rate"))
+    rates = sorted((r["epoch_date"], float(r["dfdvsol_sol_rate"])) for r in rt or []
+                   if _iso(r.get("epoch_date")) and r.get("dfdvsol_sol_rate"))
     if rates:
         end_d, end_r = rates[-1]
         frm = (datetime.date.fromisoformat(end_d) - datetime.timedelta(days=90)).isoformat()
@@ -2860,56 +2886,69 @@ def fetch_dfdv(data):
         if past:
             days = (datetime.date.fromisoformat(end_d) - datetime.date.fromisoformat(past[-1][0])).days
             co["organicYield"] = round(((end_r / past[-1][1]) ** (365 / days) - 1) * 100, 2)
-
     shs = _dfdv("shares")
-    if shs:      # share count per date, for short interest's % of float
-        _SHARES_HIST["DFDV"] = sorted((r["date"], r["shares_outstanding"] / 1e6)
-                                      for r in shs if r.get("shares_outstanding"))
+    if shs:
+        _SHARES_HIST["DFDV"] = sorted((r["date"], float(r["shares_outstanding"]) / 1e6)
+                                      for r in shs if _iso(r.get("date")) and r.get("shares_outstanding"))
 
-    # daily closes: stockHistory's calendar axis, beta to SOL, relative volume, and the
-    # price beside DFDV's own EV series. That series leaves CHAD out of EV; it goes back
-    # in here, as preferred does for MSTR and ASST.
-    try:
-        closes = _nasdaq_closes("DFDV")
-    except Exception as e:
-        log(f"[skip] DFDV closes: {e} — keeping existing series")
-        closes = []
-    if closes:
-        sh = data.get("stockHistory") or {}
-        if sh.get("iso"):
-            out, last, j = [], None, 0
-            for iso in sh["iso"]:
-                while j < len(closes) and closes[j][0] <= iso:
-                    last = closes[j][1]
-                    j += 1
-                out.append(round(last, 2) if last is not None else None)
-            sh["DFDV"] = out
-        settled = _settled_sessions([(day, c) for day, c, _v in closes], snap_et)
-        beta = _beta(settled[-253:], sol_hist)
-        if beta is not None:
-            co["betaAsset"] = round(beta, 2)
-        rv = _rvol([(day, c * v) for day, c, v in closes], snap_et)
-        if rv:
-            co["rvol"] = rv
-        mn = _dfdv("nav/mnav-enterprise", timeout=40)
-        if mn:
-            cl = [(day, c) for day, c, _v in closes]
-            dts, px, ev = [], [], []
-            for r in mn:
-                last = _step(cl, r["date"])
-                if r["date"] < MNAV_START["DFDV"] or last is None or not r.get("solNav"):
-                    continue
-                dts.append(_iso_lbl(r["date"], "%b %-d"))
-                px.append(round(last, 2))
-                ev.append(round((r["enterpriseValue"] / 1e6 + (_step(steps, r["date"]) or 0))
-                                / (r["solNav"] / 1e6), 3))
-            if ev:
-                co["mnavHistory"] = {"dates": dts, "px": px, "mnav": ev}
 
-    if co.get("holdings") and co.get("stockPrice"):
+def _dfdv_closes(co, data, steps, sol_hist):
+    """Nasdaq daily closes: stockHistory's calendar axis, beta to SOL, relative volume,
+    and the price beside DFDV's own EV series. That series leaves CHAD out of EV; it
+    goes back in here, as preferred does for MSTR and ASST."""
+    closes = _nasdaq_closes("DFDV")
+    if not closes:
+        return
+    snap_et = datetime.datetime.now(ET)
+    sh = data.get("stockHistory") or {}
+    if sh.get("iso"):
+        out, last, j = [], None, 0
+        for iso in sh["iso"]:
+            while j < len(closes) and closes[j][0] <= iso:
+                last = closes[j][1]
+                j += 1
+            out.append(round(last, 2) if last is not None else None)
+        sh["DFDV"] = out
+    beta = _beta(_settled_sessions([(d, c) for d, c, _v in closes], snap_et)[-253:], sol_hist)
+    if beta is not None:
+        co["betaAsset"] = round(beta, 2)
+    rv = _rvol([(d, c * v) for d, c, v in closes], snap_et)
+    if rv:
+        co["rvol"] = rv
+    mn = _dfdv("nav/mnav-enterprise", timeout=40)
+    cl = [(d, c) for d, c, _v in closes]
+    dts, px, ev = [], [], []
+    for r in mn or []:
+        day = _iso(r.get("date"))
+        last = _step(cl, day) if day else None
+        if not day or day < MNAV_START["DFDV"] or last is None or not r.get("solNav"):
+            continue
+        dts.append(_iso_lbl(day, "%b %-d"))
+        px.append(round(last, 2))
+        ev.append(round((float(r["enterpriseValue"]) / 1e6 + (_step(steps, day) or 0))
+                        / (float(r["solNav"]) / 1e6), 3))
+    if ev:
+        co["mnavHistory"] = {"dates": dts, "px": px, "mnav": ev}
+
+
+def fetch_dfdv(data):
+    """DFDV + CHAD from DFDV's dashboard API, in the shape the page reads for MSTR and
+    ASST. Each part is guarded on its own, so one failing route keeps only its figures."""
+    co = data["companies"].setdefault("DFDV", {})
+    co.update({"name": "DeFi Development", "ticker": "DFDV", "prefName": "DFDV Preferred",
+               "prefTicker": "CHAD", "asset": "SOL", "accent": "#a970ff",
+               "prefStated": CHAD["stated"], "opexYr": DFDV_OPEX_M})
+    co.setdefault("trail3m", {"prefMo": 0, "commonMo": 0})
+    _guard("DFDV balance sheet", _dfdv_balance_sheet, co, data)
+    steps = _guard("CHAD", _dfdv_chad, co) or list(CHAD["notional"])
+    sol_hist = _guard("DFDV holdings", _dfdv_holdings, co, data) or []
+    _guard("DFDV per share", _dfdv_per_share, co)
+    _guard("DFDV closes", _dfdv_closes, co, data, steps, sol_hist)
+    if co.get("holdings") and co.get("stockPrice") and co.get("prefBreakdown"):
         log(f"DFDV via its dashboard: {co['holdings']:,} SOL, ${co['stockPrice']} "
             f"({co.get('dayChangePct', 0):+.2f}%), debt ${co.get('seniorDebt', 0):,.1f}M, "
-            f"cash ${co.get('cash', 0):,.1f}M, CHAD ${co['prefNotional']:,.2f}M at {rate:g}%")
+            f"cash ${co.get('cash', 0):,.1f}M, CHAD ${co['prefNotional']:,.2f}M at "
+            f"{co['prefBreakdown'][0][3]:g}%")
 
 
 def apply_sats_proceeds(data):
