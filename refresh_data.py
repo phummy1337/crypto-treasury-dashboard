@@ -212,10 +212,12 @@ def _save_live_step(live, key, day, value):
     live[key] = [x for x in live.get(key, []) if x[0] != day] + [[day, value]]
 
 
-# The USD stated amount Strategy carries STRE at in its own preferred total: the
-# issue-date conversion of the €775M, fixed since Nov 2025. Kept as a constant
-# rather than EUR x spot so our five-series sum ties to strategy.com's figure.
-STRE_USD_STATED = 899.0
+def _end_at(steps, point):
+    """A (date, value) step series that ends on `point`, the issuer's own current
+    figure: a step dated on or after it can only be a lagging source's."""
+    if not point:
+        return steps
+    return [s for s in steps if s[0] < point[0]] + [tuple(point)]
 
 # Insider super-voting Class B shares (millions) — never part of the float.
 # From the 2026-03-31 10-Q covers (iXBRL dei:EntityCommonStockSharesOutstanding):
@@ -430,7 +432,7 @@ def fetch_strategytracker(data):
         snap = datetime.datetime.now(datetime.timezone.utc)
     tracker_date = _et_date(snap)
     snap_et = (snap if snap.tzinfo else snap.replace(tzinfo=datetime.timezone.utc)).astimezone(ET)
-    data.pop("eurUsd", None)    # STRE is carried at STRE_USD_STATED; nothing reads the rate
+    data.pop("eurUsd", None)    # STRE's USD figure comes from strategy.com; nothing reads the rate
     hist = {}
     for tk in ("MSTR", "ASST"):
         c = comps.get(tk)
@@ -533,17 +535,16 @@ def fetch_strategytracker(data):
         if ps:
             bd = []
             mkt = 0.0
+            kpi = _strategy_pref_notional() if tk == "MSTR" else {}
             for p in ps:
                 t = p["ticker"]
                 notM = p.get("notionalMillions") or round((p.get("notionalUSD") or 0) / 1e6)
-                if t == "STRE":
-                    # Carry STRE at the fixed USD stated amount Strategy itself uses
-                    # ($899M, the issue-date conversion of €775M), NOT a live-FX mark.
-                    # Marking it to spot made our total read ~$9M under theirs, and
-                    # readers reconcile this page against strategy.com. The economic
-                    # argument for a live mark is real — the claim is EUR-denominated —
-                    # but matching the source everyone checks against wins here.
-                    notM = STRE_USD_STATED
+                if t in kpi:
+                    # Strategy's own figure, which readers reconcile this page against.
+                    # Its STRE moves with EUR/USD: until Oct 2026 strategy.com carried
+                    # the €775M at a fixed $899M, and once it stopped, our copy of that
+                    # constant pushed the STRC residual below $28M short.
+                    notM = kpi[t][1]
                 if t == "SATA" and _SATA.get("steps"):
                     filed = _SATA["steps"][-1][1]     # filed count x par; filings win
                     if abs(filed - notM) > 1:
@@ -568,8 +569,12 @@ def fetch_strategytracker(data):
                                  key=lambda x: x["effective_date"])
                     if t == "STRC":     # splice in the SEC-filing backfill before the tracker log starts
                         first = chg[0]["effective_date"] if chg else "9999-99-99"
+                        steps = [x for x in STRC_BACKFILL if x[0] < first] + [
+                            (e["effective_date"], e["notional_millions"]) for e in chg]
+                        # and end on Strategy's figure: the tracker's log runs a filing or
+                        # two behind, and missed two buyback weeks in Oct 2026 ($387M)
                         chg = [{"effective_date": d, "notional_millions": n}
-                               for d, n in STRC_BACKFILL if d < first] + chg
+                               for d, n in _end_at(steps, kpi.get("STRC"))]
                         co["strcNotionalSteps"] = [[e["effective_date"], e["notional_millions"]] for e in chg]
                     if t == "SATA" and _SATA.get("steps"):
                         # same stall as the scalar: the tracker's change log ends at
@@ -612,7 +617,10 @@ def fetch_strategytracker(data):
             # total $132M over theirs. Strategy publishes the authoritative preferred
             # total in its KPI API, so back STRC out as the residual: the other four
             # series are static between issuances, so the residual IS STRC, and this
-            # self-corrects every week without us chasing buyback disclosures.
+            # self-corrects every week without us chasing buyback disclosures. With
+            # each series read from strategy.com too, this only absorbs the rounding,
+            # so the five rows add up to the published total; it still carries STRC
+            # through a run where strategy.com's per-series read fails.
             pub_total = (_KPI.get("MSTR") or {}).get("prefTotal")
             if tk == "MSTR" and pub_total and len(bd) >= 4:
                 others = sum(x[2] for x in bd if x[0] != "STRC")
@@ -620,7 +628,7 @@ def fetch_strategytracker(data):
                 for row in bd:
                     if row[0] == "STRC" and implied > 0:
                         if abs(implied - row[2]) > 1:
-                            log(f"[drift] STRC notional: tracker ${row[2]:,.0f}M vs "
+                            log(f"[drift] STRC notional: per-series ${row[2]:,.0f}M vs "
                                 f"${implied:,.0f}M implied by strategy.com's ${pub_total:,.0f}M "
                                 f"preferred total — using implied")
                         row[2] = round(implied)
@@ -689,9 +697,11 @@ def fetch_strategytracker(data):
             if tk == "MSTR":
                 # STRC: SEC backfill + tracker change log; other series: 8-K step
                 # constants, extended live (append a step whenever the tracker's
-                # current notional moves off the last known step; persisted in data.json)
+                # current notional moves off the last known step; persisted in data.json).
+                # Each ends on strategy.com's current figure, as the valuation tiles do.
                 live = co.get("histStepsLive") or {}
                 series = {}
+                kpi = _strategy_pref_notional()
                 for p in ps:
                     t = p["ticker"]
                     lg = sorted(((e["effective_date"], e["notional_millions"])
@@ -699,7 +709,7 @@ def fetch_strategytracker(data):
                                  if e.get("effective_date") and e.get("notional_millions") is not None))
                     if t == "STRC":
                         first = lg[0][0] if lg else "9999-99-99"
-                        series[t] = [x for x in STRC_BACKFILL if x[0] < first] + lg
+                        series[t] = _end_at([x for x in STRC_BACKFILL if x[0] < first] + lg, kpi.get(t))
                         continue
                     cur = p.get("notionalMillions") or (p.get("notionalUSD") or 0) / 1e6
                     # one step per date, the later source winning (as for cash and debt
@@ -708,7 +718,7 @@ def fetch_strategytracker(data):
                     if st and cur and abs(st[-1][1] - cur) > 0.6:
                         st.append((today, round(cur, 1)))
                         _save_live_step(live, t, today, round(cur, 1))
-                    series[t] = st
+                    series[t] = _end_at(st, kpi.get(t))
                 # live steps only extend the filed constants; those dated before the last
                 # include the retired roll-forward's and the tracker's (Jul 9–Aug 24 2026,
                 # $1.1–1.6B off). live is co["histStepsLive"], so data.json drops them too
@@ -2118,6 +2128,27 @@ def fetch_short_interest(data):
 _KPI = {}
 # live BTC price, shared with the per-share helper
 _BTC_PX = {}
+MSTR_PREF_SERIES = ("STRC", "STRF", "STRK", "STRD", "STRE")
+
+
+def _strategy_pref_notional():
+    """{ticker: (session date, $M)}: each preferred series' notional as strategy.com
+    publishes it, read once per run. This is the figure Strategy's own preferred
+    total adds up, with STRE's €775M at today's EUR/USD. A series whose read fails
+    is left out, and the tracker's figure stands in for it."""
+    if "notional" not in _KPI:
+        out = {}
+        for t in MSTR_PREF_SERIES:
+            try:
+                k = get_json(f"https://api.strategy.com/btc/{t.lower()}KpiData")[0]
+                day = datetime.datetime.strptime(k["timeStamp"], "%m/%d/%Y %I:%M %p").date().isoformat()
+                usd_m = float(k["notional"]) / 1e6
+                if usd_m > 0:
+                    out[t] = (day, round(usd_m, 2))
+            except Exception as e:
+                log(f"[skip] strategy.com {t} notional: {e} — using the tracker's")
+        _KPI["notional"] = out
+    return _KPI["notional"]
 
 
 def _apply_per_share(co, tk):
