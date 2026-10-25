@@ -2892,6 +2892,21 @@ def _dfdv_per_share(co):
                                       for r in shs if _iso(r.get("date")) and r.get("shares_outstanding"))
 
 
+def _dfdv_cost(co):
+    """Average cost per SOL from the purchase log DFDV publishes on its dashboard, which
+    the page takes as the record. The log lists purchases only and doesn't reconcile with
+    the SOL DFDV holds (2,148,968 logged vs 2,590,266 held on 2026-10-25), so
+    costBasisSol carries the SOL the cost covers, and the page's P/L counts only that."""
+    rows = [(r["date"], float(r["sol_amount"]), float(r["usd_amount"]))
+            for r in _dfdv("purchases") or []
+            if _iso(r.get("date")) and (r.get("sol_amount") or 0) > 0 and (r.get("usd_amount") or 0) > 0]
+    if rows:
+        sol, usd = sum(r[1] for r in rows), sum(r[2] for r in rows)
+        co["avgCost"] = round(usd / sol, 2)
+        co["costBasisSol"] = round(sol)
+        co["costBasisAsOf"] = max(r[0] for r in rows)
+
+
 def _dfdv_closes(co, data, steps, sol_hist):
     """Nasdaq daily closes: stockHistory's calendar axis, beta to SOL, relative volume,
     and the price beside DFDV's own EV series. That series leaves CHAD out of EV; it
@@ -2943,6 +2958,7 @@ def fetch_dfdv(data):
     steps = _guard("CHAD", _dfdv_chad, co) or list(CHAD["notional"])
     sol_hist = _guard("DFDV holdings", _dfdv_holdings, co, data) or []
     _guard("DFDV per share", _dfdv_per_share, co)
+    _guard("DFDV cost basis", _dfdv_cost, co)
     _guard("DFDV closes", _dfdv_closes, co, data, steps, sol_hist)
     if co.get("holdings") and co.get("stockPrice") and co.get("prefBreakdown"):
         log(f"DFDV via its dashboard: {co['holdings']:,} SOL, ${co['stockPrice']} "

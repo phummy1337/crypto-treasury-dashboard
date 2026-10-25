@@ -1084,11 +1084,11 @@ const METRIC_DEFS = {
     m:"The current pace of accumulation."},
   "Avg. Acquired / Day": {c:"The weekly pace ÷ 7.",
     m:"The same accumulation pace, expressed per day."},
-  "Avg Acquisition Cost": {c:"Aggregate purchase cost ÷ total held, per the latest 8-K. DFDV publishes no cost basis.",
+  "Avg Acquisition Cost": {c:"Aggregate purchase cost ÷ total held, per the latest 8-K. DFDV: total spent ÷ SOL bought, from the purchase log on DFDV's dashboard, which lists purchases only.",
     m:"The blended entry price — the asset price at which the whole stack breaks even."},
   "Current Return on Holdings": {c:"(Live asset price − average cost) ÷ average cost.",
     m:"The paper return on the treasury: whether the stack is in profit at today's price."},
-  "Unrealized P/L": {c:"(Live asset price − average cost) × holdings.",
+  "Unrealized P/L": {c:"(Live asset price − average cost) × holdings. DFDV: × the SOL in its purchase log, not all the SOL it holds.",
     m:"The dollar gain or loss embedded in the treasury right now."},
   "Holdings per Share": {c:"Treasury held ÷ shares. BTC issuers in satoshis per diluted share: MSTR's taken verbatim from strategy.com's own feed, so it always equals the figure on strategy.com/btc; ASST's on the effective diluted count Strive publishes, which excludes 26.6M warrants struck at $27. DFDV in SOL per basic share, its own headline figure. Hover a BTC value for the basic figure and the full derivation.",
     m:"What one share owns before anyone senior is paid. This is the long-horizon accumulation metric — it answers whether buying is outpacing share issuance, and it is the number each company headlines on its own site."},
@@ -1283,7 +1283,8 @@ function relGrowth(o){ const start=o.holdings-o.netChangeYtd; return o.netChange
 
 function renderCost(){
   const ret = o => o.avgCost ? (assetPx(o)/o.avgCost-1)*100 : null;
-  const pl  = o => o.avgCost ? o.holdings*(assetPx(o)-o.avgCost) : null;
+  // DFDV's cost covers only the SOL in its purchase log (costBasisSol), not all it holds
+  const pl  = o => o.avgCost ? (o.costBasisSol || o.holdings)*(assetPx(o)-o.avgCost) : null;
   const plCls = v => v==null ? "" : v>=0?"pos":"neg";
   let h = headRow();
   h += row({label:"Avg Acquisition Cost", cell:o => o.avgCost ? usd(o.avgCost)+` <span class='unit'>/ ${assetUnit(o)}</span>` : null,
