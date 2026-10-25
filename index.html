@@ -1937,7 +1937,8 @@ function renderCharts(){
       }
       if(fee && fee.pct!=null){
         const cls = fee.pct>=10 ? "hot" : fee.pct>=2 ? "warn" : "";
-        parts.push(`<span class="si-chip" title="Annualized stock-borrow fee — IBKR indicative rate">`+
+        // the date shows a stalled scrape: on 2026-10-25 these chips were 3 weeks old
+        parts.push(`<span class="si-chip" title="Annualized stock-borrow fee — IBKR indicative rate${fee.asOf ? `, as of ${esc(String(fee.asOf).slice(0, 16))} ET` : ""}">`+
           `<b class="${cls}">${fmt(fee.pct, fee.pct>=10?1:2)}%</b>/yr to borrow</span>`);
       }
       const pf = (si.pctFloat||[]).filter(v=>v!=null).slice(-1)[0];

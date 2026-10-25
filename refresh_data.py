@@ -2246,25 +2246,23 @@ CE_UA = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWeb
 
 def _ce_borrow(sym):
     """Latest IBKR indicative borrow fee for one symbol, via ChartExchange.
-    Two-step: the symbol page embeds a cxuid, then /xhr/tabledata/ serves the
-    borrow_fee table (source: the IBKR shortstock file, updated ~15 min)."""
-    page = f"https://chartexchange.com/symbol/nasdaq-{sym.lower()}/borrow-fee/"
+    The borrow-fee page server-renders the newest reading of the IBKR shortstock
+    file (updated ~15 min) as a summary line; ?source=ib pins IBKR, since the page
+    can show Robinhood's rate instead. The page used to embed a cxuid for a second
+    request to /xhr/tabledata/, until ChartExchange's Oct 2026 rebuild dropped it."""
+    page = f"https://chartexchange.com/symbol/nasdaq-{sym.lower()}/borrow-fee/?source=ib"
     req = urllib.request.Request(page, headers={**CE_UA, "Referer": "https://chartexchange.com/"})
     html = urllib.request.urlopen(req, timeout=25, context=_SSL_CTX).read().decode("utf-8", "ignore")
-    m = re.search(r'"data_adapter":"borrow_fee","data_adapter_opts":\{"cxuid":"(\d+)"', html)
+    # As of <strong>2026-10-25 08:52:43 AM EDT</strong>, there were <strong>10,000,000</strong>
+    # shares available with a fee of <strong>0.25<!-- -->%</strong>.
+    m = re.search(r'bf-summary">As of <strong>([^<]+)</strong>, there were <strong>([\d,]+)</strong>'
+                  r' shares available with a fee of <strong>([\d,.]+)', html)
     if not m:
-        raise ValueError("cxuid not found in page")
-    body = json.dumps({"op": "getpage", "dataname": "borrow_fee", "cxuid": m.group(1),
-                       "page": 1, "perpage": 3, "sort": "desc", "opts": {"bf_source": "ib"}}).encode()
-    req = urllib.request.Request("https://chartexchange.com/xhr/tabledata/", data=body,
-                                 headers={**CE_UA, "Content-Type": "application/json", "Referer": page})
-    rows = (json.loads(urllib.request.urlopen(req, timeout=25, context=_SSL_CTX).read())
-            .get("rows") or [])
-    if not rows:
-        raise ValueError("no borrow_fee rows")
-    r = rows[0]
-    return {"pct": round(float(r["fee"]["value"]), 2), "avail": int(r["avail"]["value"]),
-            "asOf": r["date"]["value"]}
+        raise ValueError("borrow-fee summary not found in page")
+    as_of = datetime.datetime.strptime(m.group(1).rsplit(" ", 1)[0], "%Y-%m-%d %I:%M:%S %p")
+    return {"pct": round(float(m.group(3).replace(",", "")), 2),
+            "avail": int(m.group(2).replace(",", "")),
+            "asOf": as_of.strftime("%Y-%m-%d %H:%M:%S")}      # ET, the page's own clock
 
 
 # --------------------------------------------------------------------------- #
@@ -2611,8 +2609,11 @@ def fetch_atm(data):
 def fetch_borrow_fees(data):
     """Annualized cost to short (IBKR indicative rate) for commons + preferreds.
     Also accumulates a daily history in data.json (one point per calendar day)."""
+    # SATS has no row: ChartExchange's nasdaq-sats is EchoStar, not Strive's preferred
     targets = [("MSTR", "MSTR", "borrowFee"), ("ASST", "ASST", "borrowFee"),
-               ("STRC", "MSTR", "prefBorrowFee"), ("SATA", "ASST", "prefBorrowFee")]
+               ("DFDV", "DFDV", "borrowFee"),
+               ("STRC", "MSTR", "prefBorrowFee"), ("SATA", "ASST", "prefBorrowFee"),
+               ("CHAD", "DFDV", "prefBorrowFee")]
     for sym, co_tk, key in targets:
         co = data["companies"].get(co_tk)
         if not co:
@@ -2631,7 +2632,7 @@ def fetch_borrow_fees(data):
             log(f"[borrow fee] {sym}: {bf['pct']}%/yr, {bf['avail']:,} shares available")
         except Exception as e:
             log(f"[skip] borrow fee {sym}: {e} — keeping existing values")
-        time.sleep(1)                       # be polite: 8 requests total per refresh
+        time.sleep(1)                       # be polite: one request per symbol
 
 
 # --------------------------------------------------------------------------- #
