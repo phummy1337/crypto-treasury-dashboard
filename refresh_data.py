@@ -2056,7 +2056,10 @@ def _nasdaq_si(sym):
     dts, isod, dtc, si = [], [], [], []
     for r in rows:
         d = datetime.datetime.strptime(r["settlementDate"], "%m/%d/%Y").date()
-        shares = int(str(r["interest"]).replace(",", ""))
+        v = str(r["interest"]).replace(",", "")
+        if not v.isdigit():     # a settlement with no figure reads "N/A" (CHAD's first, 09/15/2026)
+            continue
+        shares = int(v)
         for eff, ratio in SI_SPLITS.get(sym, []):     # normalize pre-split settlements
             if d.isoformat() < eff:
                 shares = round(shares / ratio)
