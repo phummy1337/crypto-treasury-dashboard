@@ -1940,10 +1940,13 @@ def fetch_holdings(data, max_points=60):
         log(f"{tk}: {len(weekly[tk]['dates'])} points via EDGAR ({weekly[tk]['dates'][0]} -> "
             f"{weekly[tk]['dates'][-1]}), latest {cur:,} BTC")
     if "MSTR" in weekly or "ASST" in weekly:
-        # DFDV's series comes from fetch_dfdv, not EDGAR: carry it over so a run where
-        # DFDV's API fails keeps the last one rather than dropping it here
-        weekly.update({k: v for k, v in (data.get("weekly") or {}).items()
-                       if k not in weekly and k not in CIK and k != "illustrative"})
+        # carry over every series this run didn't rebuild: DFDV's comes from fetch_dfdv,
+        # not EDGAR, and an issuer whose EDGAR read failed keeps its last series rather
+        # than losing it because the other issuer's succeeded
+        kept = {k: v for k, v in (data.get("weekly") or {}).items() if k not in weekly}
+        for k in kept.keys() & CIK.keys():
+            log(f"[keep] weekly {k}: EDGAR rebuild failed — keeping the last series")
+        weekly.update(kept)
         data["weekly"] = weekly
     if acts:    # merge with previously stored actions so old weeks never drop off
         # link each action to its source filing: the earliest 8-K filed on or after
