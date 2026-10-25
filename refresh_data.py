@@ -244,6 +244,9 @@ _PREF_DVOL = {}
 # 8-K filing index per company: [(filing date, primary doc url)] — lets each
 # action in the log link back to the filing that disclosed it
 _FILINGS = {}
+# filing date of the newest 8-K this run fetched per company, whatever it carried:
+# the filing watermark's "ingested"
+_READ_8K = {}
 
 def _cboe_last(sym):
     """Delayed last trade from Cboe, for a listing no other source here carries yet."""
@@ -1615,6 +1618,7 @@ def fetch_holdings(data, max_points=60):
                 t8 = ""
                 try:
                     t8 = _edgar_text(url)
+                    _READ_8K[tk] = max(_READ_8K.get(tk, ""), filed)
                     # newest period first, as EDGAR lists filings; one unless a quarter
                     # end split the week (see _period_texts)
                     periods = [(t, _parse_mstr(t)) for t in reversed(_period_texts(t8))]
@@ -1728,6 +1732,7 @@ def fetch_holdings(data, max_points=60):
             for url, base, _filed in docs():
                 try:
                     t8 = _edgar_text(url)
+                    _READ_8K[tk] = max(_READ_8K.get(tk, ""), _filed)
                     obs_dates = []
                     for d, h in _asst_obs(t8):
                         allobs[d] = h
@@ -3101,8 +3106,17 @@ def record_filing_watermark(data):
                           if r["form"][i] == "8-K"), default=None)
         except Exception as e:
             log(f"[skip] filing watermark {tk}: {e}")
-        ingested = max((a["filed"] for a in (data.get("actions") or [])
-                        if a["co"] == tk and a.get("filed")), default=None)
+        acted = max((a["filed"] for a in (data.get("actions") or [])
+                     if a["co"] == tk and a.get("filed")), default=None)
+        # An 8-K counts once this run has read it, whether or not it carried any
+        # figures. Counting only those that yielded an action kept ASST "behind" from
+        # a 2026-10-21 SATS dividend notice until its next weekly 8-K, and fired the
+        # page's notice, the workflow gate and filing-watch on every check meanwhile.
+        read = _READ_8K.get(tk)
+        ingested = max(filter(None, (acted, read)), default=None)
+        if read and acted and read > acted:
+            log(f"[watermark] {tk}: newest 8-K read ({read}) gave no action; "
+                f"the newest that did is {acted}")
         co["filingWatch"] = {"latestOnEdgar": newest, "ingested": ingested}
         if newest and ingested and newest > ingested:
             log(f"[stale] {tk}: EDGAR has an 8-K filed {newest} but the newest "
