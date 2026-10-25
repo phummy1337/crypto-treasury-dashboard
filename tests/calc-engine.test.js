@@ -2,27 +2,30 @@
 //
 // Each fixture is one calculator button's opening snapshot and default inputs, frozen
 // from data.json on 2026-10-25 so a data refresh can't move them. The goldens are what
-// the engine returned for them when it moved out of index.html unchanged: an edit that
-// shifts one has changed what the page shows, and its commit should say so.
+// the engine returns for them: an edit that shifts one has changed what the page shows,
+// and its commit should say so.
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { crashMonth, pathPrice, simulate, simulateCredit, breakEven } = require("../calc-engine.js");
 
 const FIXTURES = {
   MSTR: {
-    s: {px:146.01, sharesM:422.35, pref:13557, spot:80472, hold:848517, cash:5281, owed:0, debtUsd:6714, intUsd:34.5953, intUnits:0},
+    s: {px:146.01, sharesM:422.35, pref:13557, spot:80472, hold:848517, cash:5281, owed:0, debtUsd:6714, intUsd:34.5953, intUnits:0,
+        otherNotional:4987, otherDivs:470.66},
     cfg: {target:150000, months:12, prefMo:0, commonMo:1579, rate:12, fundMix:0, endMnav:1, runway:0, basis:"net", atmFloor:1, stake:0, opex:0},
-    golden: {implied:263.0091652990986, endHold:1013760.6016336514, endSharesM:521.1760969970939, assetSold:0, pausedMo:0, broke:null},
+    golden: {implied:264.17071029994645, endHold:1013760.6016336514, endSharesM:513.078966215261, assetSold:0, pausedMo:0, broke:null},
   },
   ASST: {
-    s: {px:28.97, sharesM:124.06, pref:2103, spot:80472, hold:36818, cash:976, owed:0, debtUsd:0, intUsd:0, intUnits:0},
+    s: {px:28.97, sharesM:124.06, pref:2103, spot:80472, hold:36818, cash:976, owed:0, debtUsd:0, intUsd:0, intUnits:0,
+        otherNotional:700, otherDivs:105},
     cfg: {target:150000, months:12, prefMo:207, commonMo:334, rate:13, fundMix:0, endMnav:1, runway:0, basis:"net", atmFloor:1, stake:0, opex:0},
-    golden: {implied:45.400577273337326, endHold:90876.12883711548, endSharesM:220.7112756571065, assetSold:49.692499999999995, pausedMo:1, broke:null},
+    golden: {implied:45.27608443768798, endHold:91207.41217044882, endSharesM:212.204896799109, assetSold:0, pausedMo:1, broke:null},
   },
   DFDV: {
-    s: {px:3.78, sharesM:32.62, pref:15.81, spot:101.4, hold:2590266, cash:9.98, owed:562000, debtUsd:149.0532, intUsd:7.5087, intUnits:33725},
+    s: {px:3.78, sharesM:32.62, pref:15.81, spot:101.4, hold:2590266, cash:9.98, owed:562000, debtUsd:149.0532, intUsd:7.5087, intUnits:33725,
+        otherNotional:0, otherDivs:0},
     cfg: {target:101.4, months:12, prefMo:0, commonMo:0, rate:13, fundMix:0, endMnav:1, runway:0, basis:"net", atmFloor:1, stake:5.07, opex:17},
-    golden: {implied:1.4273348098755327, endHold:2724687.5748565323, endSharesM:45.12838868973522, assetSold:0, pausedMo:0, broke:null},
+    golden: {implied:1.2563249640750038, endHold:2724687.5748565323, endSharesM:43.32742056951011, assetSold:0, pausedMo:0, broke:null},
   },
   STRC: {
     s: {spot:80472, hold:848517, cash:5281, owed:0, debtUsd:6714, intUsd:34.5953, intUnits:0, stated:100, quote:99.36,
@@ -77,6 +80,20 @@ for(const tk of ["STRC", "SATA", "CHAD"]){
     for(const k in golden) near(r[k], golden[k], k);
   });
 }
+
+test("MSTR pays a year of dividends and interest from today's cash, each series at its own rate", () => {
+  // BTC and mNAV flat, nothing issued: STRC's $8,570M at 12% plus the other four series
+  // ($470.66M) is $1,499.06M, and $34.60M of convert interest makes the $1,534M a year
+  // Strategy files. Its $5,281M of cash covers that, so no shares are issued and no BTC sold.
+  const {s, cfg} = FIXTURES.MSTR;
+  const flatCfg = {...cfg, target:s.spot, commonMo:0, endMnav:simulate(s, cfg).net0};
+  const r = simulate(s, flatCfg);
+  near(r.endSharesM, s.sharesM, "shares");
+  near(r.endHold, s.hold, "BTC");
+  near(r.endOpenCash, 5281 - (8570*0.12 + 470.66 + 34.5953), "cash left");
+  // the rate input moves STRC's dividends only
+  near(simulate(s, {...flatCfg, rate:0}).endOpenCash, 5281 - (470.66 + 34.5953), "cash left at a 0% STRC rate");
+});
 
 // A small issuer for arithmetic you can check by hand: $100 coin, no debt, no preferred.
 const tiny = (over = {}) => ({spot:100, hold:1e6, cash:0, owed:0, debtUsd:0, intUsd:0, intUnits:0,

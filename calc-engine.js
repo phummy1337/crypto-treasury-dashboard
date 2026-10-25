@@ -18,6 +18,11 @@ function pathPrice(spot, cfg, m){
   const w = m <= low ? m/low : (cfg.months - m)/(cfg.months - low);
   return line*(1 - cfg.crash/100*w);
 }
+// A month of preferred dividends in $M: `issued` (the selected series, notional in $M,
+// including anything raised of it) at the rate input, every other series at its own.
+function prefDivsMo(s, issued, rate){
+  return (s.otherDivs + issued*rate/100)/12;
+}
 function simulate(s, cfg){
   // EV mNAV framing: mNAV = (mcap + debt + pref - cash) / crypto NAV, so each month
   // market cap backs out as mNAV x NAV - claims and price = mcap / shares.
@@ -25,8 +30,11 @@ function simulate(s, cfg){
   // pre-fund dividends. It offsets claims at face value but never earns the
   // mNAV multiple, so parked dollars are per-share neutral (vs asset-bought
   // dollars, which capture the mNAV premium spread).
+  // `cash` is today's cash: it pays dividends, interest and costs before anything
+  // else, and offsets claims at its current balance, so spending it raises claims.
+  let cash = s.cash;
   const nav = (hold,b)=> hold*b/1e6;                                   // $mm
-  const claims = (pref,buf,b) => s.debtUsd + s.owed*b/1e6 + pref - s.cash - buf;   // $mm
+  const claims = (pref,buf,b) => s.debtUsd + s.owed*b/1e6 + pref - cash - buf;   // $mm
   // ending-multiple basis: EV prices the whole structure (mcap = mn×NAV − claims);
   // net prices the common's residual (mcap = mn×(NAV − claims)). Converts are held
   // at notional throughout — the model doesn't flip ITM tranches into share count.
@@ -62,7 +70,7 @@ function simulate(s, cfg){
     const atmOpen = netNav_>0 && netMn >= cfg.atmFloor;
     if(!atmOpen && cfg.commonMo>0) pausedMo++;
     pref += cfg.prefMo;
-    const divMo = pref*cfg.rate/100/12;
+    const divMo = prefDivsMo(s, pref - s.otherNotional, cfg.rate);
     // debt interest and operating costs ride the dividends' waterfall below
     const costMo = (s.intUsd + s.intUnits*b/1e6 + cfg.opex)/12;
     let gap = Math.max(0, cfg.runway*divMo - buf);                     // cash still to park
@@ -78,10 +86,11 @@ function simulate(s, cfg){
     }
     parked += pc;
     raised += cfg.prefMo + commonMo; raisedMnWt += (cfg.prefMo + commonMo)*mn;
-    // payment waterfall: runway cash -> common issuance (only while the ATM is
-    // open) -> forced sales of the treasury for whatever is left. The mix slider is
-    // a preference, not a guarantee: below the floor, selling coin is the only door.
+    // payment waterfall: today's cash -> runway cash -> common issuance (only while
+    // the ATM is open) -> forced sales of the treasury for whatever is left. The mix
+    // slider is a preference, not a guarantee: below the floor, selling coin is the only door.
     let div = divMo + costMo;
+    const fc = Math.min(div, cash); cash -= fc; div -= fc;
     const fb = Math.min(div, buf); buf -= fb; div -= fb;
     if(div>0){
       let viaAsset = div*cfg.fundMix, viaEq = div - viaAsset;
@@ -106,7 +115,7 @@ function simulate(s, cfg){
   const unitAcc = cebe0>0 && cebeEnd>0 ? (cebeEnd/cfg.target)/(cebe0/s.spot) : 1;
   return { implied:p, stockX, assetX,
            cebe0, cebeEnd, cebeX:unitAcc, mnav0, net0, mn0, mnavX:stockX/(assetX*unitAcc),
-           endHold:hold, endSharesM:sharesM, endPref:pref, endCash:buf,
+           endHold:hold, endSharesM:sharesM, endPref:pref, endCash:buf, endOpenCash:cash,
            raised, avgIssMn: raised>0 ? raisedMnWt/raised : null, parked, premCap,
            pausedMo, forcedDiv, assetSold, broke,
            endClaims:claims(pref,buf,cfg.target)/nav(hold,cfg.target)*100,
@@ -140,7 +149,7 @@ function simulateCredit(s, cfg){
       if(t.repay === m){ need += value; repaid += value; live.splice(i, 1); }
       else if(t.convert === m) live.splice(i, 1);                    // in the money: becomes shares
     }
-    need += (s.otherDivs + series*cfg.rate/100)/12;
+    need += prefDivsMo(s, series, cfg.rate);
     const fromCash = Math.min(cash, need); cash -= fromCash; need -= fromCash;
     if(need > 1e-9){
       if(cashOut == null) cashOut = m;
@@ -171,4 +180,4 @@ function breakEven(s, cfg){
   return hi;
 }
 
-if(typeof module !== "undefined") module.exports = { crashMonth, pathPrice, simulate, simulateCredit, breakEven };
+if(typeof module !== "undefined") module.exports = { crashMonth, pathPrice, prefDivsMo, simulate, simulateCredit, breakEven };

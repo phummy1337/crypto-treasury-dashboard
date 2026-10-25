@@ -742,7 +742,7 @@
       <li><b>Starts from today's live balance sheet.</b> DFDV's SOL loans are SOL owed, marked at each month's SOL price.</li>
       <li><b>Defaults are real</b> — issuance uses each company's rolling 3-month pace from its filings (MSTR preferred sits at $0 while the STRC ATM is paused below par). Override anything.</li>
       <li><b>Dividend cash runway</b> — issuance proceeds first park N months of preferred dividends as cash (MSTR's recent posture); only the rest buys the treasury asset. Parked cash never earns the mNAV multiple, so it's per-share neutral and a longer runway means less accretion. 0 = every dollar buys the asset.</li>
-      <li><b>Issuance is earned, not assumed</b> — the common ATM shuts in any month the modeled net mNAV sits below your floor (default 1.00×, Strategy's stated accretion threshold). Dividends, interest and costs then follow a waterfall: runway cash first, then issuance <i>only while the ATM is open</i>, then forced sales of the treasury. That's what makes a premium collapse actually hurt — you lose the accretion engine and start selling coin at the same moment.</li>
+      <li><b>Issuance is earned, not assumed</b> — the common ATM shuts in any month the modeled net mNAV sits below your floor (default 1.00×, Strategy's stated accretion threshold). Dividends, interest and costs then follow a waterfall: today's cash first, then runway cash, then issuance <i>only while the ATM is open</i>, then forced sales of the treasury. That's what makes a premium collapse actually hurt — you lose the accretion engine and start selling coin at the same moment.</li>
       <li><b>Digital Credit</b> — STRC, SATA and CHAD run their issuer's balance sheet from the preferred holder's seat. No new money comes in unless you add it. Opening cash pays first, then sales of the treasury. Debt interest and any convertible due come before everything else: one out of the money today is repaid in cash at its first put or maturity, with no refinancing. Operating costs come next, then every preferred series at its own rate. Whatever can't be paid is a <i>modeled funding gap</i>, not a legal default.</li>
       <li><b>When can't it pay?</b> — the break-even is the lowest ending treasury price that still funds every payment through your horizon, holding everything else. Raising preferred below its stated amount adds more claim than cash: $1M at $8 is 125,000 CHAD shares and $1.25M of stated notional.</li>
       <li><b>Crash test</b> — dips the treasury price that far below the straight line, bottoming in the month you pick, then back to your target by the horizon. Same ending price, different path: coin sold near the bottom to pay the bills is gone for good, so a crash can open a gap the straight line never shows. The break-even keeps your crash and moves only the ending price.</li>
@@ -779,7 +779,7 @@
         <label data-view="common"><span class="lblrow">ATM Pauses Below<span class="evhint" data-title="Common ATM discipline" data-rows="Rule~no common issuance below this net mNAV|Strategy's stated threshold~1.00×|Set 0~issue regardless (unrealistic)|Effect~below the floor, dividends must come from sales of the treasury">?</span></span>
           <input type="number" id="ci-floor" value="1.00" step="0.05" min="0" max="5">
           <span class="mixlbl" id="ci-floor-lbl">× net mNAV — ATM open above this</span></label>
-        <label>Dividend Rate (% / yr)<input type="number" id="ci-rate" value="12" step="0.5" min="0"></label>
+        <label><span><span id="ci-rate-name">Preferred</span> Dividend Rate (% / yr)</span><input type="number" id="ci-rate" value="12" step="0.5" min="0"></label>
         <label data-view="credit" hidden>Required Yield (%)<input type="number" id="ci-ry" value="12" step="0.25" min="0.1" max="100">
           <span class="mixlbl">the yield the market prices it at</span></label>
         <label data-view="common">Dividend Funding Mix
@@ -799,7 +799,7 @@
       </div>
       <div class="calc-out" id="calc-out"></div>
       <div class="chartwrap" style="height:260px; padding: 0 16px 14px;"><canvas id="ch-calc"></canvas></div>
-      <p class="footnote" data-calcfoot="common" style="padding:0 18px 14px; margin:0;">A model, not a forecast: the treasury asset and mNAV move linearly to your targets, the asset dipping first if you set a crash; issuance is constant per month <i>while the ATM is open</i>. Not modeled: in-the-money converts flipping to shares, variable preferred-rate resets, debt maturities, and taxes on unrealized gains. EV basis prices the whole structure (mcap = mNAV × crypto NAV − claims); net basis prices the common's residual (mcap = mNAV × net NAV). Converts are held at notional throughout — the model doesn't flip in-the-money tranches into share count. Runway cash offsets claims at face value but never earns the multiple — only asset-bought dollars capture the issuance premium. Opening cash is held, not spent: dividends draw on runway cash, issuance and sales.</p>
+      <p class="footnote" data-calcfoot="common" style="padding:0 18px 14px; margin:0;">A model, not a forecast: the treasury asset and mNAV move linearly to your targets, the asset dipping first if you set a crash; issuance is constant per month <i>while the ATM is open</i>. Not modeled: in-the-money converts flipping to shares, variable preferred-rate resets, debt maturities, and taxes on unrealized gains. EV basis prices the whole structure (mcap = mNAV × crypto NAV − claims); net basis prices the common's residual (mcap = mNAV × net NAV). Converts are held at notional throughout — the model doesn't flip in-the-money tranches into share count. Runway cash offsets claims at face value but never earns the multiple — only asset-bought dollars capture the issuance premium. Today's cash pays first, then runway cash, issuance and sales; spending it adds to claims. The dividend rate you set applies to the series being issued (STRC, SATA or CHAD); every other series pays its own rate.</p>
       <p class="footnote" data-calcfoot="credit" hidden style="padding:0 18px 14px; margin:0;">A model, not a forecast: the treasury asset moves linearly to your target, dipping first if you set a crash, and payments are aggregated by month (CHAD pays a slice every business day). Every preferred series ranks together here, though SATS is junior to SATA; debt ranks ahead of all of them. Not modeled: refinancing, buybacks, rate resets beyond your input, compounding of unpaid dividends, the $10–$11 reset of CHAD's liquidation preference, taxes, and SOL locked in staking or posted as collateral. Coverage counts the preferred at its stated amount.</p>
     </div>
   </section>
@@ -2143,8 +2143,8 @@ async function loadData(){
 // ---------- implied price calculator ----------
 // Month-by-month engine (per the CEBE framework): implied price = CEBE NAV/share × mNAV.
 // Preferred/common issuance buys the treasury asset at that month's (linear-path) price;
-// dividends, interest and operating costs are funded by issuing common or selling the
-// asset; mNAV interpolates linearly to the ending target.
+// dividends, interest and operating costs are paid from today's cash, then by issuing
+// common or selling the asset; mNAV interpolates linearly to the ending target.
 let calcCo = "MSTR";
 // The Digital Credit buttons and the issuer each one models: a preferred is valued from
 // its holder's seat on the issuer's whole balance sheet.
@@ -2164,9 +2164,20 @@ function balanceSheet(o){
            intUsd: ds.reduce((s, t) => s + (t.solAmount ? 0 : t.principal*t.coupon/100), 0),
            intUnits: ds.reduce((s, t) => s + (t.solAmount ? t.solAmount*t.coupon/100 : 0), 0) };
 }
+// The preferred series other than `tk`: their notional and yearly dividends in $M,
+// each series at its own rate. Both engines read them.
+function otherSeries(o, tk){
+  const others = (o.prefBreakdown || []).filter(r => r[0] !== tk);
+  return { otherNotional: others.reduce((s, r) => s + r[2], 0),
+           otherDivs: others.reduce((s, r) => s + r[2]*(r[3] || 0)/100, 0) };
+}
+// The preferred a button issues and whose rate the rate input sets: the button's own
+// for a Digital Credit one, the issuer's main series (STRC, SATA, CHAD) for a common.
+const issuedSeries = co => isCredit(co) ? co : (DATA.companies[co].prefTicker || "Preferred");
 function calcSnapshot(co){
   const o = DATA.companies[co];
-  return { px:o.stockPrice, sharesM:o.sharesOutstanding, pref:o.prefNotional, ...balanceSheet(o) };
+  return { px:o.stockPrice, sharesM:o.sharesOutstanding, pref:o.prefNotional, ...balanceSheet(o),
+           ...otherSeries(o, o.prefTicker) };
 }
 // simulate(), simulateCredit() and breakEven() live in calc-engine.js, which the tests load too.
 
@@ -2175,7 +2186,6 @@ function creditSnapshot(tk){
   const o = calcIssuer(tk), today = etDateStr();
   const rows = o.prefBreakdown || [];
   const me = rows.find(r => r[0] === tk) || [tk, "", o.prefNotional, null];
-  const others = rows.filter(r => r[0] !== tk);
   const monthOf = iso => Math.max(1, Math.round((Date.parse(iso) - Date.parse(today))/(30.44*864e5)));
   // A tranche comes due at its next put or maturity. Out of the money today, it is
   // repaid in cash then (no refinancing); in the money, it converts into shares.
@@ -2187,9 +2197,7 @@ function creditSnapshot(tk){
              repay: date && !itm ? monthOf(date) : null, convert: date && itm ? monthOf(date) : null };
   });
   return { ...balanceSheet(o), stated:o.prefStated || 100, quote:o.prefPrice,
-           series:me[2], rate:me[3],
-           otherNotional: others.reduce((s, r) => s + r[2], 0),
-           otherDivs: others.reduce((s, r) => s + r[2]*(r[3] || 0)/100, 0),
+           series:me[2], rate:me[3], ...otherSeries(o, tk),
            tranches };
 }
 
@@ -2231,7 +2239,7 @@ function runCommon(out){
   if(lbl){ const m=Math.round(cfg.fundMix*100);
     lbl.textContent = m===0 ? "100% common issuance" : m===100 ? `100% ${u} sales` : `${m}% ${u} sales · ${100-m}% common`; }
   const rlbl = document.getElementById("ci-runway-lbl");
-  if(rlbl){ const divMo0 = s.pref*cfg.rate/100/12;
+  if(rlbl){ const divMo0 = prefDivsMo(s, s.pref - s.otherNotional, cfg.rate);
     rlbl.textContent = cfg.runway<=0 ? `0 — every $ raised buys ${u}`
       : "parks ~$"+fmt(Math.round(cfg.runway*divMo0))+"M of dividends as cash first"; }
   const r = simulate(s, cfg);
@@ -2255,7 +2263,7 @@ function runCommon(out){
       <div class="v ${r.stockX>=r.assetX?"pos":"neg"}">${fmt(r.stockX/r.assetX,2)}x</div>
       <div class="s">stock ÷ ${u} multiple</div></div>
     <div class="calc-decomp">Decomposition: ${u} <b>${fmt(r.assetX,2)}x</b> × CEBE/share accretion <b>${fmt(r.cebeX,2)}x</b> × mNAV re-rate <b>${fmt(r.mnavX,2)}x</b> = <b>${fmt(r.stockX,2)}x</b>
-      &nbsp;·&nbsp; Ending: ${unitsTxt(o, r.endHold)} held · ${fmt(r.endSharesM,1)}M shares · CEBE NAV $${fmt(r.cebeEnd,2)}/sh · claims ${fmt(r.endClaims,1)}% of NAV${
+      &nbsp;·&nbsp; Ending: ${unitsTxt(o, r.endHold)} held · ${fmt(r.endSharesM,1)}M shares · $${fmt(Math.round(r.endOpenCash))}M of today's cash left · CEBE NAV $${fmt(r.cebeEnd,2)}/sh · claims ${fmt(r.endClaims,1)}% of NAV${
       r.raised>0 ? `<br>Issuance: $${fmt(Math.round(r.raised))}M raised @ avg ${fmt(r.avgIssMn,2)}× mNAV — $${fmt(Math.round(r.raised - r.parked))}M → ${u} (premium captured ≈ ${sig(r.premCap/(r.implied*r.endSharesM)*100)}${fmt(r.premCap/(r.implied*r.endSharesM)*100,1)}% of ending equity) · $${fmt(Math.round(r.parked))}M parked as dividend cash (per-share neutral)${r.endCash>0.5 ? ` · $${fmt(Math.round(r.endCash))}M runway cash left` : ``}` : ``}${
       (r.pausedMo>0 || r.assetSold>0.5) ? `<br>Stress: ${
         r.pausedMo>0 ? `common ATM shut <b>${r.pausedMo} of ${cfg.months} months</b> (net mNAV below ${fmt(cfg.atmFloor,2)}×)` : `ATM open all ${cfg.months} months`}${
@@ -2520,9 +2528,9 @@ function commonCardContent(cfg){
     rows:[
       [u+" Price Target", pxTxt(cfg.target)],
       ["Horizon", horizonTxt(cfg)],
-      ["Preferred Issued", "$"+fmt(cfg.prefMo)+"M / mo"],
+      [issuedSeries(calcCo)+" Issued", "$"+fmt(cfg.prefMo)+"M / mo"],
       ["Common Issued", "$"+fmt(cfg.commonMo)+"M / mo"],
-      ["Dividend Rate", fmt(cfg.rate,1)+"% / yr"],
+      [issuedSeries(calcCo)+" Dividend Rate", fmt(cfg.rate,1)+"% / yr"],
       ["Dividend Funding Mix", Math.round(cfg.fundMix*100)+"% "+u+" sales / "+Math.round((1-cfg.fundMix)*100)+"% common"],
       ["ATM Pauses Below", fmt(cfg.atmFloor,2)+"x net mNAV"],
       ...(cfg.runway>0 ? [["Div. Cash Runway", fmt(cfg.runway)+" months pre-funded"]] : []),
@@ -2716,7 +2724,8 @@ function syncCalcInputs(){
   document.querySelectorAll(".calc-inputs [data-view]").forEach(el => el.hidden = el.dataset.view !== view);
   document.querySelectorAll(".calc-inputs [data-asset]").forEach(el => el.hidden = el.dataset.asset !== o.asset);
   document.querySelectorAll("[data-calcfoot]").forEach(el => el.hidden = el.dataset.calcfoot !== view);
-  document.getElementById("ci-pref-name").textContent = credit ? calcCo : "Preferred";
+  document.getElementById("ci-pref-name").textContent = issuedSeries(calcCo);
+  document.getElementById("ci-rate-name").textContent = issuedSeries(calcCo);
   document.getElementById("ci-opex-lbl").textContent =
     o.opexYr ? `${o.ticker}'s stated run-rate: $${fmt(o.opexYr)}M` : "0 = not modeled";
 }
