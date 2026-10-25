@@ -3,6 +3,21 @@
    this file as a plain script; tests/calc-engine.test.js requires it under Node.
    Keep it free of DATA, the DOM and other page globals so both can run it. */
 
+// The month a crash bottoms: the one asked for, kept strictly inside the horizon.
+function crashMonth(cfg){
+  return Math.min(Math.max(1, Math.round(cfg.crashMo || 1)), cfg.months - 1);
+}
+// The treasury asset's price in month m: a straight line from today's price to the
+// target, dipped by a crash that bottoms cfg.crash % below that line in crashMonth()
+// and is back on the line by the horizon. Month 0 is today's price and the last month
+// is the target either way; a crash of 0, or a one-month horizon, is the straight line.
+function pathPrice(spot, cfg, m){
+  const line = spot + (cfg.target - spot)*m/cfg.months;
+  if(!(cfg.crash > 0) || cfg.months < 2) return line;
+  const low = crashMonth(cfg);
+  const w = m <= low ? m/low : (cfg.months - m)/(cfg.months - low);
+  return line*(1 - cfg.crash/100*w);
+}
 function simulate(s, cfg){
   // EV mNAV framing: mNAV = (mcap + debt + pref - cash) / crypto NAV, so each month
   // market cap backs out as mNAV x NAV - claims and price = mcap / shares.
@@ -31,7 +46,7 @@ function simulate(s, cfg){
   let pausedMo=0, forcedDiv=0, assetSold=0, broke=null;
   const idxStock=[100], idxAsset=[100], labels=["0"];
   for(let m=1;m<=cfg.months;m++){
-    const b  = s.spot + (cfg.target - s.spot)*m/cfg.months;
+    const b  = pathPrice(s.spot, cfg, m);
     const mn = mn0 + (cfg.endMnav - mn0)*m/cfg.months;
     if(broke){                                                         // structure is gone;
       idxStock.push(0); idxAsset.push(b/s.spot*100); labels.push(String(m)); continue;
@@ -112,7 +127,7 @@ function simulateCredit(s, cfg){
     live.reduce((d, t) => d + (t.units ? t.units*P/1e6 : t.principal), 0) + s.otherNotional + series];
   const labels = ["0"], assets = [mark(s.spot)[0]], claims = [mark(s.spot)[1]];
   for(let m = 1; m <= cfg.months; m++){
-    const P = s.spot + (cfg.target - s.spot)*m/cfg.months;          // same linear path as simulate()
+    const P = pathPrice(s.spot, cfg, m);                             // same path as simulate()
     hold *= 1 + cfg.stake/1200;                                      // staking accrues in units
     if(cfg.prefMo > 0){                                              // raise more of the series:
       series += cfg.prefMo*s.stated/cfg.issuePx;                     // shares × stated amount
@@ -144,8 +159,9 @@ function simulateCredit(s, cfg){
            assets, claims, labels };
 }
 // The lowest ending price of the treasury asset that still funds every payment through
-// the horizon, holding the other inputs: 0 when cash and staking alone do, null when no
-// price up to 20× today does. A higher ending price never makes a payment harder.
+// the horizon, holding the other inputs (a crash keeps its depth and month): 0 when cash
+// and staking alone do, null when no price up to 20× today does. A higher ending price
+// raises every month's price, so it never makes a payment harder.
 function breakEven(s, cfg){
   const gap = target => simulateCredit(s, {...cfg, target}).unpaid > 1e-6;
   let lo = s.spot*1e-4, hi = s.spot*20;
@@ -155,4 +171,4 @@ function breakEven(s, cfg){
   return hi;
 }
 
-if(typeof module !== "undefined") module.exports = { simulate, simulateCredit, breakEven };
+if(typeof module !== "undefined") module.exports = { crashMonth, pathPrice, simulate, simulateCredit, breakEven };

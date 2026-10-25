@@ -6,7 +6,7 @@
 // shifts one has changed what the page shows, and its commit should say so.
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { simulate, simulateCredit, breakEven } = require("../calc-engine.js");
+const { crashMonth, pathPrice, simulate, simulateCredit, breakEven } = require("../calc-engine.js");
 
 const FIXTURES = {
   MSTR: {
@@ -110,4 +110,42 @@ test("the break-even sits on the line between funded and a gap", () => {
   const {s, cfg} = FIXTURES.CHAD, be = breakEven(s, cfg);
   assert.ok(simulateCredit(s, {...cfg, target:be*1.001}).unpaid <= 1e-6, "funded just above");
   assert.ok(simulateCredit(s, {...cfg, target:be*0.999}).unpaid > 1e-6, "a gap just below");
+});
+
+test("a crash of 0 is the straight line, so every golden holds", () => {
+  for(const co of ["MSTR", "ASST", "DFDV"]){
+    const {s, cfg, golden} = FIXTURES[co], r = simulate(s, {...cfg, crash:0, crashMo:6});
+    for(const k in golden) near(r[k], golden[k], `${co} ${k}`);
+  }
+  for(const tk of ["STRC", "SATA", "CHAD"]){
+    const {s, golden} = FIXTURES[tk], cfg = {...FIXTURES[tk].cfg, crash:0, crashMo:6};
+    const r = {...simulateCredit(s, cfg), breakEven:breakEven(s, cfg)};
+    for(const k in golden) near(r[k], golden[k], `${tk} ${k}`);
+  }
+});
+
+test("a crash bottoms where asked, below the line, and still ends at the target", () => {
+  const cfg = {target:150, months:24, crash:60, crashMo:6};
+  near(pathPrice(100, cfg, 0), 100, "today");
+  near(pathPrice(100, cfg, 6), 112.5*0.4, "the low: 60% under the line's $112.50");
+  near(pathPrice(100, cfg, 24), 150, "the horizon");
+  assert.equal(crashMonth({months:12, crashMo:30}), 11);           // kept inside the horizon
+});
+
+test("same ending price, different path: a crash opens a gap the straight line doesn't", () => {
+  // $3M owed a month for two years against 1M coin at a flat $100: the straight line
+  // sells 720,000 coin. A 70% crash bottoming in month 6 sells them cheap and runs out.
+  const s = tiny(), cfg = flat({months:24, opex:36});
+  const line = simulateCredit(s, cfg), crashed = simulateCredit(s, {...cfg, crash:70, crashMo:6});
+  near(line.unpaid, 0, "straight line unpaid");
+  near(line.sold, 720000, "straight line coin sold");
+  assert.equal(crashed.firstGap, 17);                              // well after the low, on the way back up
+  assert.ok(crashed.unpaid > 21 && crashed.unpaid < 22, `crash unpaid ${crashed.unpaid}`);
+});
+
+test("with a crash, the break-even is higher and still separates funded from a gap", () => {
+  const {s, cfg} = FIXTURES.CHAD, crash = {...cfg, crash:60, crashMo:6}, be = breakEven(s, crash);
+  assert.ok(be > breakEven(s, cfg), "a crash raises the break-even");
+  assert.ok(simulateCredit(s, {...crash, target:be*1.001}).unpaid <= 1e-6, "funded just above");
+  assert.ok(simulateCredit(s, {...crash, target:be*0.999}).unpaid > 1e-6, "a gap just below");
 });

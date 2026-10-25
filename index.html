@@ -745,6 +745,7 @@
       <li><b>Issuance is earned, not assumed</b> — the common ATM shuts in any month the modeled net mNAV sits below your floor (default 1.00×, Strategy's stated accretion threshold). Dividends, interest and costs then follow a waterfall: runway cash first, then issuance <i>only while the ATM is open</i>, then forced sales of the treasury. That's what makes a premium collapse actually hurt — you lose the accretion engine and start selling coin at the same moment.</li>
       <li><b>Digital Credit</b> — STRC, SATA and CHAD run their issuer's balance sheet from the preferred holder's seat. No new money comes in unless you add it. Opening cash pays first, then sales of the treasury. Debt interest and any convertible due come before everything else: one out of the money today is repaid in cash at its first put or maturity, with no refinancing. Operating costs come next, then every preferred series at its own rate. Whatever can't be paid is a <i>modeled funding gap</i>, not a legal default.</li>
       <li><b>When can't it pay?</b> — the break-even is the lowest ending treasury price that still funds every payment through your horizon, holding everything else. Raising preferred below its stated amount adds more claim than cash: $1M at $8 is 125,000 CHAD shares and $1.25M of stated notional.</li>
+      <li><b>Crash test</b> — dips the treasury price that far below the straight line, bottoming in the month you pick, then back to your target by the horizon. Same ending price, different path: coin sold near the bottom to pay the bills is gone for good, so a crash can open a gap the straight line never shows. The break-even keeps your crash and moves only the ending price.</li>
     </ul></details>
     <div class="grid calcbox">
       <div class="calc-co">
@@ -768,6 +769,9 @@
         <label>Annual Growth (% / yr)<input type="number" id="ci-growth" step="5" min="-99" max="1000">
           <span class="mixlbl">implied by the target — edit either</span></label>
         <label>Horizon (months)<input type="number" id="ci-months" value="12" step="6" min="1" max="120"></label>
+        <label>Crash Depth (% below path)<input type="number" id="ci-crash" value="0" step="5" min="0" max="95">
+          <span class="mixlbl" id="ci-crash-lbl">0 = straight line to your target</span></label>
+        <label>Crash Low (month)<input type="number" id="ci-crashmo" value="6" step="1" min="1" max="119"></label>
         <label><span><span id="ci-pref-name">Preferred</span> Issued ($M / mo)</span><input type="number" id="ci-pref" value="0" step="50" min="0"></label>
         <label data-view="credit" hidden>Issue Price ($)<input type="number" id="ci-issue" value="100" step="0.25" min="0.01">
           <span class="mixlbl" id="ci-issue-lbl"></span></label>
@@ -795,8 +799,8 @@
       </div>
       <div class="calc-out" id="calc-out"></div>
       <div class="chartwrap" style="height:260px; padding: 0 16px 14px;"><canvas id="ch-calc"></canvas></div>
-      <p class="footnote" data-calcfoot="common" style="padding:0 18px 14px; margin:0;">A model, not a forecast: the treasury asset and mNAV move linearly to your targets; issuance is constant per month <i>while the ATM is open</i>. Not modeled: in-the-money converts flipping to shares, variable preferred-rate resets, debt maturities, and taxes on unrealized gains. EV basis prices the whole structure (mcap = mNAV × crypto NAV − claims); net basis prices the common's residual (mcap = mNAV × net NAV). Converts are held at notional throughout — the model doesn't flip in-the-money tranches into share count. Runway cash offsets claims at face value but never earns the multiple — only asset-bought dollars capture the issuance premium. Opening cash is held, not spent: dividends draw on runway cash, issuance and sales.</p>
-      <p class="footnote" data-calcfoot="credit" hidden style="padding:0 18px 14px; margin:0;">A model, not a forecast: the treasury asset moves linearly to your target and payments are aggregated by month (CHAD pays a slice every business day). Every preferred series ranks together here, though SATS is junior to SATA; debt ranks ahead of all of them. Not modeled: refinancing, buybacks, rate resets beyond your input, compounding of unpaid dividends, the $10–$11 reset of CHAD's liquidation preference, taxes, and SOL locked in staking or posted as collateral. Coverage counts the preferred at its stated amount.</p>
+      <p class="footnote" data-calcfoot="common" style="padding:0 18px 14px; margin:0;">A model, not a forecast: the treasury asset and mNAV move linearly to your targets, the asset dipping first if you set a crash; issuance is constant per month <i>while the ATM is open</i>. Not modeled: in-the-money converts flipping to shares, variable preferred-rate resets, debt maturities, and taxes on unrealized gains. EV basis prices the whole structure (mcap = mNAV × crypto NAV − claims); net basis prices the common's residual (mcap = mNAV × net NAV). Converts are held at notional throughout — the model doesn't flip in-the-money tranches into share count. Runway cash offsets claims at face value but never earns the multiple — only asset-bought dollars capture the issuance premium. Opening cash is held, not spent: dividends draw on runway cash, issuance and sales.</p>
+      <p class="footnote" data-calcfoot="credit" hidden style="padding:0 18px 14px; margin:0;">A model, not a forecast: the treasury asset moves linearly to your target, dipping first if you set a crash, and payments are aggregated by month (CHAD pays a slice every business day). Every preferred series ranks together here, though SATS is junior to SATA; debt ranks ahead of all of them. Not modeled: refinancing, buybacks, rate resets beyond your input, compounding of unpaid dividends, the $10–$11 reset of CHAD's liquidation preference, taxes, and SOL locked in staking or posted as collateral. Coverage counts the preferred at its stated amount.</p>
     </div>
   </section>
 
@@ -2198,7 +2202,8 @@ function readCalcCfg(){
     basis:(document.getElementById("ci-basis")||{}).value || "ev",
     atmFloor:Math.max(0, gv("ci-floor")),
     stake: sol ? gv("ci-stake") : 0, opex:gv("ci-opex"),
-    issuePx:gv("ci-issue") || 0.01, reqYield:gv("ci-ry") };
+    issuePx:gv("ci-issue") || 0.01, reqYield:gv("ci-ry"),
+    crash:gv("ci-crash"), crashMo:gv("ci-crashmo") };
 }
 // an amount of the treasury asset as plain text, for alerts and the share card
 const unitsTxt = (o, n) => o.asset === "SOL" ? fmt(Math.round(n))+" SOL" : "₿"+fmt(Math.round(n));
@@ -2206,12 +2211,15 @@ const pxTxt = v => "$"+fmt(v, v<1000 ? 2 : 0);
 // a $M axis tick: "$250M", or "$120B" once the stack runs to billions
 const moneyTick = v => Math.abs(v) >= 1000 ? "$"+fmt(v/1000)+"B" : "$"+fmt(v)+"M";
 const yrTxt = m => m>=12 ? `year ${fmt(m/12,1)}` : `month ${m}`;
+// the share cards' horizon, with any crash folded in so the row count holds
+const horizonTxt = cfg => cfg.months+" months"+(cfg.crash > 0 && cfg.months > 1 ? `  ·  ${fmt(cfg.crash)}% crash at mo ${crashMonth(cfg)}` : "");
 // "-27%", or "-99.6%" where a whole number would round to -100%
 const pctFrom = (v, base) => { const d = (v/base - 1)*100; return sig(d)+fmt(d, Math.abs(d) >= 99.5 ? 1 : 0)+"%"; };
 
 function runCalc(){
   const out=document.getElementById("calc-out"); if(!out || !DATA.companies) return;
   syncGrowth();
+  syncCrashLabel();
   if(isCredit(calcCo)) runCredit(out); else runCommon(out);
 }
 function runCommon(out){
@@ -2291,9 +2299,10 @@ function runCredit(out){
   if(issue) issue.textContent = cfg.issuePx < s.stated
     ? `below the $${fmt(s.stated)} stated: $1 raised adds $${fmt(s.stated/cfg.issuePx,2)} of claim`
     : `last trade $${fmt(s.quote,2)} · stated $${fmt(s.stated)}`;
+  const withCrash = cfg.crash > 0 && cfg.months > 1 ? `, with your ${fmt(cfg.crash)}% crash in month ${crashMonth(cfg)}` : ``;
   const beTxt = be === 0 ? `cash${cfg.stake > 0 ? " and staking" : ""} alone cover every payment through month ${cfg.months}, whatever ${u} does`
-    : be == null ? `no ending ${u} price up to 20× today funds every payment through month ${cfg.months}`
-    : `every payment stays funded through month ${cfg.months} unless ${u} ends below <b>${pxTxt(be)}</b> (${pctFrom(be, s.spot)} from today)`;
+    : be == null ? `no ending ${u} price up to 20× today funds every payment through month ${cfg.months}${withCrash}`
+    : `every payment stays funded through month ${cfg.months} unless ${u} ends below <b>${pxTxt(be)}</b> (${pctFrom(be, s.spot)} from today)${withCrash}`;
   out.innerHTML = `${ c.funded ? `` : `
     <div class="calc-alert"><b>Modeled funding gap from month ${r.firstGap}</b> (${yrTxt(r.firstGap)}, ${u} ≈ ${pxTxt(r.gapPx)}) — cash and the treasury run out before every payment is met: $${fmt(r.unpaid,1)}M unpaid by month ${cfg.months}.
       A model, not a legal default: the company could still raise money, and unpaid ${tk} dividends accrue.</div>` }
@@ -2508,7 +2517,7 @@ function commonCardContent(cfg){
            ["RETURN VS "+u, fmt(r.stockX/r.assetX,2)+"x", r.stockX>=r.assetX?"#34d399":"#ff7a7a", "vs holding "+u]],
     rows:[
       [u+" Price Target", pxTxt(cfg.target)],
-      ["Horizon", cfg.months+" months"],
+      ["Horizon", horizonTxt(cfg)],
       ["Preferred Issued", "$"+fmt(cfg.prefMo)+"M / mo"],
       ["Common Issued", "$"+fmt(cfg.commonMo)+"M / mo"],
       ["Dividend Rate", fmt(cfg.rate,1)+"% / yr"],
@@ -2543,7 +2552,7 @@ function creditCardContent(){
             be ? pctFrom(be, s.spot)+" from today" : be===0 ? "cash covers the horizon" : "up to 20× today"]],
     rows:[
       [u+" Price Target", pxTxt(cfg.target)+"  (now "+pxTxt(s.spot)+")"],
-      ["Horizon", cfg.months+" months"],
+      ["Horizon", horizonTxt(cfg)],
       [tk+" Issued", "$"+fmt(cfg.prefMo,1)+"M / mo at $"+fmt(cfg.issuePx,2)],
       ["Dividend Rate", fmt(cfg.rate,2)+"% on $"+fmt(s.stated)+" stated"],
       ["Required Yield", fmt(cfg.reqYield,2)+"%"],
@@ -2614,7 +2623,7 @@ async function shareCard(){
 // Short keys keep the link readable; the DOM id is the source of truth for bounds.
 const CALC_HASH_KEYS = { btc:"ci-btc", sol:"ci-sol", m:"ci-months", pref:"ci-pref", common:"ci-common",
   floor:"ci-floor", rate:"ci-rate", fund:"ci-fund", runway:"ci-runway", mnav:"ci-mnav",
-  issue:"ci-issue", ry:"ci-ry", stake:"ci-stake", opex:"ci-opex" };
+  issue:"ci-issue", ry:"ci-ry", stake:"ci-stake", opex:"ci-opex", crash:"ci-crash", low:"ci-crashmo" };
 // The markup is the schema -- every input carries min and step -- but not all carry
 // max. These are the ceilings for the ones that do not, so a hand-edited link cannot
 // push either engine somewhere it renders NaN all the way through.
@@ -2717,6 +2726,15 @@ function syncGrowth(){
   const spot = assetPx(calcIssuer(calcCo)), cfg = readCalcCfg();
   g.value = spot > 0 && cfg.target > 0 ? Math.round((Math.pow(cfg.target/spot, 12/cfg.months) - 1)*1000)/10 : "";
 }
+// The crash box's note: where the dip bottoms, in the treasury asset's own price.
+function syncCrashLabel(){
+  const lbl = document.getElementById("ci-crash-lbl"); if(!lbl) return;
+  const o = calcIssuer(calcCo), cfg = readCalcCfg(), spot = assetPx(o);
+  if(!(cfg.crash > 0)){ lbl.textContent = "0 = straight line to your target"; return; }
+  if(cfg.months < 2){ lbl.textContent = "needs a horizon of 2+ months"; return; }
+  const m = crashMonth(cfg), low = pathPrice(spot, cfg, m);
+  lbl.textContent = `${assetUnit(o)} bottoms at ${pxTxt(low)} in month ${m} (${pctFrom(low, spot)} from today)`;
+}
 
 function initCalc(){
   if(!document.getElementById("calc-out")) return;
@@ -2800,7 +2818,7 @@ function initCalc(){
     queueCalcHash();
   }));
   ["ci-btc","ci-sol","ci-months","ci-pref","ci-common","ci-rate","ci-mnav","ci-runway","ci-floor",
-   "ci-issue","ci-ry","ci-stake","ci-opex"].forEach(id =>
+   "ci-issue","ci-ry","ci-stake","ci-opex","ci-crash","ci-crashmo"].forEach(id =>
     document.getElementById(id).addEventListener("input", () => { runCalc(); queueCalcHash(); }));
   document.getElementById("ci-growth").addEventListener("input", e => {
     const g = parseFloat(e.target.value); if(!isFinite(g)) return;
