@@ -1259,7 +1259,8 @@ _ALLOC = [(r"repurchases? of (STRC|STRF|STRK|STRD|MSTR) Stock", lambda m: f"{m.g
           (r"dividend", lambda m: "dividends"),
           (r"bitcoin", lambda m: "bitcoin"),
           (r"USD Cash", lambda m: "USD Cash"),
-          (r"USD Reserve", lambda m: "USD Reserve")]
+          (r"USD Reserve", lambda m: "USD Reserve"),
+          (r"cash balance", lambda m: "cash")]
 
 
 def _alloc_label(phrase):
@@ -1273,18 +1274,23 @@ def _alloc_label(phrase):
 def _atm_allocation(text, raised):
     """['STRC buybacks $136M', 'USD Reserve $300M', 'USD Cash ~$1,570M'] from the
     footnote under the ATM table. The 'remaining net proceeds' bucket carries no
-    figure of its own, so it is backed out of the total."""
+    figure of its own, so it is backed out of the total; so is 'The net proceeds',
+    the wording when the whole raise went one way (from Oct 2026)."""
     tbl, parts, named = _atm_table(text), [], 0.0
-    for m in re.finditer(r"\$\s?([\d,.]+)\s*(million|billion)\s+in net proceeds[^.$]{0,80}?"
-                         r"were used to ([^,.]{0,90})", tbl):
+    # The purpose stops at "$" too: the 2026-09-28 footnote joins its two amounts with
+    # a bare "and", and the first purpose swallowed the second's "$103". Aug 2026's
+    # footnotes say "in proceeds" and "were added to Strategy's cash balance".
+    for m in re.finditer(r"\$\s?([\d,.]+)\s*(million|billion)\s+in (?:net )?proceeds[^.$]{0,80}?"
+                         r"were (?:used|added) to ([^,.$]{0,90})", tbl):
         v = float(m.group(1).replace(",", "")) * (1000 if m.group(2) == "billion" else 1)
         lab = _alloc_label(m.group(3))
         if lab:
             parts.append(f"{lab} ${v:,.0f}M"); named += v
-    rem = re.search(r"remaining net proceeds[^.]{0,80}?were used to ([^,.]{0,90})", tbl)
+    rem = re.search(r"(?:remaining|The) net proceeds[^.]{0,80}?were used to ([^,.$]{0,90})", tbl)
     if rem and (lab := _alloc_label(rem.group(1))):
         left = raised - named
-        parts.append(f"{lab} ~${left:,.0f}M" if left > 1 else lab)
+        approx = "~" if named else ""      # backed out of the itemised buckets, or the whole raise
+        parts.append(f"{lab} {approx}${left:,.0f}M" if left > 1 else lab)
     elif parts and raised and abs(raised - named) > max(1.0, raised * 0.02):
         # every bucket is itemised (no "remaining" catch-all) yet they don't add up:
         # a purpose phrase we don't recognise got dropped on the floor
