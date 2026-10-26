@@ -1576,7 +1576,7 @@ def fetch_sata_notional(data):
     steps = {d: n for d, n in (co.get("sataNotionalSteps") or [])}
     known = set(steps)
     try:
-        sub = get_json(f"https://data.sec.gov/submissions/CIK{CIK['ASST']}.json")
+        sub = _edgar_json(f"https://data.sec.gov/submissions/CIK{CIK['ASST']}.json")
     except Exception as e:
         log(f"[skip] SATA notional: {e} — keeping filed steps")
         _SATA["steps"] = co.get("sataNotionalSteps") or []
@@ -1709,7 +1709,7 @@ def fetch_holdings(data, max_points=60):
     acts = []
     for tk, cik in CIK.items():
         try:
-            sub = get_json(f"https://data.sec.gov/submissions/CIK{cik}.json")
+            sub = _edgar_json(f"https://data.sec.gov/submissions/CIK{cik}.json")
         except Exception as e:
             log(f"[skip] EDGAR submissions {tk} failed: {e}")
             continue
@@ -2583,7 +2583,7 @@ def _filed_atm_windows(pref, cik, parser, reports_atm, first_day_offset):
     newer 8-Ks. A network error raises, so the caller keeps the last values rather than
     publishing a span that one failed fetch cut short.
     """
-    rec = get_json(f"https://data.sec.gov/submissions/CIK{cik}.json")["filings"]["recent"]
+    rec = _edgar_json(f"https://data.sec.gov/submissions/CIK{cik}.json")["filings"]["recent"]
     found, examined, oldest_filing_date = {}, 0, ""
     for i in range(len(rec["form"])):          # EDGAR lists newest first
         if rec["form"][i] != "8-K":
@@ -3257,7 +3257,7 @@ def record_filing_watermark(data):
             continue
         newest = None
         try:
-            r = get_json(f"https://data.sec.gov/submissions/CIK{cik}.json")["filings"]["recent"]
+            r = _edgar_json(f"https://data.sec.gov/submissions/CIK{cik}.json")["filings"]["recent"]
             newest = max((r["filingDate"][i] for i in range(len(r["form"]))
                           if r["form"][i] == "8-K"), default=None)
         except Exception as e:
