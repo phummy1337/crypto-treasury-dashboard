@@ -2883,7 +2883,7 @@ function initCalc(){
       const quote = o.prefPrice || o.prefStated || 100;
       val("ci-pref", 0);
       val("ci-issue", quote.toFixed(2));
-      val("ci-ry", (rate*(o.prefStated || 100)/quote).toFixed(2));
+      val("ci-ry", (rate*(o.prefStated || 100)/quote).toFixed(4));   // to 2 places STRC opened at $99.34, not its $99.36
     } else {
       // STRC ATM is paused (trading below par), so MSTR preferred defaults to $0;
       // ASST keeps its rolling 3-month SATA pace
