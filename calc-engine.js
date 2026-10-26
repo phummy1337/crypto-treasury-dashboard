@@ -56,7 +56,8 @@ function simulate(s, cfg){
   for(let m=1;m<=cfg.months;m++){
     const b  = pathPrice(s.spot, cfg, m);
     const mn = mn0 + (cfg.endMnav - mn0)*m/cfg.months;
-    if(broke){                                                         // structure is gone;
+    if(broke && broke.exhausted){                                      // the treasury is sold out:
+      broke.months++;                                                  // nothing left to recover with
       idxStock.push(0); idxAsset.push(b/s.spot*100); labels.push(String(m)); continue;
     }
     hold *= 1 + cfg.stake/1200;                                        // staking accrues in units (SOL)
@@ -99,13 +100,18 @@ function simulate(s, cfg){
       if(viaEq>0){ p = priceAt(hold,b,pref,buf,sharesM,mn); sharesM += viaEq/p; }
     }
     p = priceAt(hold,b,pref,buf,sharesM,mn);
-    // structural break: reserves gone, or senior claims have eaten them entirely
-    if(hold<=0 || (nav(hold,b) - claims(pref,buf,b))<=0){
-      broke = { month:m, px:Math.round(b*100)/100,
-                why: hold<=0 ? "the treasury is exhausted by sales to pay dividends and costs"
-                             : "senior claims exceed total reserves" };
+    // Underwater: senior claims have eaten the reserves, so the common is worth nothing
+    // this month. If the asset recovers, so can the common; a treasury sold to zero can't.
+    // broke keeps the first such month, how many there were, and whether the last is one.
+    const exhausted = hold<=0, under = exhausted || (nav(hold,b) - claims(pref,buf,b))<=0;
+    if(under){
+      broke = broke || { month:m, px:Math.round(b*100)/100, months:0 };
+      broke.months++; broke.exhausted = exhausted;
+      broke.why = exhausted ? "the treasury is exhausted by sales to pay dividends and costs"
+                            : "senior claims exceed total reserves";
       hold = Math.max(hold, 0); p = 0.01;
     }
+    if(broke) broke.atEnd = under;
     idxStock.push(p/s.px*100); idxAsset.push(b/s.spot*100); labels.push(String(m));
   }
   const cebeEnd = cebeShare(hold, cfg.target, pref, buf, sharesM);

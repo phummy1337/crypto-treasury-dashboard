@@ -2255,12 +2255,16 @@ function runCommon(out){
     `Starting today: $${fmt(s.px,2)} · ${unitsTxt(o, s.hold)} · ${u} ${pxTxt(s.spot)} · EV mNAV ${r?fmt(r.mnav0,2):"—"}x · Net ${r&&r.net0?fmt(r.net0,2):"—"}x`;
   if(!r){ out.innerHTML = `<div class="calc-decomp">${u} NAV is unavailable — model cannot run.</div>`; return; }
   const cls = r.stockX>=1 ? "pos":"neg";
-  out.innerHTML = `${ r.broke ? `
+  // underwater at the horizon wipes the common out; underwater only in a dip doesn't
+  const wiped = r.broke && r.broke.atEnd;
+  out.innerHTML = `${ wiped ? `
     <div class="calc-alert"><b>Structure breaks in month ${r.broke.month}</b> (${yrTxt(r.broke.month)}, ${u} ≈ ${pxTxt(r.broke.px)}) — ${r.broke.why}.
-      Common equity is wiped out before the horizon ends; the implied price below is a floor, not a forecast.</div>` : `` }
+      Common equity is wiped out before the horizon ends; the implied price below is a floor, not a forecast.</div>`
+    : r.broke ? `
+    <div class="calc-alert"><b>Underwater from month ${r.broke.month}</b> (${yrTxt(r.broke.month)}, ${u} ≈ ${pxTxt(r.broke.px)}) — senior claims exceed total reserves for ${r.broke.months} month${r.broke.months>1 ? "s" : ""}, and the common is worth nothing until ${u} recovers.</div>` : `` }
     <div class="calc-cell"><div class="k">Implied ${calcCo} Price</div>
-      <div class="v" style="color:${r.broke ? "#ff7a7a" : o.accent}">${r.broke ? "$0" : "$"+fmt(r.implied,2)}</div>
-      <div class="s">${r.broke ? "equity wiped out" : "in "+cfg.months+" months"}</div></div>
+      <div class="v" style="color:${wiped ? "#ff7a7a" : o.accent}">${wiped ? "$0" : "$"+fmt(r.implied,2)}</div>
+      <div class="s">${wiped ? "equity wiped out" : "in "+cfg.months+" months"}</div></div>
     <div class="calc-cell"><div class="k">Stock Return</div>
       <div class="v ${cls}">${fmt(r.stockX,2)}x</div>
       <div class="s">${sig((r.stockX-1)*100)}${fmt((r.stockX-1)*100,0)}%</div></div>

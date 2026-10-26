@@ -180,3 +180,18 @@ test("a convert due in a short month is repaid only as far as the money reaches"
   near(r.unpaid, 32, "unpaid");
   near(r.claims[12], 22, "the unpaid principal is still a claim");
 });
+
+test("a common underwater in a crash recovers with the asset; one still under at the end doesn't", () => {
+  // DFDV with a 40% crash bottoming in month 6: claims exceed the SOL held from month 4
+  // to month 9, then SOL climbs back to today's price and the common with it
+  const {s, cfg} = FIXTURES.DFDV;
+  const dip = simulate(s, {...cfg, crash:40, crashMo:6});
+  assert.equal(dip.broke.month, 4);
+  assert.equal(dip.broke.months, 6);
+  assert.equal(dip.broke.atEnd, false);
+  assert.ok(dip.implied > 1, `recovered to ${dip.implied}`);
+  // SOL ending at $30 never comes back above the claims
+  const down = simulate(s, {...cfg, target:30});
+  assert.equal(down.broke.atEnd, true);
+  near(down.implied, 0.01, "floor");
+});
