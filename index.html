@@ -2808,6 +2808,10 @@ function initCalc(){
       const link = parseCalcHash();
       if(link){
         if(link.co && link.co !== calcCo){ calcCo = link.co; setDefaults(); }
+        // A link without the crash inputs (one made before they existed) opens with no
+        // crash, as it does on a fresh load, not with the open scenario's.
+        ["ci-crash","ci-crashmo"].forEach(id => {
+          const el = document.getElementById(id); if(!(id in link.inputs)) el.value = el.defaultValue; });
         applyCalcHash(link);
         runCalc();
       }
