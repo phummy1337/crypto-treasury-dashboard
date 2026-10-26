@@ -2987,6 +2987,17 @@ def _dfdv_closes(co, data, steps, sol_hist):
     if not closes:
         return
     snap_et = datetime.datetime.now(ET)
+    # DFDV's quote is its latest trade, after-hours included, with the change on the
+    # previous close: on Sunday 2026-10-25 it read 3.78, +2.02% for Friday, whose close
+    # was 3.705, -1.33%. Stamp it against the settled sessions, as MSTR's and ASST's
+    # are, and outside a session take the last settled close and its own change.
+    settled = _settled_sessions([(d, c) for d, c, _v in closes], snap_et)
+    if co.get("stockPrice") and len(settled) >= 2:
+        quote = _quote_session(settled, co["stockPrice"], snap_et)
+        if not quote:                         # an after-hours print: the close is the quote
+            co["stockPrice"] = settled[-1][1]   # unrounded: Friday's 3.705 on 3.755 is -1.33%
+            quote = (settled[-1][0], settled[-2][1])
+        _stamp_price(co, co["stockPrice"], (co["stockPrice"] / quote[1] - 1) * 100, quote[0])
     sh = data.get("stockHistory") or {}
     if sh.get("iso"):
         out, last, j = [], None, 0
@@ -2996,7 +3007,7 @@ def _dfdv_closes(co, data, steps, sol_hist):
                 j += 1
             out.append(round(last, 2) if last is not None else None)
         sh["DFDV"] = out
-    beta = _beta(_settled_sessions([(d, c) for d, c, _v in closes], snap_et)[-253:], sol_hist)
+    beta = _beta(settled[-253:], sol_hist)
     if beta is not None:
         co["betaAsset"] = round(beta, 2)
     rv = _rvol([(d, c * v) for d, c, v in closes], snap_et)
