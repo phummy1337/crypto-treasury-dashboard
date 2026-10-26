@@ -2311,7 +2311,8 @@ function creditResult(){
   const ret = implied != null && s.quote ? (cfg.rate/100*s.stated*cfg.months/12 + implied - s.quote)/s.quote : null;
   // the next debt repaid after the horizon, so a short horizon can't hide a maturity just past it
   const next = s.tranches.filter(t => t.repay && t.repay > cfg.months).sort((a, b) => a.repay - b.repay)[0];
-  return { tk, o, u:assetUnit(o), cfg, s, r, be:breakEven(s, cfg), cover0, p1x, funded, covered, implied, ret, next };
+  const be = breakEven(s, cfg), be0 = cfg.prefMo > 0 ? breakEven(s, {...cfg, prefMo:0}) : be;   // be0: without the raise
+  return { tk, o, u:assetUnit(o), cfg, s, r, be, be0, cover0, p1x, funded, covered, implied, ret, next };
 }
 function runCredit(out){
   const c = creditResult(), {tk, o, u, cfg, s, r, be} = c;
@@ -2322,9 +2323,16 @@ function runCredit(out){
     ? `below the $${fmt(s.stated)} stated: $1 raised adds $${fmt(s.stated/cfg.issuePx,2)} of claim`
     : `last trade $${fmt(s.quote,2)} · stated $${fmt(s.stated)}`;
   const withCrash = cfg.crash > 0 && cfg.months > 1 ? `, with your ${fmt(cfg.crash)}% crash in month ${crashMonth(cfg)}` : ``;
-  const beTxt = be === 0 ? `cash${cfg.stake > 0 ? " and staking" : ""} alone cover every payment through month ${cfg.months}, whatever ${u} does`
-    : be == null ? `no ending ${u} price up to 20× today funds every payment through month ${cfg.months}${withCrash}`
-    : `every payment stays funded through month ${cfg.months} unless ${u} ends below <b>${pxTxt(be)}</b> (${pctFrom(be, s.spot)} from today)${withCrash}`;
+  // what a break-even says, given what pays when the treasury doesn't have to
+  const beSays = (v, payers) => v === 0 ? `${payers} cover every payment through month ${cfg.months}, whatever ${u} does`
+    : v == null ? `no ending ${u} price up to 20× today funds every payment through month ${cfg.months}${withCrash}`
+    : `every payment stays funded through month ${cfg.months} unless ${u} ends below <b>${pxTxt(v)}</b> (${pctFrom(v, s.spot)} from today)${withCrash}`;
+  const cashAlone = `cash${cfg.stake > 0 ? " and staking" : ""} alone`;
+  // a raise pays bills the cash and treasury would otherwise meet, and the model sells it
+  // in full at any price, so name it and give the break-even without it too
+  const beTxt = cfg.prefMo > 0
+    ? `with $${fmt(cfg.prefMo,1)}M of new ${tk} sold every month, ${beSays(be, `cash${cfg.stake > 0 ? ", staking" : ""} and the raise`)} — if the raise keeps selling. Without the raise, ${beSays(c.be0, cashAlone)}`
+    : beSays(be, cashAlone);
   out.innerHTML = `${ c.funded ? `` : `
     <div class="calc-alert"><b>Modeled funding gap from month ${r.firstGap}</b> (${yrTxt(r.firstGap)}, ${u} ≈ ${pxTxt(r.gapPx)}) — cash and the treasury run out before every payment is met: $${fmt(r.unpaid,1)}M unpaid by month ${cfg.months}${
       r.unpaidDebt > 0.05 ? `, $${fmt(r.unpaidDebt,1)}M of it debt that ranks ahead of ${tk}` : ``}.
@@ -2562,7 +2570,8 @@ function commonCardContent(cfg){
 // What the share card shows for a preferred: whether every payment is funded, the
 // break-even treasury price, coverage, and the assumptions behind them.
 function creditCardContent(){
-  const {tk, o, u, cfg, s, r, be, cover0, funded, implied} = creditResult();
+  const {tk, o, u, cfg, s, r, be, be0, cover0, funded, implied} = creditResult();
+  const bePx = v => v===0 ? "any price" : v==null ? "none" : pxTxt(v);
   return {
     // the headline stays short enough to clear the stat boxes; the detail goes beneath
     head:`${tk} → `, tail: funded ? "funded" : "gap",
@@ -2571,8 +2580,9 @@ function creditCardContent(){
           implied != null ? `implied $${fmt(implied,2)} at ${fmt(cfg.reqYield,2)}% yield`
             : funded ? `but not covered after debt by month ${cfg.months}` : ""].filter(Boolean),
     stats:[["PREFERRED COVERAGE", fmt(r.coverEnd,2)+"x", r.coverEnd!=null && r.coverEnd<1 ? "#ff7a7a" : "#34d399", "after debt · today "+fmt(cover0,2)+"x"],
-           ["BREAK-EVEN "+u, be===0 ? "any price" : be==null ? "none" : pxTxt(be), "#f5f6f7",
-            be ? pctFrom(be, s.spot)+" from today" : be===0 ? "cash covers the horizon" : "up to 20× today"]],
+           ["BREAK-EVEN "+u, bePx(be), "#f5f6f7",
+            cfg.prefMo>0 ? "with the raise · without: "+bePx(be0)
+              : be ? pctFrom(be, s.spot)+" from today" : be===0 ? "cash covers the horizon" : "up to 20× today"]],
     rows:[
       [u+" Price Target", pxTxt(cfg.target)+"  (now "+pxTxt(s.spot)+")"],
       ["Horizon", horizonTxt(cfg)],
