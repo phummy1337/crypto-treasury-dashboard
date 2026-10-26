@@ -807,7 +807,7 @@
         <label data-view="common"><span class="lblrow"><select id="ci-basis" class="basissel" title="Choose which multiple your ending target is expressed in">
             <option value="net">Ending Net mNAV (×)</option>
             <option value="ev">Ending EV mNAV (×)</option>
-          </select><span class="evhint" data-title="MSTR mNAV at prior bull peaks" data-rows="2021 cycle (Feb peak)~≈3.7×|2024 cycle (Nov peak)~≈3.4×">?</span></span><input type="number" id="ci-mnav" value="1.00" step="0.05" min="0.05"></label>
+          </select><span class="evhint" id="ci-mnav-hint" data-title="MSTR mNAV at prior bull peaks" data-rows="2021 cycle (Feb peak)~≈3.7×|2024 cycle (Nov peak)~≈3.4×">?</span></span><input type="number" id="ci-mnav" value="1.00" step="0.05" min="0.05"></label>
         <label data-asset="SOL" hidden>Staking Yield (% / yr)<input type="number" id="ci-stake" value="0" step="0.5" min="0" max="50">
           <span class="mixlbl">earned in SOL on the whole treasury</span></label>
         <label>Operating Costs ($M / yr)<input type="number" id="ci-opex" value="0" step="1" min="0">
@@ -2804,6 +2804,8 @@ function syncCalcInputs(){
   document.querySelectorAll(".calc-inputs [data-view]").forEach(el => el.hidden = el.dataset.view !== view);
   document.querySelectorAll(".calc-inputs [data-asset]").forEach(el => el.hidden = el.dataset.asset !== o.asset);
   document.querySelectorAll("[data-calcfoot]").forEach(el => el.hidden = el.dataset.calcfoot !== view);
+  // its bull-market peaks are MSTR's own; ASST and DFDV have no cycle of their own yet
+  document.getElementById("ci-mnav-hint").hidden = calcCo !== "MSTR";
   document.getElementById("ci-pref-name").textContent = issuedSeries(calcCo);
   document.getElementById("ci-rate-name").textContent = issuedSeries(calcCo);
   document.getElementById("ci-opex-lbl").textContent =
