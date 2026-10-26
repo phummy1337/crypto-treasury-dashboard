@@ -130,7 +130,7 @@ function simulate(s, cfg){
 function simulateCredit(s, cfg){
   let hold = s.hold, cash = s.cash, series = s.series;
   const live = s.tranches.map(t => ({...t}));
-  let unpaid = 0, firstGap = null, gapPx = null, cashOut = null, firstSale = null, sold = 0, soldUsd = 0, repaid = 0;
+  let unpaid = 0, unpaidDebt = 0, firstGap = null, gapPx = null, cashOut = null, firstSale = null, sold = 0, soldUsd = 0, repaid = 0;
   // treasury + cash, and debt + preferred, in $M at price P
   const mark = P => [hold*P/1e6 + cash,
     live.reduce((d, t) => d + (t.units ? t.units*P/1e6 : t.principal), 0) + s.otherNotional + series];
@@ -142,14 +142,16 @@ function simulateCredit(s, cfg){
       series += cfg.prefMo*s.stated/cfg.issuePx;                     // shares × stated amount
       hold += cfg.prefMo*1e6/P;                                      // proceeds buy the treasury asset
     }
-    let need = cfg.opex/12;
+    let interest = 0, principal = 0;
+    const due = [];
     for(let i = live.length - 1; i >= 0; i--){
       const t = live[i], value = t.units ? t.units*P/1e6 : t.principal;
-      need += value*t.coupon/1200;
-      if(t.repay === m){ need += value; repaid += value; live.splice(i, 1); }
+      interest += value*t.coupon/1200;
+      if(t.repay === m){ principal += value; due.push(t); }
       else if(t.convert === m) live.splice(i, 1);                    // in the money: becomes shares
     }
-    need += prefDivsMo(s, series, cfg.rate);
+    const junior = cfg.opex/12 + prefDivsMo(s, series, cfg.rate);   // costs and dividends
+    let need = interest + principal + junior;
     const fromCash = Math.min(cash, need); cash -= fromCash; need -= fromCash;
     if(need > 1e-9){
       if(cashOut == null) cashOut = m;
@@ -159,11 +161,24 @@ function simulateCredit(s, cfg){
         hold -= units; sold += units; soldUsd += units*P/1e6; need -= units*P/1e6;
       }
     }
-    if(need > 1e-6){ unpaid += need; if(firstGap == null){ firstGap = m; gapPx = P; } }
+    const short = need > 1e-6 ? need : 0;
+    if(short){ unpaid += short; if(firstGap == null){ firstGap = m; gapPx = P; } }
+    // Debt ranks first, so a shortfall falls on costs and dividends before it reaches
+    // the debt, and interest is met before principal. A convert is repaid only as far
+    // as the money reaches; what's left of it stays owed, and keeps its coupon.
+    const debtShort = Math.max(0, short - junior);
+    unpaidDebt += debtShort;
+    const principalPaid = Math.max(0, principal - debtShort);
+    repaid += principalPaid;
+    const left = principal > 0 ? 1 - principalPaid/principal : 0;
+    due.forEach(t => {
+      if(left > 1e-9){ t.principal *= left; t.units *= left; t.repay = null; }
+      else live.splice(live.indexOf(t), 1);
+    });
     const [a, c] = mark(P); assets.push(a); claims.push(c); labels.push(String(m));
   }
   const [aEnd, cEnd] = mark(cfg.target), prefEnd = s.otherNotional + series;
-  return { unpaid, firstGap, gapPx, cashOut, firstSale, sold, soldUsd, repaid, endSeries:series,
+  return { unpaid, unpaidDebt, firstGap, gapPx, cashOut, firstSale, sold, soldUsd, repaid, endSeries:series,
            coverEnd: prefEnd > 0 ? (aEnd - (cEnd - prefEnd))/prefEnd : null,
            assets, claims, labels };
 }

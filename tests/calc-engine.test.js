@@ -166,3 +166,17 @@ test("with a crash, the break-even is higher and still separates funded from a g
   assert.ok(simulateCredit(s, {...crash, target:be*1.001}).unpaid <= 1e-6, "funded just above");
   assert.ok(simulateCredit(s, {...crash, target:be*0.999}).unpaid > 1e-6, "a gap just below");
 });
+
+test("a convert due in a short month is repaid only as far as the money reaches", () => {
+  // $1M of costs a month against 300,000 coin at $100. Months 1-2 sell 20,000 coin; in
+  // month 3 the $50M convert and $1M of costs meet the last $28M. Debt ranks first, so
+  // the costs go unpaid before the debt: $28M of principal is repaid and $22M stays owed.
+  // Months 4-12 leave $9M more of costs unpaid.
+  const convert = {note:"Convert", principal:50, coupon:0, units:0, repay:3, convert:null};
+  const r = simulateCredit(tiny({hold:300000, tranches:[convert]}), flat({opex:12}));
+  assert.equal(r.firstGap, 3);
+  near(r.repaid, 28, "repaid");
+  near(r.unpaidDebt, 22, "debt unpaid");
+  near(r.unpaid, 32, "unpaid");
+  near(r.claims[12], 22, "the unpaid principal is still a claim");
+});

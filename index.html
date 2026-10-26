@@ -2322,8 +2322,9 @@ function runCredit(out){
     : be == null ? `no ending ${u} price up to 20× today funds every payment through month ${cfg.months}${withCrash}`
     : `every payment stays funded through month ${cfg.months} unless ${u} ends below <b>${pxTxt(be)}</b> (${pctFrom(be, s.spot)} from today)${withCrash}`;
   out.innerHTML = `${ c.funded ? `` : `
-    <div class="calc-alert"><b>Modeled funding gap from month ${r.firstGap}</b> (${yrTxt(r.firstGap)}, ${u} ≈ ${pxTxt(r.gapPx)}) — cash and the treasury run out before every payment is met: $${fmt(r.unpaid,1)}M unpaid by month ${cfg.months}.
-      A model, not a legal default: the company could still raise money, and unpaid ${tk} dividends accrue.</div>` }
+    <div class="calc-alert"><b>Modeled funding gap from month ${r.firstGap}</b> (${yrTxt(r.firstGap)}, ${u} ≈ ${pxTxt(r.gapPx)}) — cash and the treasury run out before every payment is met: $${fmt(r.unpaid,1)}M unpaid by month ${cfg.months}${
+      r.unpaidDebt > 0.05 ? `, $${fmt(r.unpaidDebt,1)}M of it debt that ranks ahead of ${tk}` : ``}.
+      A model, not a legal default: the company could still raise money${r.unpaidDebt > 0.05 ? " or refinance" : ""}, and unpaid ${tk} dividends accrue.</div>` }
     <div class="calc-cell"><div class="k">Payments</div>
       <div class="v ${c.funded ? "pos" : "neg"}">${c.funded ? "Funded" : "Gap · mo "+r.firstGap}</div>
       <div class="s">${c.funded ? "every payment through month "+cfg.months : "$"+fmt(r.unpaid,1)+"M unpaid"}</div></div>
