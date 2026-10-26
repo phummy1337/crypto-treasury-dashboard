@@ -1450,7 +1450,7 @@ def _asst_actions(text):
                 f"{issued - ex:,} ATM/other)")
         else:
             items.append(f"Issued {issued:,} Class A shares (ATM)")
-    pm = re.search(r"SATA Stock[^0-9]{0,60}([\d,]{6,})\s*([\d,]{6,})\s*([\d,]+)", text)
+    pm = re.search(_SATA_ROW + r"[^0-9]{0,60}([\d,]{6,})\s*([\d,]{6,})\s*([\d,]+)", text)
     if pm and int(pm.group(3).replace(",", "")) > 1000:
         items.append(f"Issued {pm.group(3)} SATA preferred shares")
     rm = re.search(r"dividend rate[^.]{0,200}?from ([\d.]+)% to ([\d.]+)%", text)
@@ -1488,6 +1488,9 @@ def _asst_snapshot(text):
 
 
 _SATA = {}
+# The SATA row of Strive's weekly table, with the footnote marker a filing can add: Oct 19
+# 2026 wrote "SATA Stock (6) 14,030,176 14,030,176", and every reader of the row missed it
+_SATA_ROW = r"SATA Stock(?:\s*\(\d+\))?"
 
 
 def _asst_sata_counts(text):
@@ -1500,7 +1503,7 @@ def _asst_sata_counts(text):
     """
     out = []
     per = re.search(r"As of ([A-Z][a-z]+ \d{1,2}, \d{4}) As of ([A-Z][a-z]+ \d{1,2}, \d{4})", text)
-    m = re.search(r"SATA Stock ([\d,]+) ([\d,]+)", text)
+    m = re.search(_SATA_ROW + r" ([\d,]+) ([\d,]+)", text)
     if per and m:
         for d, v in zip(per.groups(), m.groups()):
             try:
@@ -2503,12 +2506,12 @@ _MSTR_STRC_CAPACITY_ONLY = re.compile(r"STRC Stock(?:\s*\(\d\))?\s+\$\s*([\d,.]+
 # back to the week before. Strategy's heading has read four ways since Aug 2025 ("ATM
 # Update", "ATM Updates", "ATM and BTC Update", "... for the Period"), so its second mark
 # is the "During Period" line every weekly table carries; Strive's are the table's header
-# pair and its SATA row ("SATA Stock (1) ...", "As of Sept. 4" would each slip one). In
+# pair and its SATA row, footnoted or not (_SATA_ROW; "As of Sept. 4" would slip the first). In
 # the 80 newest 8-Ks of either company, none fires on a filing that isn't an ATM report.
 _MSTR_ATM_SECTION = re.compile(r"ATM (?:and BTC )?Updates?|did not sell any shares under"
                                r"|During Period [A-Z][a-z]+ \d{1,2}, \d{4} to")
 _ASST_ATM_SECTION = re.compile(r"As of [A-Z][a-z]+ \d{1,2}, \d{4} As of [A-Z][a-z]+ \d{1,2}, \d{4}"
-                               r"|SATA Stock\s+[\d,]{6,}")
+                               r"|" + _SATA_ROW + r"\s+[\d,]{6,}")
 
 
 def _mstr_strc_atm(text):
@@ -2546,7 +2549,7 @@ def _asst_sata_atm(text):
     Proceeds are the share-count change x $100 par; the filing states no dollars.
     """
     per = re.search(r"As of ([A-Z][a-z]+ \d+, \d{4}) As of ([A-Z][a-z]+ \d+, \d{4})", text)
-    m = re.search(r"SATA Stock ([\d,]+) ([\d,]+)", text)
+    m = re.search(_SATA_ROW + r" ([\d,]+) ([\d,]+)", text)
     if not (per and m):
         return []
     a, b = (int(x.replace(",", "")) for x in m.groups())
