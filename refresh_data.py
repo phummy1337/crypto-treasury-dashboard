@@ -3260,6 +3260,15 @@ def record_filing_watermark(data):
             r = _edgar_json(f"https://data.sec.gov/submissions/CIK{cik}.json")["filings"]["recent"]
             newest = max((r["filingDate"][i] for i in range(len(r["form"]))
                           if r["form"][i] == "8-K"), default=None)
+            # Nothing here reads an amendment: they're rare (Strategy's one, 2026-07-31,
+            # replaced an earnings exhibit), and parsing them would mean deciding, reader by
+            # reader, which filing stands. Name a recent one so a restatement gets checked.
+            since = (datetime.date.today() - datetime.timedelta(days=14)).isoformat()
+            for i in range(len(r["form"])):
+                if r["form"][i] == "8-K/A" and r["filingDate"][i] >= since:
+                    log(f"[drift] {tk} filed an 8-K/A on {r['filingDate'][i]}, amending its "
+                        f"{r['reportDate'][i]} report — amendments aren't read; check whether "
+                        f"it restates a figure")
         except Exception as e:
             log(f"[skip] filing watermark {tk}: {e}")
         acted = max((a["filed"] for a in (data.get("actions") or [])
