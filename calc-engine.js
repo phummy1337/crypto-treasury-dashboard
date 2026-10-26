@@ -89,7 +89,8 @@ function simulate(s, cfg){
     parked += pc;
     raised += cfg.prefMo + commonMo; raisedMnWt += (cfg.prefMo + commonMo)*mn;
     // payment waterfall: today's cash -> runway cash -> common issuance (only while
-    // the ATM is open) -> forced sales of the treasury for whatever is left. The mix
+    // the ATM is open, and only for a bill smaller than the company's market value)
+    // -> forced sales of the treasury for whatever is left. The mix
     // slider is a preference, not a guarantee: below the floor, selling coin is the only door.
     let div = divMo + costMo;
     const fc = Math.min(div, cash); cash -= fc; div -= fc;
@@ -98,7 +99,14 @@ function simulate(s, cfg){
       let viaAsset = div*cfg.fundMix, viaEq = div - viaAsset;
       if(!atmOpen && viaEq>0){ forcedDiv += viaEq; viaAsset += viaEq; viaEq = 0; }
       if(viaAsset>0){ hold -= viaAsset*1e6/b; assetSold += viaAsset; }
-      if(viaEq>0){ p = priceAt(hold,b,pref,buf,sharesM,mn); sharesM += viaEq/p; }
+      if(viaEq>0){
+        // Stock sold to pay a bill is priced after its own dilution, so existing holders
+        // bear exactly the bill: raising X on a market cap M issues X*S/(M - X) shares. A
+        // bill the whole company isn't worth can't be paid in stock, so the treasury pays.
+        const mcap = priceAt(hold,b,pref,buf,sharesM,mn)*sharesM;
+        if(viaEq < mcap) sharesM += viaEq*sharesM/(mcap - viaEq);
+        else { forcedDiv += viaEq; hold -= viaEq*1e6/b; assetSold += viaEq; }
+      }
     }
     p = priceAt(hold,b,pref,buf,sharesM,mn);
     // Underwater: senior claims have eaten the reserves, so the common is worth nothing

@@ -25,7 +25,7 @@ const FIXTURES = {
     s: {px:3.78, sharesM:32.62, pref:15.81, spot:101.4, hold:2590266, cash:9.98, owed:562000, debtUsd:149.0532, intUsd:7.5087, intUnits:33725,
         otherNotional:0, otherDivs:0},
     cfg: {target:101.4, months:12, prefMo:0, commonMo:0, rate:13, fundMix:0, endMnav:2.45, runway:0, basis:"net", atmFloor:1, stake:5.07, opex:17},
-    golden: {implied:3.4794605581110587, endHold:2724687.5748565323, endSharesM:38.32825002448313, assetSold:0, pausedMo:0, broke:null},
+    golden: {implied:3.467920781773927, endHold:2724687.5748565323, endSharesM:38.45579025983129, assetSold:0, pausedMo:0, broke:null},
   },
   STRC: {
     s: {spot:80472, hold:848517, cash:5281, owed:0, debtUsd:6714, intUsd:34.5953, intUnits:0, stated:100, quote:99.36,
@@ -210,6 +210,25 @@ test("with the ATM shut below its floor, costs are paid by selling the treasury"
   near(shut.assetSold, 12, "sold");
   near(shut.forcedDiv, 12, "all of it forced");
   near(shut.endSharesM, 10, "no shares issued");
+});
+
+test("stock sold to pay a bill costs existing holders exactly the bill", () => {
+  // $12M of costs in the month, at 1.5x net NAV of $80M: the company is worth $120M, so
+  // the sale issues 12 x 10 / (120 - 12) shares and leaves the old 10M worth $108M
+  const r = simulate(tinyCo(), flatCo({opex:144}));
+  near(r.endSharesM, 10 + 12*10/108, "shares");
+  near(r.implied*10, 120 - 12, "the old holders' stake");
+  near(r.assetSold, 0, "nothing sold");
+});
+
+test("a bill bigger than the company's market value is paid by selling the treasury", () => {
+  // DFDV with a 22% crash bottoming in month 6: that month's $2.44M of bills is more than
+  // the whole company is worth, so SOL pays them though the ATM stays open
+  const {s, cfg} = FIXTURES.DFDV;
+  const r = simulate(s, {...cfg, crash:22, crashMo:6});
+  near(r.pausedMo, 0, "the ATM never shut");
+  assert.ok(r.forcedDiv > 2.4 && r.forcedDiv < 2.5, `forced ${r.forcedDiv}`);
+  assert.ok(r.implied > 2.3, `recovered to ${r.implied}`);
 });
 
 test("SOL owed is marked at each month's SOL price, not today's", () => {
