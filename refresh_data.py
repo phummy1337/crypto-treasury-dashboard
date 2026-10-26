@@ -2898,7 +2898,12 @@ def _dfdv_holdings(co, data):
     h = _dfdv("history", timeout=40) or []
     held = sorted((r["date"], int(r["total_sol_holdings"])) for r in h
                   if _iso(r.get("date")) and r.get("total_sol_holdings"))
-    sol_hist = sorted((r["date"], float(r["sol_price"])) for r in h
+    # A row's sol_price is CoinGecko's 00:00 UTC print on its date: 8pm ET the evening
+    # before (it matched exactly on 2026-10-18, -20 and -23). File each under that ET
+    # evening, four hours after its session's close, so beta pairs a close with SOL that
+    # night rather than twenty hours earlier, which read beta 0.32 against about 1.3.
+    day_before = lambda iso: (datetime.date.fromisoformat(iso) - datetime.timedelta(days=1)).isoformat()
+    sol_hist = sorted((day_before(r["date"]), float(r["sol_price"])) for r in h
                       if _iso(r.get("date")) and r.get("sol_price"))
     if not held:
         return sol_hist
