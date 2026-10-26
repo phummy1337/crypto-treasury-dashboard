@@ -2858,18 +2858,36 @@ def _dfdv_chad(co):
     if q and q.get("price"):
         co["prefPrice"] = round(float(q["price"]), 2)
         co["prefChangePct"] = round(float(q.get("price_change_percent") or 0), 2)
-    ch = _dfdv("chad/history", timeout=40, tries=3)
-    rows = sorted(((r["date"], float(r["close"]), float(r.get("volume") or 0))
-                   for r in ch or [] if _iso(r.get("date")) and r.get("close")))
+    # Daily closes and volume come from Nasdaq, as DFDV's do. DFDV's chad/history is
+    # not the consolidated tape: it gave 2,364 shares for 2026-10-23 against 33,422 in
+    # its own chad/quote and on Nasdaq, and a "close" that was the day's low. Divided
+    # into FINRA's short interest, its volume read 6.3 days to cover, not about 0.3.
+    # If Nasdaq fails, its prices still draw the chart, without the volume.
+    snap_et = datetime.datetime.now(ET)
+    rows = _nasdaq_closes("CHAD")
+    if not rows:
+        ch = _dfdv("chad/history", timeout=40, tries=3)
+        rows = sorted((r["date"], float(r["close"]), None)
+                      for r in ch or [] if _iso(r.get("date")) and r.get("close"))
     if rows:
         co["prefHistory"] = {"dates": [_iso_lbl(d, "%b %-d") for d, _c, _v in rows],
                              "iso": [d for d, _c, _v in rows],
                              "px": [round(c, 2) for _d, c, _v in rows],
                              "notional": [_step(steps, d) for d, _c, _v in rows]}
+    if rows and rows[-1][2] is not None:
         _VOL_HIST["CHAD"] = [(d, v) for d, _c, v in rows]
-        rv = _rvol([(d, v * c) for d, c, v in rows], datetime.datetime.now(ET))
+        rv = _rvol([(d, v * c) for d, c, v in rows], snap_et)
         if rv:
             co["prefRvol"] = rv
+        # Once the session is over chad/quote rolls previous_close to the close, so its
+        # change reads 0.00 all evening and weekend; base it on the settled sessions.
+        settled = _settled_sessions([(d, c) for d, c, _v in rows], snap_et)
+        if co.get("prefPrice") and len(settled) >= 2:
+            quote = _quote_session(settled, co["prefPrice"], snap_et)
+            if not quote:                     # an after-hours print: the close is the quote
+                co["prefPrice"] = settled[-1][1]
+                quote = (settled[-1][0], settled[-2][1])
+            co["prefChangePct"] = round((co["prefPrice"] / quote[1] - 1) * 100, 2)
     return steps
 
 
