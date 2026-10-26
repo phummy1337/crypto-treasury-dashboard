@@ -541,6 +541,11 @@ def fetch_strategytracker(data):
             kpi = _strategy_pref_notional() if tk == "MSTR" else {}
             for p in ps:
                 t = p["ticker"]
+                # the ticker lands in the "Preferred by Series" hover as HTML (index.html's
+                # tipHTML, which escaping can't protect), so it has to be a plain ticker
+                if not re.fullmatch(r"[A-Z]{2,6}", str(t or "")):
+                    log(f"[skip] {tk} preferred with ticker {str(t)[:20]!r}: not a ticker")
+                    continue
                 notM = p.get("notionalMillions") or round((p.get("notionalUSD") or 0) / 1e6)
                 if t in kpi:
                     # Strategy's own figure, which readers reconcile this page against.

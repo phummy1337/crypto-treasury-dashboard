@@ -994,7 +994,9 @@ const holdingsHtml = o => o.asset === "SOL" ? fmt(o.holdings)+" <span class='uni
 const perShareHtml = (o, units) => units==null || !isFinite(units) ? null
   : o.asset === "SOL" ? fmt(units,4)+" <span class='unit'>SOL</span>"
   : fmt(Math.round(units*1e8))+" <span class='unit'>sats</span>";
-// for text that lands in innerHTML from a third-party feed
+// for text that lands in innerHTML from a third-party feed. Not for a hover's data-rows
+// or data-title: the browser decodes the attribute and tipHTML inserts it as HTML, so
+// esc() there protects nothing. Text bound for a hover is checked in refresh_data.py.
 const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
 
 // mNAV = EV / crypto reserve.  EV = (price × basic shares) + debt + preferred notional − USD reserve(cash)
