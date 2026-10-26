@@ -914,6 +914,11 @@ def _edgar_json(url):
 _WEEKLY_MARKERS = ("Aggregate BTC Holdings", "bitcoin at an average price",
                    "aggregate purchase price", "Bitcoin held")
 _DOC_FOR = {}
+# Filings whose weekly tables may sit in an exhibit this run couldn't list or fetch.
+# _filing_doc hands back the cover page for them, and reading that isn't reading the
+# filing: counted as read, a failed exhibit GET would mark the 8-K ingested, clear the
+# page's notice and let the workflow's gate skip the retries.
+_DOC_PARTIAL = set()
 
 
 def _filing_doc(base, primary, markers=_WEEKLY_MARKERS):
@@ -926,6 +931,7 @@ def _filing_doc(base, primary, markers=_WEEKLY_MARKERS):
     try:
         txt = _edgar_text(url)
     except Exception:
+        _DOC_PARTIAL.add(url)                 # its exhibits went unchecked
         return url
     low = txt.lower()
     if any(m.lower() in low for m in markers):
@@ -937,6 +943,7 @@ def _filing_doc(base, primary, markers=_WEEKLY_MARKERS):
     try:                                      # Archives rejects get_json's UA
         items = _edgar_json(base + "index.json")["directory"]["item"]
     except Exception:
+        _DOC_PARTIAL.add(url)
         return url
     for n in [it["name"] for it in items
               if re.search(r"ex-?99", it["name"], re.I)
@@ -944,9 +951,11 @@ def _filing_doc(base, primary, markers=_WEEKLY_MARKERS):
         try:
             t = _edgar_text(base + n)
         except Exception:
+            _DOC_PARTIAL.add(url)
             continue
         if any(m.lower() in t.lower() for m in markers):
             _DOC_FOR[url] = base + n
+            _DOC_PARTIAL.discard(url)
             break
     return _DOC_FOR[url]
 
@@ -1623,7 +1632,8 @@ def fetch_holdings(data, max_points=60):
                 t8 = ""
                 try:
                     t8 = _edgar_text(url)
-                    _READ_8K[tk] = max(_READ_8K.get(tk, ""), filed)
+                    if url not in _DOC_PARTIAL:       # a cover page whose exhibit failed isn't read
+                        _READ_8K[tk] = max(_READ_8K.get(tk, ""), filed)
                     # newest period first, as EDGAR lists filings; one unless a quarter
                     # end split the week (see _period_texts)
                     periods = [(t, _parse_mstr(t)) for t in reversed(_period_texts(t8))]
@@ -1737,7 +1747,8 @@ def fetch_holdings(data, max_points=60):
             for url, base, _filed in docs():
                 try:
                     t8 = _edgar_text(url)
-                    _READ_8K[tk] = max(_READ_8K.get(tk, ""), _filed)
+                    if url not in _DOC_PARTIAL:       # a cover page whose exhibit failed isn't read
+                        _READ_8K[tk] = max(_READ_8K.get(tk, ""), _filed)
                     obs_dates = []
                     for d, h in _asst_obs(t8):
                         allobs[d] = h
