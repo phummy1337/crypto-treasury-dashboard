@@ -1475,6 +1475,27 @@ _ASST_PROSE_PERIOD = re.compile(
     r"\s+(?:through|to)\s+([A-Z][a-z]+ \d{1,2}, \d{4})", re.I)
 _ASST_PROSE_BTC = re.compile(
     r"purchased ([\d,]+) bitcoin at an average price", re.I)
+# Capital-structure events arrive in their own 8-K with no position table and no
+# purchase, so neither the weekly parser nor the prose-purchase path sees them.
+# A $1B ATM authorised over a $700M series is exactly what this log exists for.
+_ASST_ATM_SIZE = re.compile(r"aggregate sales price of up to \$\s?([\d,]+)", re.I)
+_ASST_ATM_COMM = re.compile(r"commission of up to ([\d.]+)\s*%", re.I)
+
+
+def _asst_capital_events(text):
+    """Programme-level actions from a Strive 8-K that reports no week."""
+    if "Sales Agreement" not in text or "Item 1.01" not in text:
+        return []
+    m = _ASST_ATM_SIZE.search(text)
+    if not m:
+        return []
+    amt = int(m.group(1).replace(",", "")) / 1e6
+    pre = text[max(0, m.start() - 800):m.start()]      # which series it covers
+    sec = ("SATS" if "SATS Stock" in pre else "SATA" if "SATA Stock" in pre else
+           "Class A" if "Class A" in pre else "equity")
+    c = _ASST_ATM_COMM.search(text)
+    return [f"Established ${amt:,.0f}M {sec} ATM"
+            + (f" ({c.group(1)}% commission)" if c else "")]
 # "273,493,909 traditional warrants to purchase 13,674,703 shares of Class A common
 # stock were exercised for expected gross proceeds of $369.2 million". The weekly
 # table cannot source this: in the week the programme closes it reports only the
@@ -1702,7 +1723,7 @@ def fetch_holdings(data, max_points=60):
             cutoff92 = datetime.date.today() - datetime.timedelta(days=92)
             _sh = data.get("stockHistory") or {}
             pxmap = dict(zip(_sh.get("dates") or [], _sh.get("ASST") or []))
-            prose_buys, prose_ex = [], []
+            prose_buys, prose_ex, cap_evts = [], [], []
             for url, base, _filed in docs():
                 try:
                     t8 = _edgar_text(url)
@@ -1739,6 +1760,10 @@ def fetch_holdings(data, max_points=60):
                     # Monday table. Hold it and resolve it once allobs is built;
                     # the scan runs newest-first, so the level it builds on has
                     # not been read yet.
+                    ce = _asst_capital_events(t8)
+                    if ce:
+                        cap_evts.append({"d": _filed, "co": "ASST", "items": ce,
+                                         "filed": _filed, "url": url})
                     if ai and not obs_dates and not sn:
                         per = _ASST_PROSE_PERIOD.search(t8)
                         nb = _ASST_PROSE_BTC.search(t8)
@@ -1830,6 +1855,17 @@ def fetch_holdings(data, max_points=60):
                         + (f" · {rest:,} ATM/other)" if rest else ")"))
                     log(f"[ASST] week to {tgt['d']}: {pe['shares']:,} of {tot:,} Class A "
                         f"shares were warrant exercises, not ATM")
+
+            # Programme announcements get their own entry, dated to the day they
+            # were made rather than to a week they do not cover. If a weekly entry
+            # already sits on that date, add to it rather than replacing it.
+            for ev in cap_evts:
+                same = next((a for a in acts if a["co"] == "ASST" and a["d"] == ev["d"]), None)
+                if same:
+                    same["items"] = same["items"] + [i for i in ev["items"] if i not in same["items"]]
+                else:
+                    acts.append(ev)
+                log(f"[ASST] capital event {ev['d']}: {'; '.join(ev['items'])}")
 
             # Fold in purchases that only a prose 8-K reported. Carry the last
             # filed level forward by the stated amount, but only when that level

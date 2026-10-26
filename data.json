@@ -1,7 +1,7 @@
 {
   "asOf": "2026-10-26",
   "priceAsOf": "2026-10-26",
-  "btcPriceUsd": 80085,
+  "btcPriceUsd": 80066,
   "btcSupply": 21000000,
   "btcCirculating": 20103596,
   "companies": {
@@ -136,7 +136,7 @@
       "capStructAsOf": "2026-03-31 (10-Q)",
       "dilutedShares": 451.93,
       "marketCapBasic": 29540,
-      "navPremiumBasic": 0.906,
+      "navPremiumBasic": 0.908,
       "treasuryDate": "2026-10-19",
       "bpsHistory": {
         "dates": [
@@ -3404,7 +3404,7 @@
           1.12,
           1.125,
           1.135,
-          1.13
+          1.132
         ],
         "net": [
           1.621,
@@ -3797,7 +3797,7 @@
           1.166,
           1.172,
           1.185,
-          1.178
+          1.181
         ]
       },
       "strcNotionalSteps": [
@@ -4381,12 +4381,12 @@
       },
       "assumedDilutedShares": 451.93,
       "_dilOverlayM": 29.5801,
-      "netSatsPerShare": 155104,
+      "netSatsPerShare": 155157,
       "netMnavPub": 1.1549,
-      "amplificationPub": 1.2832,
-      "breakevenArrPub": 2.2225,
+      "amplificationPub": 1.2828,
+      "breakevenArrPub": 2.2198,
       "hurdleArrPub": 10.5572,
-      "floorArrPub": -17.2964,
+      "floorArrPub": -17.3142,
       "creditDurationPub": 6.1767,
       "netDilutedShares": 426.32,
       "atm": {
@@ -4747,7 +4747,7 @@
         "latestOnEdgar": "2026-10-26",
         "ingested": "2026-10-26"
       },
-      "netLeveragePub": 2.4138,
+      "netLeveragePub": 2.4109,
       "costBasisFiledM": 64020,
       "rvol": {
         "mult": 0.83,
@@ -4818,7 +4818,7 @@
       "capStructAsOf": "2026-06-18 (8-K)",
       "dilutedShares": 130.04,
       "marketCapBasic": 925,
-      "navPremiumBasic": 1.07,
+      "navPremiumBasic": 1.071,
       "treasuryDate": "2026-10-23",
       "bpsHistory": {
         "dates": [
@@ -7022,7 +7022,7 @@
           1.301,
           1.306,
           1.318,
-          1.316
+          1.318
         ],
         "net": [
           1.288,
@@ -7323,7 +7323,7 @@
           1.428,
           1.435,
           1.452,
-          1.449
+          1.452
         ]
       },
       "cashUsd": 504.4,
@@ -7728,7 +7728,7 @@
       },
       "_dilOverlayM": 2.7163,
       "assumedDilutedShares": 130.05,
-      "netSatsPerShare": 18201,
+      "netSatsPerShare": 18198,
       "netDilutedShares": 130.05,
       "atm": {
         "ticker": "SATA",
@@ -10211,6 +10211,15 @@
   "dataSource": "strategytracker.com (live) + SEC EDGAR (debt/preferred)",
   "actions": [
     {
+      "d": "2026-10-26",
+      "co": "ASST",
+      "items": [
+        "Established $1,000M SATS ATM (2.0% commission)"
+      ],
+      "filed": "2026-10-26",
+      "url": "https://www.sec.gov/Archives/edgar/data/1920406/000095010326016138/dp255514_8k.htm"
+    },
+    {
       "d": "2026-10-25",
       "co": "MSTR",
       "items": [
@@ -11130,6 +11139,15 @@
       ],
       "filed": "2025-12-15",
       "url": "https://www.sec.gov/Archives/edgar/data/1050446/000119312525318468/mstr-20251117.htm"
+    },
+    {
+      "d": "2025-12-09",
+      "co": "ASST",
+      "items": [
+        "Established $500M SATA ATM (3.0% commission)"
+      ],
+      "filed": "2025-12-09",
+      "url": "https://www.sec.gov/Archives/edgar/data/1920406/000114036125045044/ef20060773_8k.htm"
     },
     {
       "d": "2025-12-07",
