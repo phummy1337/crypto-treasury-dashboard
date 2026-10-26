@@ -575,14 +575,9 @@ def fetch_strategytracker(data):
                     chg = sorted((e for e in (p.get("history") or [])
                                   if e.get("effective_date") and e.get("notional_millions") is not None),
                                  key=lambda x: x["effective_date"])
-                    if t == "STRC":     # splice in the SEC-filing backfill before the tracker log starts
-                        first = chg[0]["effective_date"] if chg else "9999-99-99"
-                        steps = [x for x in STRC_BACKFILL if x[0] < first] + [
-                            (e["effective_date"], e["notional_millions"]) for e in chg]
-                        # and end on Strategy's figure: the tracker's log runs a filing or
-                        # two behind, and missed two buyback weeks in Oct 2026 ($387M)
-                        chg = [{"effective_date": d, "notional_millions": n}
-                               for d, n in _end_at(steps, kpi.get("STRC"))]
+                    if t == "STRC":     # the filed weeks, not the tracker's lagging log
+                        chg = [{"effective_date": d, "notional_millions": n} for d, n in _strc_steps(
+                            [(e["effective_date"], e["notional_millions"]) for e in chg])]
                         co["strcNotionalSteps"] = [[e["effective_date"], e["notional_millions"]] for e in chg]
                     if t == "SATA" and _SATA.get("steps"):
                         # same stall as the scalar: the tracker's change log ends at
@@ -703,10 +698,11 @@ def fetch_strategytracker(data):
             start = MNAV_START[tk]
             today = datetime.date.today().isoformat()
             if tk == "MSTR":
-                # STRC: SEC backfill + tracker change log; other series: 8-K step
-                # constants, extended live (append a step whenever the tracker's
-                # current notional moves off the last known step; persisted in data.json).
-                # Each ends on strategy.com's current figure, as the valuation tiles do.
+                # STRC: the SEC backfill and the weeks filed since (_strc_steps); other
+                # series: 8-K step constants, extended live (append a step whenever the
+                # tracker's current notional moves off the last known step; persisted in
+                # data.json). Each ends on strategy.com's current figure, as the valuation
+                # tiles do.
                 live = co.get("histStepsLive") or {}
                 series = {}
                 kpi = _strategy_pref_notional()
@@ -716,8 +712,7 @@ def fetch_strategytracker(data):
                                  for e in (p.get("history") or [])
                                  if e.get("effective_date") and e.get("notional_millions") is not None))
                     if t == "STRC":
-                        first = lg[0][0] if lg else "9999-99-99"
-                        series[t] = _end_at([x for x in STRC_BACKFILL if x[0] < first] + lg, kpi.get(t))
+                        series[t] = _strc_steps(lg)
                         continue
                     cur = p.get("notionalMillions") or (p.get("notionalUSD") or 0) / 1e6
                     # one step per date, the later source winning (as for cash and debt
@@ -1336,6 +1331,34 @@ def _convert_retirement(text):
     return f"{verb} ~${v:,.0f}M principal of {m.group(3) or m.group(4)} convertible notes"
 
 
+# The share repurchase programs' table (Jun-2026 framework). Like the ATM table it has a
+# "During Period" block per period, two across a quarter end, with rows that read
+# "<SER> Stock (1) <shares> $ <amount>" and dashes for a series nothing was bought of.
+_MSTR_REPURCHASE = re.compile(r"Repurchase Program Update(.*?)(?:BTC Update|ATM Update|Item\s+7|$)", re.S)
+
+
+def _mstr_repurchases(text):
+    """[(from, to, {series: (shares, $M)})] for each period of an MSTR 8-K's Repurchase
+    Program Update table, oldest first, with the dates None where a table states no
+    period; [] when the filing has no such table. Dashed rows are left out."""
+    sec = _MSTR_REPURCHASE.search(text)
+    if not sec:
+        return []
+    body = sec.group(1)
+    marks = list(_MSTR_PERIOD.finditer(body))
+    blocks = [(m.groups(), body[m.end():marks[k + 1].start() if k + 1 < len(marks) else len(body)])
+              for k, m in enumerate(marks)] or [((None, None), body)]
+    out = []
+    for (start, end), block in blocks:
+        rows = {}
+        for s in ("STRC", "STRF", "STRK", "STRD", "MSTR"):
+            m = re.search(rf"{s} Stock\s*(?:\(\d\))?\s*([\d,]+)\s*\$\s*([\d,.]+)", block)
+            if m:
+                rows[s] = (int(m.group(1).replace(",", "")), float(m.group(2).replace(",", "")))
+        out.append((start and _pdate(start).isoformat(), end and _pdate(end).isoformat(), rows))
+    return out
+
+
 def _mstr_actions(text, rec, fl, whole_filing=True):
     """Readable weekly actions from an MSTR 8-K period. Only the newest period of a
     split filing (see _period_texts) carries the items that describe the filing as a
@@ -1366,13 +1389,9 @@ def _mstr_actions(text, rec, fl, whole_filing=True):
     if rm and "STRC" in text:
         items.append(f"{'Raised' if float(rm.group(2)) > float(rm.group(1)) else 'Cut'} STRC dividend rate "
                      f"{rm.group(1)}% → {rm.group(2)}%")
-    # share repurchase program (Jun-2026 framework): "<SEC> Stock (1) <shares> $<amt>"
-    rp = re.search(r"Repurchase Program Update(.*?)(?:BTC Update|ATM Update|Item\s+7|$)", text, re.S)
-    if rp:
-        for s in ("STRC", "STRF", "STRK", "STRD", "MSTR"):
-            m = re.search(rf"{s} Stock\s*(?:\(\d\))?\s*([\d,]+)\s*\$\s*([\d,.]+)", rp.group(1))
-            if m and int(m.group(1).replace(",", "")) > 0:
-                sh, amt = int(m.group(1).replace(",", "")), float(m.group(2).replace(",", ""))
+    for _start, _end, rows in _mstr_repurchases(text):
+        for s, (sh, amt) in rows.items():
+            if sh > 0:
                 items.append(f"Repurchased {sh:,} {s} shares (~${amt:,.0f}M)")
     # convertible note retirements (no dedicated table yet — prose disclosure)
     if (retired := _convert_retirement(text)):
@@ -1591,6 +1610,90 @@ def fetch_sata_notional(data):
         d, n = co["sataNotionalSteps"][-1]
         log(f"[SATA] notional from filings: ${n:,.1f}M ({n * 1e4:,.0f} sh as of {d}) "
             f"from {len(steps)} filed steps, {scanned} filings scanned")
+
+
+# STRC's filed weekly steps since STRC_BACKFILL, for _strc_steps
+_STRC = {}
+
+
+def fetch_strc_notional(data):
+    """STRC's notional at the end of every week Strategy has filed since STRC_BACKFILL.
+
+    The history took these from strategytracker's change log, which dates each change a
+    week or more late, folds some weeks into the next, and on 2026-10-26 still lacked
+    the Oct 5-18 buybacks ($387M). Each weekly 8-K states that week's STRC sales (the
+    ATM table) and, since the Jun-2026 framework, its STRC buybacks (the Repurchase
+    Program Update), so the level rolls forward from the backfill's last week at $100
+    stated a share, one step per period end it moves on. Rolled from 2026-03-02 it came
+    to within $0.2M of strategy.com's figure on 2026-10-26. The steps stop before the
+    first week no filing covers. Nothing persists: fetch_holdings reads the same 8-Ks
+    through _edgar_text's memo. Leaves _STRC empty, and the tracker's log in use, when
+    no week can be read.
+    """
+    if not data["companies"].get("MSTR"):
+        return
+    start, level = STRC_BACKFILL[-1]
+    try:
+        rec = _edgar_json(f"https://data.sec.gov/submissions/CIK{CIK['MSTR']}.json")["filings"]["recent"]
+    except Exception as e:
+        log(f"[skip] STRC notional from filings: {e} — using the tracker's change log")
+        return
+    sold, bought = {}, {}         # (from, to) -> STRC shares; newest filing first, so a later one stands
+    for i in range(len(rec["form"])):          # EDGAR lists newest first
+        if rec["form"][i] != "8-K":
+            continue
+        filed = rec["filingDate"][i]
+        if filed <= start:
+            break
+        base = f"https://www.sec.gov/Archives/edgar/data/{int(CIK['MSTR'])}/{rec['accessionNumber'][i].replace('-', '')}/"
+        fresh = base + rec["primaryDocument"][i] not in _EDGAR_TXT
+        try:
+            text = _edgar_text(_filing_doc(base, rec["primaryDocument"][i]))
+            for w in _mstr_strc_atm(text):
+                sold.setdefault((w["from"], w["to"]), w["shares"])
+            for a, b, rows in _mstr_repurchases(text):
+                if a and "STRC" in rows:
+                    bought.setdefault((a, b), rows["STRC"][0])
+        except Exception as e:                  # its week shows up below as a gap
+            log(f"[drift] STRC notional: the 8-K filed {filed} couldn't be read: {e}")
+        if fresh:
+            time.sleep(0.12)
+    n, steps, through, expect = level, [], None, _iso_plus(start, 1)
+    for a, b, sh in sorted((a, b, sh) for (a, b), sh in sold.items() if b > start):
+        if a != expect:
+            log(f"[drift] STRC notional: no filed week starts {expect} (the next runs {a} to {b}) — "
+                f"the filed steps stop at {through or start}")
+            break
+        # a quarter end can split a week's buybacks where its ATM line didn't
+        back = sum(s for (x, y), s in bought.items() if a <= x and y <= b)
+        if sh or back:
+            n += (sh - back) * 100 / 1e6        # shares x $100 stated, in $M
+            steps.append((b, round(n, 1)))
+        through, expect = b, _iso_plus(b, 1)
+    if not through:
+        log(f"[skip] STRC notional from filings: no week since {start} could be read — "
+            f"using the tracker's change log")
+        return
+    _STRC.update(steps=steps, through=through)
+    now = _strategy_pref_notional().get("STRC")
+    if now and abs(n - now[1]) > 1:
+        log(f"[drift] STRC notional: the filings come to ${n:,.1f}M by {through} but strategy.com "
+            f"shows ${now[1]:,.1f}M on {now[0]} — a week's sales or buybacks went unread")
+    else:
+        log(f"[STRC] notional from filings: ${n:,.1f}M by {through}, {len(steps)} steps since {start}")
+
+
+def _strc_steps(tracker_log):
+    """STRC's notional steps for the history: STRC_BACKFILL and the weeks filed since
+    (fetch_strc_notional), then strategy.com's figure unless the filings are newer (a
+    Monday 8-K read before strategy.com's first quote of the day). When no filed week
+    could be read, the tracker's change log stands in from where it starts."""
+    now = _strategy_pref_notional().get("STRC")
+    if _STRC.get("through"):
+        steps = STRC_BACKFILL + _STRC["steps"]
+        return steps + [tuple(now)] if now and now[0] > _STRC["through"] else steps
+    first = tracker_log[0][0] if tracker_log else "9999-99-99"
+    return _end_at([x for x in STRC_BACKFILL if x[0] < first] + list(tracker_log), now)
 
 
 def fetch_holdings(data, max_points=60):
@@ -3191,6 +3294,7 @@ def main():
     fetch_crypto_market(data)         # CoinGecko: BTC + SOL price and supply
     fetch_strategy_kpi(data)          # strategy.com API: shares, debt, USD reserve (MSTR)
     fetch_sata_notional(data)         # SEC EDGAR: filed SATA count (the tracker's stalls)
+    fetch_strc_notional(data)         # SEC EDGAR: STRC's filed weekly sales and buybacks (the tracker's log lags)
     fetch_strategytracker(data)       # PRIMARY: current metrics + real history (both names)
     fetch_holdings(data)             # SEC EDGAR: weekly accumulation (8-K period ranges)
     fetch_strategy_kpi(data)          # re-apply: holdings sets cash from the 8-K balances; live wins
