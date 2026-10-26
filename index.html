@@ -948,6 +948,7 @@ const SEED = {
 let DATA = JSON.parse(JSON.stringify(SEED));
 let btcPrice = DATA.btcPriceUsd;
 let solPrice = DATA.solPriceUsd;
+let liveBtc = false, liveSol = false;   // CoinGecko has ticked: a data.json repoll keeps its prices
 const COS = ["MSTR","ASST","DFDV"]; // order of columns
 
 // ---------- formatting helpers ----------
@@ -2099,10 +2100,10 @@ async function fetchCryptoPrices(){
     const r = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,solana&vs_currencies=usd&include_24hr_change=true");
     if(!r.ok) throw new Error(r.status);
     const j = await r.json();
-    btcPrice = j.bitcoin.usd;
+    btcPrice = j.bitcoin.usd; liveBtc = true;
     live(sub, j.bitcoin.usd_24h_change);
-    if(j.solana && j.solana.usd > 0){ solPrice = j.solana.usd; live(ssub, j.solana.usd_24h_change); }
-    renderAll(); markFresh();
+    if(j.solana && j.solana.usd > 0){ solPrice = j.solana.usd; liveSol = true; live(ssub, j.solana.usd_24h_change); }
+    markSolLoans(); renderAll(); markFresh();
   }catch(e){
     sub.textContent = `latest · ${usd(DATA.btcPriceUsd)} · as of ${DATA.priceAsOf}`;
     ssub.textContent = `latest · ${usd(DATA.solPriceUsd,2)} · as of ${DATA.priceAsOf}`;
@@ -2114,6 +2115,18 @@ async function fetchCryptoPrices(){
 function seedMissingIssuers(){
   COS.forEach(tk => { if(!DATA.companies[tk]) DATA.companies[tk] = JSON.parse(JSON.stringify(SEED.companies[tk])); });
   if(!(DATA.solPriceUsd > 0)) DATA.solPriceUsd = SEED.solPriceUsd;
+}
+
+// DFDV's SOL loans are SOL owed, and data.json values them at the refresh's SOL price.
+// Re-mark them, and the senior debt that holds them, at the live price whenever it
+// moves, so the debt moves with the SOL held instead of staying at the refresh's price.
+function markSolLoans(){
+  if(!(solPrice > 0)) return;
+  Object.values(DATA.companies).forEach(o => (o.debtSchedule || []).forEach(t => {
+    if(!t.solAmount) return;
+    const v = t.solAmount*solPrice/1e6;
+    o.seniorDebt += v - t.principal; t.principal = v;
+  }));
 }
 
 async function loadData(){
@@ -2128,7 +2141,7 @@ async function loadData(){
     }catch(e){ /* keep data.js / SEED */ }
   }
   seedMissingIssuers();
-  btcPrice = DATA.btcPriceUsd; solPrice = DATA.solPriceUsd;
+  btcPrice = DATA.btcPriceUsd; solPrice = DATA.solPriceUsd; markSolLoans();
   if(typeof derivePrevClose === "function") derivePrevClose();
   if(!DATA.history && SEED.history) DATA.history = SEED.history;  // per-block fallbacks
   if(!DATA.weekly && SEED.weekly) DATA.weekly = SEED.weekly;
@@ -2159,7 +2172,8 @@ function balanceSheet(o){
   const ds = o.debtSchedule || [], spot = assetPx(o);
   const owed = ds.reduce((s, t) => s + (t.solAmount || 0), 0);
   return { spot, hold:o.holdings, cash:o.cash, owed,
-           debtUsd: o.seniorDebt - owed*spot/1e6,
+           // the dollar debt: senior debt less the SOL loans in it, which `owed` carries in SOL
+           debtUsd: o.seniorDebt - ds.reduce((s, t) => s + (t.solAmount ? t.principal : 0), 0),
            // yearly coupons: dollar debt in $M, SOL loans in SOL
            intUsd: ds.reduce((s, t) => s + (t.solAmount ? 0 : t.principal*t.coupon/100), 0),
            intUnits: ds.reduce((s, t) => s + (t.solAmount ? t.solAmount*t.coupon/100 : 0), 0) };
@@ -3195,7 +3209,10 @@ async function repollData(){
     const r = await fetch("./data.json", {cache:"no-store"});
     if(r.ok){
       DATA = await r.json(); seedMissingIssuers();
-      btcPrice = DATA.btcPriceUsd; solPrice = DATA.solPriceUsd;
+      // the snapshot's BTC and SOL are hours old next to CoinGecko's minute-old ticks
+      if(!liveBtc) btcPrice = DATA.btcPriceUsd;
+      if(!liveSol) solPrice = DATA.solPriceUsd;
+      markSolLoans();
       derivePrevClose();
       renderAll(); renderCharts();
       // re-apply the freshest tape on top, strategy.com last
