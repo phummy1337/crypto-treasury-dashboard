@@ -1600,8 +1600,8 @@ async function checkFilingFreshness(){
   const box = document.getElementById('filing-stale'); if(!box) return;
   const behind = [];
   await Promise.all(Object.entries(SEC_CIK).map(async ([tk, cik]) => {
-    const seen = (DATA.companies[tk] || {}).filingWatch?.ingested
-              || Math.max(...(DATA.actions||[]).filter(a=>a.co===tk).map(a=>a.filed||''), '');
+    // the refresh writes filingWatch for both on every run; without it (seed data) say nothing
+    const seen = (DATA.companies[tk] || {}).filingWatch?.ingested;
     try{
       const r = await fetch(`https://data.sec.gov/submissions/CIK${cik}.json`, {cache:'no-store'});
       if(!r.ok) return;
