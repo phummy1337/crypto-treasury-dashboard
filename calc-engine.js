@@ -27,9 +27,10 @@ function simulate(s, cfg){
   // EV mNAV framing: mNAV = (mcap + debt + pref - cash) / crypto NAV, so each month
   // market cap backs out as mNAV x NAV - claims and price = mcap / shares.
   // `buf` is the dividend cash runway: issuance proceeds parked as cash to
-  // pre-fund dividends. It offsets claims at face value but never earns the
-  // mNAV multiple, so parked dollars are per-share neutral (vs asset-bought
-  // dollars, which capture the mNAV premium spread).
+  // pre-fund dividends. It offsets claims at face value. On the EV basis it never
+  // earns the mNAV multiple, so parked dollars are per-share neutral (vs asset-bought
+  // dollars, which capture the mNAV premium spread); on the net basis it sits in net
+  // NAV and earns the multiple like the asset.
   // `cash` is today's cash: it pays dividends, interest and costs before anything
   // else, and offsets claims at its current balance, so spending it raises claims.
   let cash = s.cash;
@@ -83,7 +84,7 @@ function simulate(s, cfg){
     if(commonMo>0){                                                    // common ATM: same split
       const cc = Math.min(commonMo, gap);
       buf += cc; sharesM += commonMo/p; hold += (commonMo - cc)*1e6/b;
-      parked += cc; premCap += (commonMo - cc)*(mn-1);
+      parked += cc; premCap += (cfg.basis==="net" ? commonMo : commonMo - cc)*(mn-1);   // net: parked cash earns it too
     }
     parked += pc;
     raised += cfg.prefMo + commonMo; raisedMnWt += (cfg.prefMo + commonMo)*mn;
