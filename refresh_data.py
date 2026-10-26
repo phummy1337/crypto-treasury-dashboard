@@ -537,7 +537,6 @@ def fetch_strategytracker(data):
                 f"{SATS['rate']}%" + (f", last ${px:,.2f}" if px else ", no quote"))
         if ps:
             bd = []
-            mkt = 0.0
             kpi = _strategy_pref_notional() if tk == "MSTR" else {}
             for p in ps:
                 t = p["ticker"]
@@ -562,10 +561,6 @@ def fetch_strategytracker(data):
                 rate = p.get("dividendRate")
                 lab = PREF_LABEL.get(t, "{r}%").format(r=("%g" % rate) if rate is not None else "?")
                 bd.append([t, lab, round(notM), rate])     # rate: the calculator's per-series default
-                # market value of the series: notional scaled by price/par
-                # (par $100 for USD series; STRE is EUR-denominated with a €10 par)
-                par = 10 if t == "STRE" else 100
-                mkt += notM * (p.get("price") or par) / par
                 if t == co.get("prefTicker"):
                     co["prefPrice"] = round(p["price"], 2)
                     co["prefChangePct"] = round(p.get("priceChangePercent") or 0, 2)
@@ -638,7 +633,10 @@ def fetch_strategytracker(data):
             bd.sort(key=lambda x: -x[2])
             co["prefBreakdown"] = bd
             co["prefNotional"] = round(sum(x[2] for x in bd))
-            co["prefMarket"] = round(mkt)
+            # The preferred stack at market prices had no reader, and it was wrong: the
+            # tracker's STRE quote (10.23) isn't a price per its €100 stated amount
+            # (strategy.com: €78.88). Drop the copy earlier refreshes stored.
+            co.pop("prefMarket", None)
             corr = {x[0]: x[2] for x in bd}   # FX-corrected notionals
             pref_div = sum(corr.get(p["ticker"], 0) * (p.get("dividendRate") or 0) / 100 for p in ps)
             debt_int = sum(x["principal"] * x["coupon"] / 100 for x in (co.get("debtSchedule") or []))
