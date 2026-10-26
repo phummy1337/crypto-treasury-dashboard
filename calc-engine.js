@@ -69,7 +69,7 @@ function simulate(s, cfg){
     const nav_ = nav(hold,b), cl_ = claims(pref,buf,b), netNav_ = nav_ - cl_;
     const netMn = netNav_>0 ? (cfg.basis==="net" ? mn : (mn*nav_ - cl_)/netNav_) : 0;
     const atmOpen = netNav_>0 && netMn >= cfg.atmFloor;
-    if(!atmOpen && cfg.commonMo>0) pausedMo++;
+    if(!atmOpen) pausedMo++;
     pref += cfg.prefMo;
     const divMo = prefDivsMo(s, pref - s.otherNotional, cfg.rate);
     // debt interest and operating costs ride the dividends' waterfall below
