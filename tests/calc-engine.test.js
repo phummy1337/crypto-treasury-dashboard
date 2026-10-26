@@ -181,11 +181,24 @@ test("a convert due in a short month is repaid only as far as the money reaches"
   near(r.claims[12], 22, "the unpaid principal is still a claim");
 });
 
+test("a convert in the money converts into shares instead of being repaid", () => {
+  const convert = {note:"Convert", principal:50, coupon:0, units:0, repay:null, convert:3};
+  const r = simulateCredit(tiny({tranches:[convert]}), flat({months:6}));
+  near(r.repaid, 0, "repaid");
+  near(r.claims[2], 50, "a claim before");
+  near(r.claims[3], 0, "gone after");
+});
+
 // A small common issuer: $100M of coin, $20M of debt, 10M shares at $10.
 const tinyCo = (over = {}) => ({px:10, sharesM:10, pref:0, spot:100, hold:1e6, cash:0, owed:0, debtUsd:20,
   intUsd:0, intUnits:0, otherNotional:0, otherDivs:0, ...over});
 const flatCo = (over = {}) => ({target:100, months:1, prefMo:0, commonMo:0, rate:0, fundMix:0, endMnav:1.5,
   runway:0, basis:"net", atmFloor:1, stake:0, opex:0, ...over});
+
+test("the net basis prices the common's residual, the EV basis the whole structure", () => {
+  near(simulate(tinyCo(), flatCo()).implied, 1.5*(100 - 20)/10, "net: 1.5 x (NAV - claims) / shares");
+  near(simulate(tinyCo(), flatCo({basis:"ev"})).implied, (1.5*100 - 20)/10, "EV: (1.5 x NAV - claims) / shares");
+});
 
 test("with the ATM shut below its floor, costs are paid by selling the treasury", () => {
   // $1M of costs a month, all meant to come from issuance, at a 1.5x multiple
@@ -197,6 +210,15 @@ test("with the ATM shut below its floor, costs are paid by selling the treasury"
   near(shut.assetSold, 12, "sold");
   near(shut.forcedDiv, 12, "all of it forced");
   near(shut.endSharesM, 10, "no shares issued");
+});
+
+test("SOL owed is marked at each month's SOL price, not today's", () => {
+  // DFDV's SOL loans grow in dollars as SOL rises; holding them at today's dollars
+  // would overstate what the common keeps at a $200 target
+  const {s, cfg} = FIXTURES.DFDV, up = {...cfg, target:200};
+  const asDollars = {...s, owed:0, debtUsd:s.debtUsd + s.owed*s.spot/1e6,
+                     intUnits:0, intUsd:s.intUsd + s.intUnits*s.spot/1e6};
+  assert.ok(simulate(s, up).implied < simulate(asDollars, up).implied*0.9);
 });
 
 test("a common underwater in a crash recovers with the asset; one still under at the end doesn't", () => {
