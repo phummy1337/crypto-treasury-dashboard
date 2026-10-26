@@ -2054,7 +2054,10 @@ function debtTipHTML(co){
   // weighted over the tranches that mature: DFDV's loans roll monthly or are open-ended
   const dated=ds.filter(x=>x.maturity), datedTot=dated.reduce((s,x)=>s+x.principal,0);
   const wam=datedTot ? dated.reduce((s,x)=>s+x.principal*yrs(x),0)/datedTot : null;
-  const u=assetUnit(o), assetPar=(tot*1e6)/o.holdings;   // asset price at which reserve covers the debt
+  // the asset price at which the reserve covers the debt. SOL loans are owed in SOL, so
+  // they come off the SOL held rather than being priced: P × held = dollar debt + P × owed
+  const owed=ds.reduce((s,x)=>s+(x.solAmount||0),0), usdDebt=ds.reduce((s,x)=>s+(x.solAmount?0:x.principal),0);
+  const u=assetUnit(o), assetPar=o.holdings>owed ? usdDebt*1e6/(o.holdings-owed) : null;
   const px=o.stockPrice;
   const mDate=s=>s ? new Date(s+"T00:00:00").toLocaleDateString("en-US",{month:"short",year:"2-digit"}) : "—";
   const parity=x=>x.convRate ? px*x.convRate/10 : null;   // conversion value as % of par
@@ -2063,9 +2066,9 @@ function debtTipHTML(co){
   const cc=v=>v==null?"—":`<span class='${v>=0?'pos':'neg'}'>${sig(v)}${fmt(v,1)}%</span>`;
   const rows=ds.map(x=>`<tr><td>${esc(x.note)}${x.solAmount ? ` <span style="color:var(--faint);font-weight:400">${fmt(x.solAmount)} SOL</span>` : ""}</td><td>${fmt(x.coupon,3)}%</td><td>${mDate(x.maturity)}</td><td>${mDate(x.put)}</td><td>${capFmt(x.principal)}</td><td>${x.convPrice ? "$"+fmt(x.convPrice,2) : "—"}</td><td>${parity(x)==null ? "—" : fmt(parity(x),0)+"%"}</td></tr>`).join("");
   return `<div class="et-title">${ds.every(x=>x.convPrice) ? "Convertible Notes" : "Debt"} · ${esc(o.capStructAsOf)}</div>
-    <div class="dt-sum"><b>${capFmt(tot)}</b> total · Wtd coupon <b>${fmt(wac,2)}%</b>${wam!=null ? ` · Wtd maturity <b>${fmt(wam,1)} yr</b>` : ""} · ${u} par <b>$${fmt(assetPar, assetPar<1000?2:0)}</b></div>
+    <div class="dt-sum"><b>${capFmt(tot)}</b> total · Wtd coupon <b>${fmt(wac,2)}%</b>${wam!=null ? ` · Wtd maturity${dated.length<ds.length ? " of dated notes" : ""} <b>${fmt(wam,1)} yr</b>` : ""} · ${u} par <b>${assetPar==null ? "—" : "$"+fmt(assetPar, assetPar<1000?2:0)}</b></div>
     <table class="dt"><tr><th>Note</th><th>Coupon</th><th>Maturity</th><th>Put</th><th>Principal</th><th>Conv $</th><th>Parity</th></tr>${rows}</table>
-    <div class="dt-note">${u} par = ${u} price at which reserves cover the debt. Parity = conversion value ÷ par at live stock ($${fmt(px,2)}); stock 7d ${cc(chg(7))}, 1mo ${cc(chg(30))}. Actual bond prices trade above parity (bond floor) and need a TRACE/dealer feed.${ds.some(x=>x.solAmount) ? " SOL loans are marked at the live SOL price." : ""}</div>`;
+    <div class="dt-note">${u} par = ${u} price at which reserves cover the debt${owed ? ", with the SOL loans repaid in SOL" : ""}. Parity = conversion value ÷ par at live stock ($${fmt(px,2)}); stock 7d ${cc(chg(7))}, 1mo ${cc(chg(30))}. Actual bond prices trade above parity (bond floor) and need a TRACE/dealer feed.${ds.some(x=>x.solAmount) ? " SOL loans are marked at the live SOL price." : ""}</div>`;
 }
 const debttip=document.createElement("div"); debttip.id="debttip"; document.body.appendChild(debttip);
 document.addEventListener("mouseover", e => {
