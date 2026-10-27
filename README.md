@@ -1,9 +1,13 @@
-# BTC Treasury Tracker — Strategy (MSTR/STRC) vs Strive (ASST/SATA)
+# TreasuryTracker.NET — Strategy (MSTR/STRC), Strive (ASST/SATA/SATS) and DeFi Development (DFDV/CHAD)
 
-A single-file dashboard comparing both companies and their preferred equity relative to Bitcoin.
+A single-file dashboard comparing digital-asset treasury companies and their preferred
+equity (digital credit) against the asset each one holds: BTC for Strategy and Strive,
+SOL for DeFi Development.
 
 ## Files
-- **index.html** — the dashboard. Self-contained (HTML/CSS/JS in one file).
+- **index.html** — the dashboard: HTML, CSS and JS in one file, apart from the calculator's engine.
+- **calc-engine.js** — the Implied Price Calculator's engine, which index.html loads.
+- **tests/** — `node --test tests/*.test.js` checks that engine. No dependencies; CI runs it on changes.
 - **data.json** — the numbers the dashboard reads. Edit by hand or via the scraper.
 - **refresh_data.py** — optional updater that repopulates `data.json`.
 

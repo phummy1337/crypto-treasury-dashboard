@@ -3,30 +3,31 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>TreasuryTracker.NET — Real-Time BTC Treasury &amp; Digital Credit Tracking</title>
-<meta name="description" content="Live analytics on Strategy (MSTR · STRC) and Strive (ASST · SATA · SATS): mNAV, CEBE, accumulation, capital structure, and implied price models. Powered by APYX.">
+<title>TreasuryTracker.NET — Real-Time Treasury &amp; Digital Credit Tracking</title>
+<meta name="description" content="Live analytics on Strategy (MSTR · STRC), Strive (ASST · SATA · SATS) and DeFi Development (DFDV · CHAD): mNAV, CEBE, accumulation, capital structure, and implied price models. Powered by APYX.">
 <link rel="canonical" href="https://treasurytracker.net/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="TreasuryTracker.NET">
-<meta property="og:title" content="TreasuryTracker.NET — Real-Time BTC Treasury &amp; Digital Credit Tracking">
-<meta property="og:description" content="Live analytics on Strategy (MSTR · STRC) and Strive (ASST · SATA · SATS): mNAV, CEBE, accumulation, capital structure, and implied price models. Powered by APYX.">
+<meta property="og:title" content="TreasuryTracker.NET — Real-Time Treasury &amp; Digital Credit Tracking">
+<meta property="og:description" content="Live analytics on Strategy (MSTR · STRC), Strive (ASST · SATA · SATS) and DeFi Development (DFDV · CHAD): mNAV, CEBE, accumulation, capital structure, and implied price models. Powered by APYX.">
 <meta property="og:url" content="https://treasurytracker.net/">
-<meta property="og:image" content="https://treasurytracker.net/og-card-v2.jpg">
+<meta property="og:image" content="https://treasurytracker.net/og-card-v3.jpg">
   <meta property="og:image:type" content="image/jpeg">
-  <meta property="og:image:alt" content="TreasuryTracker.NET — live MSTR, STRC, ASST, SATA and SATS analytics">
+  <meta property="og:image:alt" content="TreasuryTracker.NET — live MSTR, STRC, ASST, SATA, SATS, DFDV and CHAD analytics">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="TreasuryTracker.NET — Real-Time BTC Treasury &amp; Digital Credit Tracking">
-<meta name="twitter:description" content="Live MSTR · STRC · ASST · SATA · SATS analytics — mNAV, CEBE, accumulation, capital structure, implied price models. Powered by APYX.">
-<meta name="twitter:image" content="https://treasurytracker.net/og-card-v2.jpg">
-  <meta name="twitter:image:alt" content="TreasuryTracker.NET — live MSTR, STRC, ASST, SATA and SATS analytics">
+<meta name="twitter:title" content="TreasuryTracker.NET — Real-Time Treasury &amp; Digital Credit Tracking">
+<meta name="twitter:description" content="Live MSTR · STRC · ASST · SATA · SATS · DFDV · CHAD analytics — mNAV, CEBE, accumulation, capital structure, implied price models. Powered by APYX.">
+<meta name="twitter:image" content="https://treasurytracker.net/og-card-v3.jpg">
+  <meta name="twitter:image:alt" content="TreasuryTracker.NET — live MSTR, STRC, ASST, SATA, SATS, DFDV and CHAD analytics">
 <link rel="icon" href="apyx-logo.svg" type="image/svg+xml">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,wght@6..144,300..800&display=swap" rel="stylesheet">
 <script src="data.js" onerror="window.__DATA__=undefined"></script>
+<script src="calc-engine.js"></script>
 <style>
   :root {
     /* APYX brand: near-black, crimson accent, white headlines, gray body (deck + logo) */
@@ -42,6 +43,9 @@
     --apyx: #dc143c;
     --mstr: #ed1946;
     --asst: #4c9fff;
+    --dfdv: #a970ff;     /* violet: clear of crimson MSTR, blue ASST, the amber EV line
+                            and the green/red P&L colours */
+    --sol: #14f195;
     --evmnav: #ffc44d;   /* EV mNAV line: warm, so it separates from BOTH the
                             crimson MSTR and blue ASST price lines, and from the
                             white net line. Lighter than --btc, which never
@@ -93,11 +97,18 @@
   }
   .title h1 .hl { color: var(--red); }
   .title p { margin: 10px 0 0; color: var(--muted); font-size: 16px; }
-  .title .legend { margin-top: 11px; display:flex; gap:20px; font-size:14.5px; color:var(--muted); }
+  .title .legend { margin-top: 11px; display:flex; flex-wrap:wrap; gap:4px 20px; font-size:14.5px; color:var(--muted); }
+  .title .legend > span { white-space: nowrap; }
   .dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:6px; vertical-align: middle; }
 
   /* header stat bar */
-  .statbar { display:grid; grid-template-columns: 0.85fr 1.5fr 1.5fr; gap: 12px; align-items: stretch; }
+  /* a price column (BTC over SOL) and three issuer cards; Strive's is widest, since it
+     carries two preferred series */
+  .statbar { display:grid; grid-template-columns: 0.72fr 1.3fr 1.62fr 1.3fr; gap: 12px; align-items: stretch; }
+  .pricecol { display:flex; flex-direction:column; gap:12px; }
+  .pricecol .statbox { flex:1; padding: 9px 13px; }
+  .pricecol .statbox .val { font-size: 21px; margin-top: 2px; }
+  .pricecol .statbox .sub { font-size: 11.5px; margin-top: 1px; }
   .statgroup { position:relative; overflow:hidden; border:1px solid var(--border); border-radius:6px;
     background:rgba(255,255,255,0.02); padding:10px 16px 12px; }
   .statgroup::before { content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--bx); }
@@ -107,10 +118,10 @@
      the same single row keeps both cards the same height; the value size steps down
      just enough that a $100-par price still fits the narrower column. */
   .sg-items.four { grid-template-columns:repeat(4,1fr); gap:10px; }
-  .sg-items.four .sg-item .val { font-size:20px; }
+  .sg-items.four .sg-item .val { font-size:18px; }
   .sg-items.four .sg-item .lbl { letter-spacing:.6px; }
-  .sg-item .lbl { font-size:11.5px; text-transform:uppercase; letter-spacing:1px; color:var(--muted); white-space:nowrap; }
-  .sg-item .val { font-size:23px; font-weight:700; font-style:italic; margin-top:2px;
+  .sg-item .lbl { font-size:11px; text-transform:uppercase; letter-spacing:.8px; color:var(--muted); white-space:nowrap; }
+  .sg-item .val { font-size:20px; font-weight:700; font-style:italic; margin-top:2px;
     color:var(--bx); font-variant-numeric:tabular-nums; }
   .sg-item .sub { font-size:12px; color:var(--faint); margin-top:2px; }
   .sg-item .defhint { margin-left:4px; }
@@ -118,10 +129,17 @@
      separate glyph, so it must not pick up the glyph's spacing or size. nowrap: on
      phones a wrapped "Mon · last trade" reads as Monday's last trade */
   .sg-item .sub .defhint { margin-left:0; font-size:inherit; vertical-align:0; white-space:nowrap; }
-  /* Above 1100px the stat cards sit three across and a column is ~124px at most: two
-     clauses fit, three don't, so the word wrapped onto a line of its own. As on phones,
-     the multiple wins; a line without one keeps its word ("-1.86% · common"). */
+  /* Above 1100px the issuer cards sit three across and a column is ~80px: two clauses
+     fit, three don't, so the word wrapped onto a line of its own. As on phones, the
+     multiple wins; a line without one keeps its word ("-1.86% · common"). */
   @media (min-width: 1101px) { .sg-item .sub .defhint ~ .secword { display: none; } }
+  /* Just above 1100px a three-tile card is ~230px wide: "$146.01", "NET MNAV" and
+     "$99.36" at full size push the third tile out of the card ("$99.3"). */
+  @media (min-width: 1101px) and (max-width: 1200px) {
+    .sg-items { gap: 10px; }
+    .sg-item .val, .sg-items.four .sg-item .val { font-size: 17px; }
+    .sg-item .lbl { letter-spacing: .5px; }
+  }
   .statbox {
     background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
     padding: 13px 15px; position: relative; overflow: hidden;
@@ -131,12 +149,13 @@
     background: var(--bx, var(--red)); }
   .statbox .lbl { font-size: 12.5px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted); white-space: nowrap; }
   /* italic bold stat callouts, like the deck's "3.3x" / "-50%" figures */
-  .statbox .val { font-size: 25px; font-weight: 700; font-style: italic; margin-top: 4px;
+  .statbox .val { font-size: 23px; font-weight: 700; font-style: italic; margin-top: 4px;
     color: var(--bx, var(--text)); font-variant-numeric: tabular-nums; }
   .statbox .sub { font-size: 12.5px; color: var(--faint); margin-top: 3px; }
   .statbox .sub.live { color: var(--pos); }
   .statbox .refresh { margin-top: 8px; display:inline-block; }
-  @media (max-width: 1100px) { .statbar { grid-template-columns: 1fr; } .btchero { max-width: none; } }
+  @media (max-width: 1100px) { .statbar { grid-template-columns: 1fr; } .btchero { max-width: none; }
+    .pricecol { flex-direction:row; } }
 
   /* apxUSD lending banner: Apyx's "Slim lending banner", dark variant, at the design's
      geometry (104px tall on desktop, 194px stacked on phones; the 1px border is part of
@@ -187,14 +206,14 @@
   .sec-head .tag.stub { color: var(--btc); border-color: rgba(247,147,26,0.4); }
   .sec-note { color: var(--muted); font-size: 15px; margin: -2px 0 14px; max-width: 820px; line-height: 1.5; }
 
-  /* metric grid: label | MSTR | ASST */
+  /* metric grid: label | MSTR | ASST | DFDV */
   .grid {
     background: var(--panel); border:1px solid var(--border); border-radius: var(--radius);
     overflow: hidden;
     backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px);
   }
   .grow {
-    display:grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 0;
+    display:grid; grid-template-columns: 1.4fr repeat(3, 1fr); gap: 0;
     border-top: 1px solid var(--border);
   }
   .grow { border-top: 1px solid var(--border); }
@@ -270,9 +289,17 @@
   .calc-co { display:flex; align-items:center; gap:10px; padding: 14px 18px 4px; flex-wrap: wrap; }
   .cobtn { font: inherit; font-size: 13.5px; font-weight: 700; color: var(--muted); background: rgba(255,255,255,0.04);
     border: 1px solid var(--border); border-radius: 6px; padding: 7px 14px; cursor: pointer; }
-  .cobtn.active[data-co="MSTR"] { color:#fff; border-color: var(--mstr); background: rgba(237,25,70,0.12); }
-  .cobtn.active[data-co="ASST"] { color:#fff; border-color: var(--asst); background: rgba(76,159,255,0.12); }
-  .calc-snap { color: var(--faint); font-size: 12.5px; margin-left: auto; }
+  .cobtn.active[data-co="MSTR"], .cobtn.active[data-co="STRC"] { color:#fff; border-color: var(--mstr); background: rgba(237,25,70,0.12); }
+  .cobtn.active[data-co="ASST"], .cobtn.active[data-co="SATA"] { color:#fff; border-color: var(--asst); background: rgba(76,159,255,0.12); }
+  .cobtn.active[data-co="DFDV"], .cobtn.active[data-co="CHAD"] { color:#fff; border-color: var(--dfdv); background: rgba(169,112,255,0.13); }
+  .calc-snap { color: var(--faint); font-size: 12.5px; margin-right: auto; }
+  .calc-meta { padding-top: 8px; }
+  /* "Common" and "Digital Credit" ahead of their buttons */
+  .cogroup { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.1px;
+    color: var(--faint); margin-left: 8px; }
+  .cogroup:first-child { margin-left: 0; }
+  /* inputs the selected button doesn't use (labels are flex, which beats [hidden]) */
+  .calc-inputs [hidden] { display: none; }
   .calc-inputs { display:grid; grid-template-columns: repeat(4, 1fr); gap: 12px; padding: 12px 18px 4px; }
   .calc-inputs label { display:flex; flex-direction:column; gap:5px; color: var(--muted); font-size: 12.5px;
     text-transform: uppercase; letter-spacing: .8px; }
@@ -408,15 +435,19 @@
     background: rgba(255,255,255,0.04); border-radius:6px; padding:6px 11px; transition: background .15s, border-color .15s; }
   .refresh:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.3); }
   /* charts */
-  .charts { display:grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
+  .charts { display:grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 14px; }
+  .charts.two { grid-template-columns: 1fr 1fr; }   /* the ATM cards: MSTR and ASST only */
+  @media (max-width: 1100px) { .charts { grid-template-columns: 1fr 1fr; } }
   .charts.full { grid-template-columns: 1fr; }
+  .charts ~ .grid { margin-top: 14px; }   /* charts above a table (Company Stats, Valuation): same gap as a table above charts */
   .chartcard {
     background: var(--panel); border:1px solid var(--border); border-radius: var(--radius);
     padding: 14px 16px 12px;
     backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px);
   }
   .chartcard h3 { margin:0; font-weight:700; font-size: 14.5px; letter-spacing:.3px;
-    display:flex; align-items:center; gap:7px; color:#fff; }
+    display:flex; flex-wrap:wrap; align-items:center; gap:6px 7px; color:#fff; }
+  .chartcard h3 .h3t { white-space: nowrap; }
   .chartcard h3 .dot { width:9px; height:9px; }
   .chartcard h3 .pngbtn { margin-left:auto; flex:0 0 auto; background:none;
     border:1px solid var(--border); border-radius:4px; color:var(--faint);
@@ -426,16 +457,19 @@
   .chartwrap { position: relative; height: 250px; }
   .illus { color: var(--btc); font-size: 12.5px; margin-top: 6px; opacity:.9; }
 
-  @media (max-width: 760px) { .charts { grid-template-columns: 1fr; } }
+  @media (max-width: 760px) { .charts, .charts.two { grid-template-columns: 1fr; } }
   @media (max-width: 640px) {
-    .grow { grid-template-columns: 1.3fr 1fr 1fr; }
-    .grow > div { padding: 9px 10px; }
+    .grow { grid-template-columns: 1.15fr repeat(3, 1fr); }
+    .grow > div { padding: 9px 6px; }
+    .grow .glabel { font-size: 14px; }
+    .grow .gval { font-size: 14px; }   /* "2,590,266" (DFDV's SOL) has to fit a quarter of a phone */
     .btcprice { min-width: 160px; }
     .masthead { flex-direction: column-reverse; align-items: flex-start; gap: 16px; }
     .masthead .poweredby { flex-direction: row; align-items: center; gap: 8px; }
     .title h1 { font-size: 25px; }
     .title p { font-size: 14.5px; }
     .title .legend { flex-direction: column; gap: 6px; }
+    .title .legend > span { white-space: normal; }
     .statbar { gap: 8px; }
     .statbox .val { font-size: 21px; }
     .statbox { padding: 10px 12px; }
@@ -462,6 +496,15 @@
     .tabs { gap: 16px; }
     .tabbtn { font-size: 13.5px; }
   }
+  /* A 360px phone leaves a value column ~70px: at 14px, DFDV's "2,590,266" and the
+     wider rates push the row past the grid's edge, which clips them ("2,590,26"). */
+  @media (max-width: 400px) {
+    .grow { grid-template-columns: 1fr repeat(3, 1fr); }
+    .grow > div { padding: 8px 4px; }
+    .grow .glabel { font-size: 13px; }
+    .grow .gval { font-size: 13px; }
+  }
+  @media (max-width: 350px) { .grow > div { padding: 8px 3px; } .grow .glabel, .grow .gval { font-size: 12px; } }
 </style>
 </head>
 <body>
@@ -471,10 +514,11 @@
     <div class="masthead">
       <div class="title">
         <h1>TreasuryTracker<span class="hl">.NET</span></h1>
-        <p>Real-Time BTC Treasury &amp; Digital Credit Tracking</p>
+        <p>Real-Time Treasury &amp; Digital Credit Tracking</p>
         <div class="legend">
           <span><span class="dot" style="background:var(--mstr)"></span>Strategy — <b>MSTR</b> common · <b>STRC</b> preferred</span>
           <span><span class="dot" style="background:var(--asst)"></span>Strive — <b>ASST</b> common · <b>SATA</b> + <b>SATS</b> preferred</span>
+          <span><span class="dot" style="background:var(--dfdv)"></span>DeFi Development — <b>DFDV</b> common · <b>CHAD</b> preferred</span>
         </div>
       </div>
       <a href="https://apyx.fi" target="_blank" rel="noopener" class="poweredby">
@@ -483,10 +527,17 @@
       </a>
     </div>
     <div class="statbar">
-      <div class="statbox btchero" style="--bx:var(--btc)">
-        <div class="lbl">Bitcoin</div>
-        <div class="val" id="btcVal">—</div>
-        <div class="sub" id="btcSub">loading…</div>
+      <div class="pricecol">
+        <div class="statbox btchero" style="--bx:var(--btc)">
+          <div class="lbl">Bitcoin</div>
+          <div class="val" id="btcVal">—</div>
+          <div class="sub" id="btcSub">loading…</div>
+        </div>
+        <div class="statbox" style="--bx:var(--sol)">
+          <div class="lbl">Solana</div>
+          <div class="val" id="solVal">—</div>
+          <div class="sub" id="solSub">loading…</div>
+        </div>
       </div>
       <div class="statgroup" style="--bx:var(--mstr)">
         <div class="sg-head" style="color:var(--mstr)">Strategy</div>
@@ -495,8 +546,8 @@
             <div class="sub" id="hdr-px-MSTR-sub">common</div></div>
           <div class="sg-item"><div class="lbl">Net mNAV<span class="defhint" data-def="Net mNAV" aria-label="About this metric">&#9432;</span></div>
             <div class="val" id="hdr-mnav-MSTR">—</div><div class="sub">mcap ÷ net reserve</div></div>
-          <div class="sg-item"><div class="lbl">STRC</div><div class="val" id="hdr-strc">—</div>
-            <div class="sub" id="hdr-strc-sub">preferred</div></div>
+          <div class="sg-item"><div class="lbl">STRC</div><div class="val" id="hdr-pref-MSTR">—</div>
+            <div class="sub" id="hdr-pref-MSTR-sub">preferred</div></div>
         </div>
       </div>
       <div class="statgroup" style="--bx:var(--asst)">
@@ -506,11 +557,22 @@
             <div class="sub" id="hdr-px-ASST-sub">common</div></div>
           <div class="sg-item"><div class="lbl">Net mNAV<span class="defhint" data-def="Net mNAV" aria-label="About this metric">&#9432;</span></div>
             <div class="val" id="hdr-mnav-ASST">—</div><div class="sub">mcap ÷ net reserve</div></div>
-          <div class="sg-item"><div class="lbl">SATA</div><div class="val" id="hdr-sata">—</div>
-            <div class="sub" id="hdr-sata-sub">preferred</div></div>
+          <div class="sg-item"><div class="lbl">SATA</div><div class="val" id="hdr-pref-ASST">—</div>
+            <div class="sub" id="hdr-pref-ASST-sub">preferred</div></div>
           <div class="sg-item" id="hdr-sats-item" hidden><div class="lbl">SATS</div>
             <div class="val" id="hdr-sats">—</div>
             <div class="sub" id="hdr-sats-sub">preferred</div></div>
+        </div>
+      </div>
+      <div class="statgroup" style="--bx:var(--dfdv)">
+        <div class="sg-head" style="color:var(--dfdv)">DeFi Development</div>
+        <div class="sg-items">
+          <div class="sg-item"><div class="lbl">DFDV</div><div class="val" id="hdr-px-DFDV">—</div>
+            <div class="sub" id="hdr-px-DFDV-sub">common</div></div>
+          <div class="sg-item"><div class="lbl">Net mNAV<span class="defhint" data-def="Net mNAV" aria-label="About this metric">&#9432;</span></div>
+            <div class="val" id="hdr-mnav-DFDV">—</div><div class="sub">mcap ÷ net reserve</div></div>
+          <div class="sg-item"><div class="lbl">CHAD</div><div class="val" id="hdr-pref-DFDV">—</div>
+            <div class="sub" id="hdr-pref-DFDV-sub">preferred</div></div>
         </div>
       </div>
     </div>
@@ -534,7 +596,7 @@
 
   <nav class="tabs">
     <button class="tabbtn active" data-tab="dash">Dashboard</button>
-    <button class="tabbtn" data-tab="calc">MSTR/ASST Implied Price Calculator</button>
+    <button class="tabbtn" data-tab="calc">Implied Price Calculator</button>
   </nav>
 
   <nav class="secnav" id="secnav">
@@ -555,7 +617,7 @@
     <div class="sec-head"><h2>Preferred ATM Tracker</h2><span class="tag stub" id="tag-atm">seed data</span></div>
     <p class="sec-note">An estimate of how much bitcoin each company is buying through its preferred ATM today, inferred from live trading and calibrated to the filings.
       <span class="evhint hint-icon" aria-label="Methodology" data-title="How this estimate is built" data-rows="At-par volume~15-min bars printed at/above $99.95, prorated when a bar straddles it|Capture rate~the share of that volume that was really ATM issuance|Calibration~capture solved from the newest filed week, else a default rate|To bitcoin~estimated proceeds ÷ live BTC price|Why $99.95, not $100~SATA hugs par to the cent; a strict cutoff undercounted a confirmed $44.1M week roughly 4x|Assumption~issuance tracks at-par volume evenly through the session|Confirmed vs estimate~the 8-K figure is fact; the intraday number is an estimate between filings">&#9432;</span></p>
-    <div class="charts" id="atm-cards"></div>
+    <div class="charts two" id="atm-cards"></div>
   </section>
 
 
@@ -575,13 +637,22 @@
         <div class="chartwrap"><canvas id="ch-si-ASST"></canvas></div>
       </div>
       <div class="chartcard">
-        <h3><span class="dot" style="background:var(--mstr)"></span>STRC — Preferred Daily Close</h3>
+        <h3><span class="dot" style="background:var(--dfdv)"></span>DFDV — Daily Close</h3>
+        <div class="si-chips mnav-ctx" id="mnav-ctx-DFDV"></div>
+        <div class="chartwrap"><canvas id="ch-si-DFDV"></canvas></div>
+      </div>
+      <div class="chartcard">
+        <h3><span class="dot" style="background:var(--mstr)"></span>STRC — Daily Close</h3>
         <div class="chartwrap"><canvas id="ch-pref-MSTR"></canvas></div>
       </div>
       <div class="chartcard">
-        <h3><span class="dot" style="background:var(--asst)"></span><span id="pref-title">SATA</span> — Preferred Daily Close<span class="serieschips" data-switch="pref">
+        <h3><span class="dot" style="background:var(--asst)"></span><span class="h3t"><span id="pref-title">SATA</span> — Daily Close</span><span class="serieschips" data-switch="pref">
           <button data-series="SATA" class="active">SATA</button><button data-series="SATS">SATS</button></span></h3>
         <div class="chartwrap"><canvas id="ch-pref-ASST"></canvas></div>
+      </div>
+      <div class="chartcard">
+        <h3><span class="dot" style="background:var(--dfdv)"></span>CHAD — Daily Close</h3>
+        <div class="chartwrap"><canvas id="ch-pref-DFDV"></canvas></div>
       </div>
     </div>
     <div class="illus" id="illus-company"></div>
@@ -591,7 +662,7 @@
   <!-- 1. Accumulation & Holdings -->
   <section id="holdings">
     <div class="sec-head"><h2>Accumulation &amp; Holdings</h2><span class="tag stub" id="tag-holdings">seed data</span></div>
-    <p class="sec-note">How big each bitcoin treasury is and how fast it's growing.</p>
+    <p class="sec-note">How big each treasury is and how fast it's growing.</p>
     <div class="grid" id="grid-holdings"></div>
     <div class="charts">
       <div class="chartcard">
@@ -604,6 +675,11 @@
         <div class="ch-sub">Weekly · Bars: BTC acquired / week (left) · Line: total BTC holdings (right)</div>
         <div class="chartwrap"><canvas id="ch-acc-ASST"></canvas></div>
       </div>
+      <div class="chartcard">
+        <h3><span class="dot" style="background:var(--dfdv)"></span>DFDV — Accumulation</h3>
+        <div class="ch-sub">Weekly · Bars: change in SOL held / week (left) · Line: total SOL &amp; equivalents (right)</div>
+        <div class="chartwrap"><canvas id="ch-acc-DFDV"></canvas></div>
+      </div>
     </div>
     <div class="illus" id="illus-holdings"></div>
   </section>
@@ -611,7 +687,7 @@
   <!-- 2. Cost & Efficiency -->
   <section id="cost">
     <div class="sec-head"><h2>Cost &amp; Efficiency</h2></div>
-    <p class="sec-note">How well the bitcoin was bought — each company's entry price versus today's market.</p>
+    <p class="sec-note">How well the treasury was bought — each company's entry price versus today's market.</p>
     <div class="grid" id="grid-cost"></div>
   </section>
 
@@ -631,6 +707,11 @@
         <div class="ch-sub">sats / share over time · basic shares</div>
         <div class="chartwrap"><canvas id="ch-bps-ASST"></canvas></div>
       </div>
+      <div class="chartcard">
+        <h3><span class="dot" style="background:var(--dfdv)"></span>DFDV — SOL per Share</h3>
+        <div class="ch-sub">SOL / share over time · basic shares</div>
+        <div class="chartwrap"><canvas id="ch-bps-DFDV"></canvas></div>
+      </div>
     </div>
     <div class="illus" id="illus-pershare"></div>
   </section>
@@ -638,7 +719,7 @@
   <!-- 4. Valuation & Premium (incl. CEBE) -->
   <section id="valuation">
     <div class="sec-head"><h2>Valuation &amp; Premium</h2><span class="tag stub" id="tag-valuation">seed data</span></div>
-    <p class="sec-note">Whether the market is pricing each company above or below the bitcoin behind it — for the structure as a whole, and for common shareholders after debt and preferred take their cut.</p>
+    <p class="sec-note">Whether the market is pricing each company above or below the treasury behind it — for the structure as a whole, and for common shareholders after debt and preferred take their cut.</p>
     <div class="charts">
       <div class="chartcard">
         <h3><span class="dot" style="background:var(--mstr)"></span>MSTR — Price vs. mNAV</h3>
@@ -649,6 +730,11 @@
         <h3><span class="dot" style="background:var(--asst)"></span>ASST — Price vs. mNAV</h3>
         <div class="ch-sub">Line: daily close (left) · Right: Net mNAV solid (after debt &amp; preferred) · EV mNAV dashed (whole structure)</div>
         <div class="chartwrap"><canvas id="ch-mnav-ASST"></canvas></div>
+      </div>
+      <div class="chartcard">
+        <h3><span class="dot" style="background:var(--dfdv)"></span>DFDV — Price vs. mNAV</h3>
+        <div class="ch-sub">Line: daily close (left) · Right: EV mNAV dashed (whole structure, from DFDV's own series with CHAD added)</div>
+        <div class="chartwrap"><canvas id="ch-mnav-DFDV"></canvas></div>
       </div>
     </div>
     <div class="grid" id="grid-valuation"></div>
@@ -666,46 +752,72 @@
   <!-- Implied Price Calculator -->
   <section id="calc">
     <div class="sec-head"><h2>Implied Price Calculator</h2><span class="tag" style="color:var(--btc);border-color:rgba(247,147,26,0.4)">model</span></div>
-    <p class="sec-note">Set your assumptions, get an implied share price.</p>
+    <p class="sec-note">Pick a common to get an implied share price, or a preferred to see whether its dividends stay funded — and at what treasury price they wouldn't.</p>
     <details class="howto"><summary>How the model works</summary>
     <ul class="calc-how">
-      <li><b>Month-by-month engine</b> — issuance buys BTC, dividends get serviced, and each month's price backs out of your EV&nbsp;mNAV.</li>
-      <li><b>Starts from today's live balance sheet.</b></li>
-      <li><b>Defaults are real</b> — issuance uses each company's rolling 3-month pace from its filings (MSTR preferred sits at $0 while the STRC ATM is paused below par). Override anything.</li>
-      <li><b>Dividend cash runway</b> — issuance proceeds first park N months of preferred dividends as cash (MSTR's recent posture); only the rest buys BTC. Parked cash never earns the mNAV multiple, so it's per-share neutral and a longer runway means less accretion. 0 = every dollar buys BTC.</li>
-      <li><b>Issuance is earned, not assumed</b> — the common ATM shuts in any month the modeled net mNAV sits below your floor (default 1.00×, Strategy's stated accretion threshold). Dividends then follow a waterfall: runway cash first, then issuance <i>only while the ATM is open</i>, then forced BTC sales. That's what makes a premium collapse actually hurt — you lose the accretion engine and start selling coin at the same moment.</li>
+      <li><b>Month-by-month engine</b> — issuance buys the treasury asset (BTC, or SOL for DFDV), dividends, debt interest and operating costs get serviced, and for a common each month's price backs out of your mNAV. Every common share sold, for a raise or a bill, is priced after its own dilution, so its buyer pays what it's then worth.</li>
+      <li><b>Starts from today's live balance sheet.</b> DFDV's SOL loans are SOL owed, marked at each month's SOL price.</li>
+      <li><b>Defaults are real</b> — issuance uses each company's rolling 3-month pace from its filings (MSTR preferred sits at $0 while the STRC ATM is paused below par). A common's ending mNAV starts at its multiple today, so nothing re-rates unless you set it; a preferred starts with BTC or SOL going nowhere. Those follow the live price until you change them. Override anything.</li>
+      <li><b>Dividend cash runway</b> — issuance proceeds first park N months of preferred dividends as cash (MSTR's recent posture); only the rest buys the treasury asset. On the EV basis parked cash never earns the mNAV multiple, so it's per-share neutral and a longer runway means less accretion. On the net basis it counts in net NAV like the asset and earns the multiple too, so a longer runway trades exposure to the asset's price for cash. 0 = every dollar buys the asset.</li>
+      <li><b>Issuance is earned, not assumed</b> — the common ATM shuts in any month the modeled net mNAV sits below your floor (default 1.00×, Strategy's stated accretion threshold). Dividends, interest and costs then follow a waterfall: today's cash first, then runway cash, then issuance <i>only while the ATM is open</i>, priced after its own dilution so it never raises more than the company is worth, then forced sales of the treasury. That's what makes a premium collapse actually hurt — you lose the accretion engine and start selling coin at the same moment.</li>
+      <li><b>Digital Credit</b> — STRC, SATA and CHAD run their issuer's balance sheet from the preferred holder's seat. No new money comes in unless you add it. Opening cash pays first, then sales of the treasury. Debt interest and any convertible due come before everything else: one out of the money today is repaid in cash at its first put or maturity, with no refinancing. Operating costs come next, then every preferred series at its own rate. Whatever can't be paid is a <i>modeled funding gap</i>, not a legal default.</li>
+      <li><b>When can't it pay?</b> — the break-even is the lowest ending treasury price that still funds every payment through your horizon, holding everything else. Raising preferred below its stated amount adds more claim than cash: $1M at $8 is 125,000 CHAD shares and $1.25M of stated notional.</li>
+      <li><b>Crash test</b> — dips the treasury price that far below the straight line, bottoming in the month you pick, then back to your target by the horizon. Same ending price, different path: coin sold near the bottom to pay the bills is gone for good, so a crash can open a gap the straight line never shows. The break-even keeps your crash and moves only the ending price.</li>
     </ul></details>
     <div class="grid calcbox">
       <div class="calc-co">
+        <span class="cogroup">Common</span>
         <button class="cobtn active" data-co="MSTR">MSTR · Strategy</button>
         <button class="cobtn" data-co="ASST">ASST · Strive</button>
+        <button class="cobtn" data-co="DFDV">DFDV · DeFi Dev</button>
+        <span class="cogroup">Digital Credit</span>
+        <button class="cobtn" data-co="STRC">STRC</button>
+        <button class="cobtn" data-co="SATA">SATA</button>
+        <button class="cobtn" data-co="CHAD">CHAD</button>
+      </div>
+      <div class="calc-co calc-meta">
         <span class="calc-snap" id="calc-snap"></span>
         <button class="cobtn" id="ci-share" title="Download a shareable image of these assumptions and results">&#128247; Share Card</button>
         <button class="cobtn" id="ci-link" title="Copy a link that reopens these exact assumptions">&#128279; Copy link</button>
       </div>
       <div class="calc-inputs">
-        <label>BTC Price Target ($)<input type="number" id="ci-btc" value="150000" step="5000" min="1000"></label>
+        <label data-asset="BTC">BTC Price Target ($)<input type="number" id="ci-btc" value="150000" step="5000" min="1000"></label>
+        <label data-asset="SOL" hidden>SOL Price Target ($)<input type="number" id="ci-sol" value="" step="5" min="1"></label>
+        <label>Annual Growth (% / yr)<input type="number" id="ci-growth" step="5" min="-99" max="1000">
+          <span class="mixlbl">implied by the target — edit either</span></label>
         <label>Horizon (months)<input type="number" id="ci-months" value="12" step="6" min="1" max="120"></label>
-        <label>Preferred Issued ($M / mo)<input type="number" id="ci-pref" value="0" step="50" min="0"></label>
-        <label>Common Issued ($M / mo)<input type="number" id="ci-common" value="0" step="50" min="0"></label>
-        <label><span class="lblrow">ATM Pauses Below<span class="evhint" data-title="Common ATM discipline" data-rows="Rule~no common issuance below this net mNAV|Strategy's stated threshold~1.00×|Set 0~issue regardless (unrealistic)|Effect~below the floor, dividends must come from BTC sales">?</span></span>
+        <label>Crash Depth (% below path)<input type="number" id="ci-crash" value="0" step="5" min="0" max="95">
+          <span class="mixlbl" id="ci-crash-lbl">0 = straight line to your target</span></label>
+        <label>Crash Low (month)<input type="number" id="ci-crashmo" value="6" step="1" min="1" max="119"></label>
+        <label><span><span id="ci-pref-name">Preferred</span> Issued ($M / mo)</span><input type="number" id="ci-pref" value="0" step="50" min="0"></label>
+        <label data-view="credit" hidden>Issue Price ($)<input type="number" id="ci-issue" value="100" step="0.25" min="0.01">
+          <span class="mixlbl" id="ci-issue-lbl"></span></label>
+        <label data-view="common">Common Issued ($M / mo)<input type="number" id="ci-common" value="0" step="50" min="0"></label>
+        <label data-view="common"><span class="lblrow">ATM Pauses Below<span class="evhint" data-title="Common ATM discipline" data-rows="Rule~no common issuance below this net mNAV|Strategy's stated threshold~1.00×|Set 0~issue regardless (unrealistic)|Effect~below the floor, dividends must come from sales of the treasury">?</span></span>
           <input type="number" id="ci-floor" value="1.00" step="0.05" min="0" max="5">
           <span class="mixlbl" id="ci-floor-lbl">× net mNAV — ATM open above this</span></label>
-        <label>Dividend Rate (% / yr)<input type="number" id="ci-rate" value="12" step="0.5" min="0"></label>
-        <label>Dividend Funding Mix
+        <label><span><span id="ci-rate-name">Preferred</span> Dividend Rate (% / yr)</span><input type="number" id="ci-rate" value="12" step="0.5" min="0"></label>
+        <label data-view="credit" hidden>Required Yield (%)<input type="number" id="ci-ry" value="12" step="0.25" min="0.1" max="100">
+          <span class="mixlbl">the yield the market prices it at</span></label>
+        <label data-view="common">Dividend Funding Mix
           <input type="range" id="ci-fund" min="0" max="100" step="5" value="0">
           <span class="mixlbl" id="ci-fund-lbl">100% common issuance</span></label>
-        <label>Div. Cash Runway (months)
-          <input type="number" id="ci-runway" value="0" step="3" min="0" max="120" title="Months of preferred dividends pre-funded with issuance cash before proceeds buy BTC">
-          <span class="mixlbl" id="ci-runway-lbl">0 — every $ raised buys BTC</span></label>
-        <label><span class="lblrow"><select id="ci-basis" class="basissel" title="Choose which multiple your ending target is expressed in">
+        <label data-view="common">Div. Cash Runway (months)
+          <input type="number" id="ci-runway" value="0" step="3" min="0" max="120" title="Months of preferred dividends pre-funded with issuance cash before proceeds buy the treasury asset">
+          <span class="mixlbl" id="ci-runway-lbl">0 — every $ raised buys the asset</span></label>
+        <label data-view="common"><span class="lblrow"><select id="ci-basis" class="basissel" title="Choose which multiple your ending target is expressed in">
             <option value="net">Ending Net mNAV (×)</option>
             <option value="ev">Ending EV mNAV (×)</option>
-          </select><span class="evhint" data-title="MSTR mNAV at prior bull peaks" data-rows="2021 cycle (Feb peak)~≈3.7×|2024 cycle (Nov peak)~≈3.4×">?</span></span><input type="number" id="ci-mnav" value="1.00" step="0.05" min="0.05"></label>
+          </select><span class="evhint" id="ci-mnav-hint" data-title="MSTR mNAV at prior bull peaks" data-rows="2021 cycle (Feb peak)~≈3.7×|2024 cycle (Nov peak)~≈3.4×">?</span></span><input type="number" id="ci-mnav" value="1.00" step="0.05" min="0.05"></label>
+        <label data-asset="SOL" hidden>Staking Yield (% / yr)<input type="number" id="ci-stake" value="0" step="0.5" min="0" max="50">
+          <span class="mixlbl">earned in SOL on the whole treasury</span></label>
+        <label>Operating Costs ($M / yr)<input type="number" id="ci-opex" value="0" step="1" min="0">
+          <span class="mixlbl" id="ci-opex-lbl">0 = not modeled</span></label>
       </div>
       <div class="calc-out" id="calc-out"></div>
       <div class="chartwrap" style="height:260px; padding: 0 16px 14px;"><canvas id="ch-calc"></canvas></div>
-      <p class="footnote" style="padding:0 18px 14px; margin:0;">A model, not a forecast: BTC and mNAV move linearly to your targets; issuance is constant per month <i>while the ATM is open</i>. Not modeled: in-the-money converts flipping to shares, variable preferred-rate resets, and taxes on unrealized gains. EV basis prices the whole structure (mcap = mNAV × BTC NAV − claims); net basis prices the common's residual (mcap = mNAV × net NAV). Converts are held at notional throughout — the model doesn't flip in-the-money tranches into share count. Runway cash offsets claims at face value but never earns the multiple — only BTC-bought dollars capture the issuance premium.</p>
+      <p class="footnote" data-calcfoot="common" style="padding:0 18px 14px; margin:0;">A model, not a forecast: the treasury asset and mNAV move linearly to your targets, the asset dipping first if you set a crash; issuance is constant per month <i>while the ATM is open</i>. Not modeled: in-the-money converts flipping to shares, variable preferred-rate resets, debt maturities, and taxes on unrealized gains. EV basis prices the whole structure (mcap = mNAV × crypto NAV − claims); net basis prices the common's residual (mcap = mNAV × net NAV). Converts are held at notional throughout — the model doesn't flip in-the-money tranches into share count. Runway cash offsets claims at face value: on the EV basis it never earns the multiple, so only asset-bought dollars capture the issuance premium; on the net basis it sits in net NAV and earns the multiple like the asset. Today's cash pays first, then runway cash, issuance and sales; spending it adds to claims. The dividend rate you set applies to the series being issued (STRC, SATA or CHAD); every other series pays its own rate.</p>
+      <p class="footnote" data-calcfoot="credit" hidden style="padding:0 18px 14px; margin:0;">A model, not a forecast: the treasury asset moves linearly to your target, dipping first if you set a crash, and payments are aggregated by month (CHAD pays a slice every business day). Every preferred series ranks together here, though SATS is junior to SATA; debt ranks ahead of all of them. Not modeled: refinancing, buybacks, rate resets beyond your input, compounding of unpaid dividends, the $10–$11 reset of CHAD's liquidation preference, taxes, and SOL locked in staking or posted as collateral. Coverage counts the preferred at its stated amount.</p>
     </div>
   </section>
 
@@ -713,7 +825,7 @@
   <section id="shorts">
     <div class="sec-head"><h2>Short Interest</h2><span class="tag stub" id="tag-shorts">seed data</span></div>
     <p class="sec-note">How crowded the short side is, instrument by instrument — and what it costs to stay short.
-      <span class="evhint hint-icon" aria-label="Methodology" data-title="Short interest methodology" data-rows="Source~FINRA semi-monthly settlements, via Nasdaq|Bars~shares short ÷ float, at that settlement date|Common float~shares outstanding then − insider Class B|Preferred float~notional ÷ $100 par|Line~days to cover on trailing 10-day avg volume|Why 10 days~≈ FINRA's own reporting window|Cost to short~IBKR indicative annualized borrow rate">&#9432;</span></p>
+      <span class="evhint hint-icon" aria-label="Methodology" data-title="Short interest methodology" data-rows="Source~FINRA semi-monthly settlements, via Nasdaq|Bars~shares short ÷ float, at that settlement date|Common float~shares outstanding then − insider Class B|Preferred float~notional ÷ stated amount ($100; CHAD $10)|Line~days to cover on trailing 10-day avg volume|Why 10 days~≈ FINRA's own reporting window|Cost to short~IBKR indicative annualized borrow rate">&#9432;</span></p>
     <div class="charts">
       <div class="chartcard">
         <h3><span class="dot" style="background:var(--mstr)"></span>MSTR — Short Interest</h3>
@@ -726,15 +838,25 @@
         <div class="chartwrap"><canvas id="ch-short-ASST"></canvas></div>
       </div>
       <div class="chartcard">
+        <h3><span class="dot" style="background:var(--dfdv)"></span>DFDV — Short Interest</h3>
+        <div class="si-chips" id="si-chips-DFDV"></div>
+        <div class="chartwrap"><canvas id="ch-short-DFDV"></canvas></div>
+      </div>
+      <div class="chartcard">
         <h3><span class="dot" style="background:var(--mstr)"></span>STRC — Short Interest</h3>
         <div class="si-chips" id="si-chips-STRC"></div>
         <div class="chartwrap"><canvas id="ch-short-STRC"></canvas></div>
       </div>
       <div class="chartcard">
-        <h3><span class="dot" style="background:var(--asst)"></span><span id="si-title">SATA</span> — Short Interest<span class="serieschips" data-switch="si">
+        <h3><span class="dot" style="background:var(--asst)"></span><span class="h3t"><span id="si-title">SATA</span> — Short Interest</span><span class="serieschips" data-switch="si">
           <button data-series="SATA" class="active">SATA</button><button data-series="SATS">SATS</button></span></h3>
         <div class="si-chips" id="si-chips-SATA"></div>
         <div class="chartwrap"><canvas id="ch-short-SATA"></canvas></div>
+      </div>
+      <div class="chartcard">
+        <h3><span class="dot" style="background:var(--dfdv)"></span>CHAD — Short Interest</h3>
+        <div class="si-chips" id="si-chips-CHAD"></div>
+        <div class="chartwrap"><canvas id="ch-short-CHAD"></canvas></div>
       </div>
     </div>
   </section>
@@ -751,10 +873,11 @@
     <b>Sources &amp; methodology</b> — Prices as of <span id="priceAsOf">—</span>; data as of <span id="dataAsOf">—</span>. Data refreshes automatically throughout market hours.
     <ul>
       <li>Holdings, prices, shares, yields, preferred series: strategy.com / treasury.strive.com data feed</li>
+      <li>DFDV &amp; CHAD — SOL held, shares, debt, cash, CHAD notional and quotes, SOL per share: DeFi Development's dashboard (defidevcorp.com/dashboard); daily DFDV closes: Nasdaq</li>
       <li>Weekly accumulation, debt schedule, historical preferred &amp; cash: SEC EDGAR filings (8-K, 10-Q, XBRL)</li>
       <li>Days to cover / short interest: Nasdaq (semi-monthly settlement data)</li>
-      <li>Live BTC price: CoinGecko API</li>
-      <li>Live preferred quotes: strategy.com API (STRC, real-time) · Cboe delayed quotes (SATA, SATS, ~15 min)</li>
+      <li>Live BTC and SOL prices: CoinGecko API</li>
+      <li>Live preferred quotes: strategy.com API (STRC, real-time) · Cboe delayed quotes (SATA, SATS, CHAD, ~15 min)</li>
     </ul>
     <div style="margin-top:8px;color:var(--faint)">Not investment advice. Confirm against each issuer's latest filing before relying on the ratios.</div>
   </div>
@@ -774,6 +897,7 @@
 const SEED = {
   asOf: "2026-06-17", priceAsOf: "2026-06-16",
   btcPriceUsd: 66449, btcSupply: 21000000, btcCirculating: 19900000,
+  solPriceUsd: 101.13, solCirculating: 589708788,
   companies: {
     MSTR: { name:"Strategy", ticker:"MSTR", prefTicker:"STRC", asset:"BTC", accent:"#ed1946",
       stockPrice:113.66, dayChangePct:-2.49, sharesOutstanding:351.60, betaBtc:1.61, week52Low:104.17, week52High:457.22, prefPrice:99.50,
@@ -786,7 +910,12 @@ const SEED = {
       holdings:19105, pctSupply:0.0910, netChangeYtd:11600, btcPerDay:70, btcPerWeek:490,
       avgCost:96079, satsPerShareBasic:23979, satsPerShareDiluted:23181, btcYieldYtd:36.0, btcYieldQtd:null,
       btcGain:null, btcDollarGain:null, cebeSatsPerShare:13000, claimsPct:44.5, satsPer100:81000,
-      mnav:0.89, cebeMnav:1.88, cash:189, seniorDebt:0, prefNotional:751, annualObligations:98, staking:0 }
+      mnav:0.89, cebeMnav:1.88, cash:189, seniorDebt:0, prefNotional:751, annualObligations:98, staking:0 },
+    DFDV: { name:"DeFi Development", ticker:"DFDV", prefTicker:"CHAD", asset:"SOL", accent:"#a970ff", prefStated:10,
+      stockPrice:3.78, dayChangePct:2.02, sharesOutstanding:32.62, prefPrice:9.90,
+      holdings:2590266, pctSupply:0.4392, netChangeYtd:394340,
+      cash:9.98, seniorDebt:205.9, prefNotional:15.81, annualObligations:12.97, opexYr:17, organicYield:5.07,
+      prefBreakdown:[["CHAD","CHAD · 13% var",15.81,13]] }
   },
   stockHistory: {
     illustrative: false,
@@ -835,7 +964,9 @@ const SEED = {
 
 let DATA = JSON.parse(JSON.stringify(SEED));
 let btcPrice = DATA.btcPriceUsd;
-const COS = ["MSTR","ASST"]; // order of columns
+let solPrice = DATA.solPriceUsd;
+let liveBtc = false, liveSol = false;   // CoinGecko has ticked: a data.json repoll keeps its prices
+const COS = ["MSTR","ASST","DFDV"]; // order of columns
 
 // ---------- formatting helpers ----------
 const fmt = (n, d=0) => n==null||isNaN(n) ? "—" : Number(n).toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d});
@@ -855,40 +986,55 @@ const pct = (n, d=1) => n==null||isNaN(n) ? "—" : fmt(n,d)+"%";
 const shortDate = iso => new Date(iso+"T00:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric"});
 const sig = (n) => n>0?"+":"";
 
-// mNAV = EV / BTC reserve.  EV = (price × basic shares) + debt + preferred notional − USD reserve(cash)
+// Each treasury is marked at its own asset's live price: BTC for MSTR and ASST, SOL for DFDV.
+const assetPx = o => o.asset === "SOL" ? solPrice : btcPrice;
+const assetUnit = o => o.asset === "SOL" ? "SOL" : "BTC";
+const assetSym = o => o.asset === "SOL" ? "SOL" : "₿";
+const holdingsHtml = o => o.asset === "SOL" ? fmt(o.holdings)+" <span class='unit'>SOL</span>" : "₿"+fmt(o.holdings);
+// an amount of the treasury asset per share (or per $100): sats for BTC, SOL to four places
+const perShareHtml = (o, units) => units==null || !isFinite(units) ? null
+  : o.asset === "SOL" ? fmt(units,4)+" <span class='unit'>SOL</span>"
+  : fmt(Math.round(units*1e8))+" <span class='unit'>sats</span>";
+// for text that lands in innerHTML from a third-party feed. Not for a hover's data-rows
+// or data-title: the browser decodes the attribute and tipHTML inserts it as HTML, so
+// esc() there protects nothing. Text bound for a hover is checked in refresh_data.py.
+const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
+
+// mNAV = EV / crypto reserve.  EV = (price × basic shares) + debt + preferred notional − USD reserve(cash)
 // (same formula as strategy.com / treasury.strive.com; note strategy.com's own widget runs a
 //  stale bundled debt schedule of $6.7B vs the $8.2B in the Q1-26 10-Q, so it reads ~0.03 low)
 function evMnav(o){
   if(!(o.stockPrice && o.sharesOutstanding)) return o.mnav;
   const mcap = o.stockPrice*o.sharesOutstanding;            // $mm
   const ev   = mcap + o.seniorDebt + o.prefNotional - o.cash;
-  const nav  = o.holdings*btcPrice/1e6;                     // BTC reserve, $mm
+  const nav  = o.holdings*assetPx(o)/1e6;                   // crypto reserve, $mm
   return nav ? ev/nav : o.mnav;
 }
 
-// Net framework (Strategy, Jul-2026): net reserve = BTC NAV + USD reserve − OTM
+// Net framework (Strategy, Jul-2026): net reserve = crypto NAV + USD reserve − OTM
 // convertible debt − preferred. In-the-money converts dilute the share count
-// instead of counting as debt. Net mNAV = fully-diluted mcap ÷ net reserve.
+// instead of counting as debt; straight debt (no convPrice — DFDV's loans) is
+// always a claim. Net mNAV = fully-diluted mcap ÷ net reserve.
 function netParts(o){
   const ds = o.debtSchedule || [], px = o.stockPrice;
   let otm = 0, itmSh = 0;                                   // $mm claims / M shares
-  if(ds.length) ds.forEach(t => { if(px < t.convPrice) otm += t.principal;
+  if(ds.length) ds.forEach(t => { if(!t.convPrice || px < t.convPrice) otm += t.principal;
                                   else itmSh += t.principal*t.convRate/1000; });
   else otm = o.seniorDebt;
-  const nav = o.holdings*btcPrice/1e6;
+  const nav = o.holdings*assetPx(o)/1e6;
   const reserve = nav + o.cash;
   const netReserve = reserve - otm - o.prefNotional;
   // Strategy divides by its published fully-diluted count (~420M vs 416M basic) —
   // basic plus the in-the-money converts, options and RSUs. netDilutedShares is
   // backed out of their own net-sats figure, so prefer it and fall back to the
-  // debt-schedule reconstruction only when it's missing (ASST publishes no net).
+  // debt-schedule reconstruction only when it's missing (ASST and DFDV publish no net).
   const shares = o.netDilutedShares || (o.sharesOutstanding + itmSh);
   return { nav, reserve, netReserve, shares, mcap: px*shares, otm, itmSh };
 }
 function netMnav(o){
   // Strategy publishes its own mNAV every minute; take it verbatim so the headline
   // can never drift from strategy.com/btc. The computed path below is the fallback
-  // (and the only path for ASST, which publishes no net figure).
+  // (and the only path for ASST and DFDV, which publish no net figure).
   if(o._netMnavLive != null) return o._netMnavLive;
   if(!(o.stockPrice && o.sharesOutstanding)) return null;
   const p = netParts(o);
@@ -900,142 +1046,155 @@ function unit(v, u){ return `${v}<span class="unit">${u}</span>`; }
 
 // ---------- per-metric definitions (label hover: how it's calculated / what it means) ----------
 const METRIC_DEFS = {
-  "Duration": {c:"(BTC reserve + USD reserve) ÷ annual obligations, where obligations are preferred dividends plus cash interest on debt. Answers: if no new money ever came in, how many years could the existing reserves keep paying?",
-    m:"Staying power. A high number means the company could service its dividends and interest for decades out of what it already holds, so a long bear market is survivable without touching the equity story. A low number means it depends on continued issuance or rising bitcoin to keep the obligations funded — the same treasury is far more fragile. Strategy splits this into BTC duration and USD duration; this is the combined figure."},
-  "EV mNAV": {c:"(Market cap + senior debt + preferred notional − USD reserve) ÷ BTC reserve.",
-    m:"What the market pays for the whole structure — common, debt and preferred together — per dollar of bitcoin behind it. This is the solvency and coverage lens, and it's the one a STRC or SATA holder should care about, since their claim sits on the entire enterprise rather than the residual."},
-  "Net mNAV": {c:"Fully-diluted market cap ÷ net reserve, where net reserve is BTC + USD reserve − out-of-the-money convertible debt − preferred notional. In-the-money converts are counted as shares instead of debt.",
-    m:"What common shareholders pay per dollar of bitcoin that's actually left for them after the senior claims are satisfied. Strategy adopted this as its headline mNAV in July 2026, and it fixes the accretion threshold at exactly 1.0× — above it, issuing stock to buy bitcoin raises bitcoin-per-share; below it, issuing destroys it."},
-  "Net Reserve": {c:"BTC reserve + USD reserve − out-of-the-money convertible debt − preferred notional.",
-    m:"The bitcoin value genuinely attributable to common equity once everyone senior has been paid. This is the denominator common shareholders are actually buying, and it's what makes leverage cut both ways: it grows faster than bitcoin on the way up and shrinks faster on the way down."},
-  "Net Leverage": {c:"Senior debt left uncovered by the USD assets (USD Reserve + USD Cash), divided by the BTC reserve. Zero once the dollars on hand fully offset the converts. Taken from strategy.com's published figure for MSTR; the same arithmetic for ASST, which carries no debt.",
-    m:"How much of the bitcoin is really financed rather than owned outright. Strategy reached 0.0% on 30 Aug 2026 — every convertible dollar is matched by a dollar of USD assets, so a bitcoin drawdown can no longer force the debt into the money's way. It is the cleanest single read on whether the leverage story is currently a risk or a formality; it climbs again the moment new debt is issued or the reserve is spent."},
-  "Amplification": {c:"BTC reserve ÷ net reserve.",
-    m:"How much the residual moves for a given move in bitcoin. At 1.5×, a 20% rise in bitcoin lifts net bitcoin-per-share roughly 30% — that's the leverage common holders are paying a premium to access. It rises as bitcoin falls (the fixed claims eat a bigger share) and decays as bitcoin rises unless the company keeps issuing preferred."},
-  "BTC Hurdle Rate": {c:"The effective annual cost of the credit stack. MSTR: taken from strategy.com's published figure, which uses the option-adjusted financing cost of the converts, not just cash coupons. ASST: annual SATA dividends ÷ preferred notional — no converts, so no option adjustment is needed.",
-    m:"The referee between the gross and net per-share figures. If bitcoin compounds above this rate, the leverage pays for itself, the senior claims shrink relative to NAV, and your outcome converges on the gross Sats per Share. Below it, the claims eat the equity from underneath and Net Sats per Share was the number telling the truth. Compare it to your own BTC return expectation before paying any mNAV premium."},
-  "Breakeven BTC Rate": {c:"Annual obligations ÷ total reserves, expressed as a percentage per year.",
-    m:"The rate bitcoin has to appreciate for capital gains alone to cover every dividend and interest payment. Above this rate the structure funds itself indefinitely without selling coin or issuing stock; below it, the obligations have to come from somewhere else."},
-  "Stock Price": {c:"Latest common-share price from the strategy.com / treasury.strive.com data feed, refreshed throughout market hours.",
+  "Duration": {c:"(Crypto reserve + USD reserve) ÷ annual obligations, where obligations are preferred dividends plus cash interest on debt. Answers: if no new money ever came in, how many years could the existing reserves keep paying?",
+    m:"Staying power. A high number means the company could service its dividends and interest for decades out of what it already holds, so a long bear market is survivable without touching the equity story. A low number means it depends on continued issuance or a rising treasury asset to keep the obligations funded — the same treasury is far more fragile. Operating costs are not counted; DFDV's run larger than its dividends and interest combined, and the calculator models them. Strategy splits this into BTC duration and USD duration; this is the combined figure."},
+  "EV mNAV": {c:"(Market cap + senior debt + preferred notional − USD reserve) ÷ crypto reserve (holdings × live BTC or SOL price). DFDV's own dashboard leaves CHAD out of EV; it is counted here, as STRC and SATA are.",
+    m:"What the market pays for the whole structure — common, debt and preferred together — per dollar of treasury asset behind it. This is the solvency and coverage lens, and it's the one a STRC, SATA or CHAD holder should care about, since their claim sits on the entire enterprise rather than the residual."},
+  "Net mNAV": {c:"Fully-diluted market cap ÷ net reserve, where net reserve is crypto + USD reserve − out-of-the-money convertible and straight debt − preferred notional. In-the-money converts are counted as shares instead of debt. DFDV's own adjusted mNAV leaves CHAD out; it is a claim here.",
+    m:"What common shareholders pay per dollar of treasury asset that's actually left for them after the senior claims are satisfied. Strategy adopted this as its headline mNAV in July 2026, and it fixes the accretion threshold at exactly 1.0× — above it, issuing stock to buy the asset raises holdings per share; below it, issuing destroys them."},
+  "Net Reserve": {c:"Crypto reserve + USD reserve − out-of-the-money convertible and straight debt − preferred notional.",
+    m:"The treasury value genuinely attributable to common equity once everyone senior has been paid. This is the denominator common shareholders are actually buying, and it's what makes leverage cut both ways: it grows faster than the asset on the way up and shrinks faster on the way down."},
+  "Net Leverage": {c:"Senior debt left uncovered by the USD assets (USD Reserve + USD Cash), divided by the crypto reserve. Zero once the dollars on hand fully offset the debt. Taken from strategy.com's published figure for MSTR; the same arithmetic for ASST, which carries no debt, and DFDV.",
+    m:"How much of the treasury is really financed rather than owned outright. Strategy reached 0.0% on 30 Aug 2026 — every convertible dollar is matched by a dollar of USD assets, so a drawdown can no longer force the debt into the money's way. It is the cleanest single read on whether the leverage story is currently a risk or a formality; it climbs again the moment new debt is issued or the reserve is spent."},
+  "Amplification": {c:"Crypto reserve ÷ net reserve.",
+    m:"How much the residual moves for a given move in the treasury asset. At 1.5×, a 20% rise in the asset lifts net holdings per share roughly 30% — that's the leverage common holders are paying a premium to access. It rises as the asset falls (the fixed claims eat a bigger share) and decays as it rises unless the company keeps issuing preferred."},
+  "Crypto Hurdle Rate": {c:"The effective annual cost of the credit stack. MSTR: taken from strategy.com's published figure, which uses the option-adjusted financing cost of the converts, not just cash coupons. ASST and DFDV: annual obligations ÷ (debt + preferred notional).",
+    m:"The referee between the gross and net per-share figures. If the treasury asset compounds above this rate, the leverage pays for itself, the senior claims shrink relative to NAV, and your outcome converges on the gross Holdings per Share. Below it, the claims eat the equity from underneath and Net Holdings per Share was the number telling the truth. Compare it to your own return expectation for BTC or SOL before paying any mNAV premium."},
+  "Breakeven Crypto Rate": {c:"Annual obligations ÷ total reserves, expressed as a percentage per year.",
+    m:"The rate the treasury asset has to appreciate for capital gains alone to cover every dividend and interest payment. Above this rate the structure funds itself indefinitely without selling the asset or issuing stock; below it, the obligations have to come from somewhere else. DFDV's staking earns part of this in SOL; the calculator models it."},
+  "Stock Price": {c:"Latest common-share price — the strategy.com / treasury.strive.com data feed for MSTR and ASST, DeFi Development's dashboard for DFDV — refreshed throughout market hours.",
     m:"What the market charges for one share of common stock — the starting point for market cap and every valuation ratio below."},
   "Day Change": {c:"Today's price versus the prior close, in percent.",
-    m:"Direction and size of today's move — worth reading next to BTC's own 24-hour change above."},
+    m:"Direction and size of today's move — worth reading next to BTC's or SOL's own 24-hour change above."},
   "Relative Volume": {c:"Dollar volume (shares traded × close) of one full session, ÷ the mean of the 30 sessions before it. The running session never counts — a part-day divided by full ones reads low all morning — so from the open until the evening refresh this is the previous session's figure, and the tile names that day (\"2.2× vol Mon\"). Once the session it measures is today's, no day is shown; past 6 days old it is hidden.",
     m:"Whether a price move carries conviction or is just noise. A 3% fall on 2× normal volume is the market repricing the name; the same 3% on 0.4× volume is a thin tape. Above 1 is busier than usual, below 1 quieter."},
   "Market Cap": {c:"Stock price × basic shares outstanding.",
     m:"The market's total value on the common equity — what all common shares are worth together."},
-  "Shares Outstanding": {c:"Basic share count across common classes, from the latest SEC filing.",
-    m:"The denominator behind every per-share figure. Growth here is dilution — unless the bitcoin grows faster."},
+  "Shares Outstanding": {c:"Basic share count across common classes, from the latest SEC filing (DFDV: its dashboard).",
+    m:"The denominator behind every per-share figure. Growth here is dilution — unless the treasury grows faster."},
   "Enterprise Value": {c:"Market cap + senior debt + preferred notional − cash reserve.",
     m:"What it would cost to own the entire company: the equity plus every claim ahead of it, net of the cash on hand."},
-  "Beta to BTC": {c:"Slope of daily stock returns regressed against BTC returns over the past year.",
-    m:"Sensitivity to bitcoin: a beta of 1.5 means the stock has tended to move 1.5% for every 1% move in BTC."},
-  "Preferred Price": {c:"Last trade of the flagship preferred (STRC / SATA), against a $100 stated value. Strive's second series, SATS, is junior to SATA and shown in the header and in the preferred breakdown.",
-    m:"Below $100, the market demands more yield than the coupon pays — the discount is the market's live read on issuer risk."},
-  "Crypto Holdings": {c:"Total bitcoin held, per the latest weekly 8-K filing.",
+  "Beta to Treasury Asset": {c:"Slope of daily stock returns regressed against the issuer's own treasury asset over the past year: BTC for MSTR and ASST, SOL for DFDV.",
+    m:"Sensitivity to the asset behind the stock: a beta of 1.5 means the stock has tended to move 1.5% for every 1% move in that asset. A low figure means the stock has been trading on more than its treasury."},
+  "Preferred Price": {c:"Last trade of each issuer's flagship preferred (STRC / SATA / CHAD), against its stated value — $100 for STRC and SATA, $10 for CHAD. Strive's second series, SATS, is junior to SATA and shown in the header and in the preferred breakdown.",
+    m:"Below its stated value, the market demands more yield than the coupon pays — the discount is the market's live read on issuer risk."},
+  "Crypto Holdings": {c:"The treasury held: bitcoin per the latest weekly 8-K (MSTR, ASST); SOL and SOL equivalents per DeFi Development's dashboard (DFDV), whose SOL loans are counted in senior debt.",
     m:"The treasury itself — the asset backing everything else on this page."},
-  "Cash & Cash Equivalents": {c:"MSTR: the USD Reserve plus USD Cash balances stated in the latest weekly 8-K (strategy.com's live figure is built from the same balances). ASST: filed USD cash plus its 505,000 STRC shares marked at the live price.",
+  "Cash & Cash Equivalents": {c:"MSTR: the USD Reserve plus USD Cash balances stated in the latest weekly 8-K (strategy.com's live figure is built from the same balances). ASST: filed USD cash plus its 505,000 STRC shares marked at the live price. DFDV: total cash per its dashboard.",
     m:"The liquid reserve that pays dividends and nets against debt and preferred claims in every ratio below."},
-  "Senior Debt": {c:"Sum of convertible-note principal outstanding, per the latest 10-Q.",
+  "Senior Debt": {c:"Debt ranking ahead of preferred and common: convertible-note principal per the latest 10-Q for MSTR; for DFDV, two converts plus SOL- and stablecoin-denominated loans per its dashboard, the SOL loans marked at the live SOL price.",
     m:"The claims that rank ahead of both preferred and common if things go wrong."},
-  "Preferred Equity Notional": {c:"Face (stated) value of every preferred series — $100 per share, with the EUR-denominated STRE converted at the live rate.",
-    m:"The full preferred claim sitting senior to common — the 'digital credit' layer both companies fund themselves with."},
-  "BTC Duration": {c:"BTC reserve (holdings × live BTC price) ÷ annual obligations, in years — how long the bitcoin stack alone could fund every dividend and coupon at today's marks.",
-    m:"The bitcoin leg of staying power. It moves with the BTC price: a drawdown shortens it exactly when the obligations feel heaviest. Add USD Duration for the total figure shown in the Valuation section."},
+  "Preferred Equity Notional": {c:"Stated value of every preferred series — $100 per share (EUR-denominated STRE at its USD stated amount), $10 per CHAD share.",
+    m:"The full preferred claim sitting senior to common — the 'digital credit' layer each company funds itself with."},
+  "Crypto Duration": {c:"Crypto reserve (holdings × live BTC or SOL price) ÷ annual obligations, in years — how long the treasury alone could fund every dividend and coupon at today's marks.",
+    m:"The crypto leg of staying power. It moves with the asset price: a drawdown shortens it exactly when the obligations feel heaviest. Add USD Duration for the total figure shown in the Valuation section."},
   "USD Duration": {c:"True dollar reserve ÷ annual obligations, in years. For ASST this deliberately EXCLUDES the ~$45M of STRC preferred Strive holds — that position is counted in total-reserve metrics (matching Strive's own math) but it is BTC-linked paper, not dollars; hover the ASST value for the blended figure.",
-    m:"The cushion that decides whether a bear market forces bitcoin sales — so it should only count assets that hold value in that exact scenario. A reserve parked in another BTC treasury company's preferred is weakest at precisely the moment it's needed, which is why the headline here is stricter than the issuer's blended number."},
-  "Annual Obligations": {c:"Each preferred series' notional × its dividend rate, plus convertible-note coupons.",
+    m:"The cushion that decides whether a bear market forces treasury sales — so it should only count assets that hold value in that exact scenario. A reserve parked in another BTC treasury company's preferred is weakest at precisely the moment it's needed, which is why the headline here is stricter than the issuer's blended number."},
+  "Annual Obligations": {c:"Each preferred series' notional × its dividend rate, plus debt coupons.",
     m:"The fixed yearly cash cost of the capital structure — what must be paid out before common shareholders see anything."},
-  "Total BTC Holdings": {c:"Total bitcoin per the latest weekly 8-K; hover the value for the year-by-year path.",
-    m:"Raw treasury size — scale before adjusting for who holds claims against it."},
-  "% of 21M Supply": {c:"Holdings ÷ 21,000,000, bitcoin's hard supply cap.",
-    m:"The share of all bitcoin that will ever exist held by this one company."},
+  "Total Holdings": {c:"Total treasury per the latest weekly 8-K (BTC) or DeFi Development's dashboard (SOL); hover the value for the year-by-year path.",
+    m:"Raw treasury size — scale before adjusting for who holds claims against it. BTC and SOL counts don't compare with each other; compare dollars or ratios."},
+  "% of Supply": {c:"Holdings ÷ supply: bitcoin's 21,000,000 hard cap, or SOL's circulating supply (SOL has no cap).",
+    m:"The share of the asset's supply held by this one company."},
   "Net Change YTD": {c:"Current holdings − holdings at last year-end.",
-    m:"How much bitcoin the treasury has actually added this year, net of any sales."},
+    m:"How much the treasury has actually added this year, net of any sales."},
   "YTD Growth (Relative)": {c:"Net YTD change ÷ holdings at the start of the year.",
     m:"Growth relative to size — a small treasury adding quickly can out-compound a giant one."},
-  "Avg. BTC Acquired / Week": {c:"Average bitcoin added per week across recent 8-K filings.",
+  "Avg. Acquired / Week": {c:"Average added per week this year: across 8-K weeks for BTC; for DFDV, the weekly change in the SOL balance it publishes daily, so staking rewards and loans count too.",
     m:"The current pace of accumulation."},
-  "Avg. BTC Acquired / Day": {c:"The weekly pace ÷ 7.",
+  "Avg. Acquired / Day": {c:"The weekly pace ÷ 7.",
     m:"The same accumulation pace, expressed per day."},
-  "Avg Acquisition Cost / BTC": {c:"Aggregate purchase cost ÷ total bitcoin held, per the latest 8-K.",
-    m:"The blended entry price — the bitcoin level at which the whole stack breaks even."},
-  "Current Return on BTC": {c:"(Live BTC price − average cost) ÷ average cost.",
+  "Avg Acquisition Cost": {c:"Aggregate purchase cost ÷ total held, per the latest 8-K. DFDV: total spent ÷ SOL bought, from the purchase log on DFDV's dashboard, which lists purchases only.",
+    m:"The blended entry price — the asset price at which the whole stack breaks even."},
+  "Current Return on Holdings": {c:"(Live asset price − average cost) ÷ average cost.",
     m:"The paper return on the treasury: whether the stack is in profit at today's price."},
-  "Unrealized P/L": {c:"(Live BTC price − average cost) × holdings.",
+  "Unrealized P/L": {c:"(Live asset price − average cost) × holdings. DFDV: × the SOL in its purchase log, not all the SOL it holds.",
     m:"The dollar gain or loss embedded in the treasury right now."},
-  "Sats per Share": {c:"Bitcoin held ÷ diluted shares, in satoshis. For MSTR this is taken verbatim from strategy.com's own feed, so it always equals the figure on strategy.com/btc; for ASST it is computed on the effective diluted count Strive publishes, which excludes 26.6M warrants struck at $27 against a ~$12 stock. Hover the value for the basic figure and the full derivation.",
+  "Holdings per Share": {c:"Treasury held ÷ shares. BTC issuers in satoshis per diluted share: MSTR's taken verbatim from strategy.com's own feed, so it always equals the figure on strategy.com/btc; ASST's on the effective diluted count Strive publishes, which excludes 26.6M warrants struck at $27. DFDV in SOL per basic share, its own headline figure. Hover a BTC value for the basic figure and the full derivation.",
     m:"What one share owns before anyone senior is paid. This is the long-horizon accumulation metric — it answers whether buying is outpacing share issuance, and it is the number each company headlines on its own site."},
-  "Net Sats per Share": {c:"Bitcoin left for common shareholders after senior claims — net reserve ÷ BTC price, spread over the same diluted share count. Net reserve is BTC plus USD reserve minus out-of-the-money convertible debt and preferred. For MSTR this comes straight from strategy.com's feed.",
-    m:"What one share owns after debt and preferred are satisfied — the shorter-horizon, more conservative read Strategy introduced in July 2026. The gap between this and BTC per Share is the drag from the credit stack: for MSTR that is roughly 30% of the gross figure, which is exactly the leverage common holders are paying a premium to access."},
-  "BTC Yield — 1 Week": {c:"Percent change in BTC-per-share over the latest 8-K week.",
-    m:"Whether last week's buying grew each share's bitcoin backing after any new share issuance."},
-  "BTC Yield — YTD": {c:"Percent change in BTC-per-share since January 1.",
-    m:"The accretion scoreboard: positive means accumulation outran dilution, so each share owns more bitcoin than it did in January."},
-  "mNAV": {c:"Enterprise value ÷ bitcoin NAV (holdings × live BTC price). Hover the value for the full math.",
-    m:"The premium or discount on the whole structure versus its bitcoin: above 1x the market pays extra; below 1x the bitcoin is selling for less than spot."},
-  "CEBE mNAV": {c:"Common market cap ÷ (bitcoin NAV − net senior claims). Hover the value for the math.",
-    m:"The premium from the common shareholder's seat only, after debt and preferred have taken their cut."},
-  "CEBE": {c:"(Holdings − net senior claims ÷ BTC price) ÷ basic shares, in satoshis.",
-    m:"Common Equity Bitcoin Exposure — the bitcoin per share left over for common after every senior claim is covered."},
-  "Claims % (Drag)": {c:"(Senior debt + preferred notional − cash) ÷ bitcoin NAV.",
+  "Net Holdings per Share": {c:"Treasury left for common shareholders after senior claims — net reserve ÷ asset price, spread over the same diluted share count. Net reserve is the crypto plus USD reserve minus out-of-the-money convertible and straight debt and preferred. For MSTR this comes straight from strategy.com's feed.",
+    m:"What one share owns after debt and preferred are satisfied — the shorter-horizon, more conservative read Strategy introduced in July 2026. The gap between this and Holdings per Share is the drag from the credit stack — the leverage common holders are paying a premium to access, and for DFDV, whose debt is most of its treasury, by far the largest."},
+  "Treasury Yield — 1 Week": {c:"Percent change in total holdings over the latest week (the 8-K week for BTC, the calendar week for DFDV). Shares issued in the week aren't netted out, unlike the YTD figure.",
+    m:"Whether last week's buying grew the treasury."},
+  "Treasury Yield — YTD": {c:"Percent change in holdings per share since January 1: Strategy's and Strive's published BTC Yield; for DFDV, the change in its SOL per share.",
+    m:"The accretion scoreboard: positive means accumulation outran dilution, so each share owns more of the treasury asset than it did in January."},
+  "CEBE": {c:"(Holdings − net senior claims ÷ asset price) ÷ basic shares, in satoshis (BTC) or SOL.",
+    m:"Common Equity treasury exposure — the BTC or SOL per share left over for common after every senior claim is covered."},
+  "Claims % (Drag)": {c:"(Senior debt + preferred notional − cash) ÷ crypto NAV.",
     m:"How much of the treasury is already spoken for by senior claims — the drag on a common shareholder's exposure."},
-  "Sats per $100 Invested": {c:"After-claims bitcoin ÷ market cap, scaled to a $100 purchase.",
-    m:"Bang for the buck: how much net bitcoin exposure $100 of stock buys at today's price."},
-  "Crypto NAV": {c:"Holdings × the live BTC price.",
+  "Holdings per $100 Invested": {c:"After-claims treasury ÷ market cap, scaled to a $100 purchase, in satoshis (BTC) or SOL.",
+    m:"Bang for the buck: how much net treasury exposure $100 of stock buys at today's price."},
+  "Crypto NAV": {c:"Holdings × the live BTC or SOL price.",
     m:"The treasury marked to market — the asset side of the whole structure."},
   "Total Hard Assets": {c:"Crypto NAV + cash reserve.",
     m:"Everything liquid that's available to cover obligations."},
-  "Senior Debt / Hard Assets": {c:"Convertible-note principal ÷ total hard assets.",
+  "Senior Debt / Hard Assets": {c:"Senior debt (convertible notes and loans) ÷ total hard assets.",
     m:"Debt leverage: the slice of the asset base lenders could claim. Lower is safer for everyone below them."},
   "(Debt + Preferred) / Hard Assets": {c:"(Senior debt + preferred notional) ÷ total hard assets.",
     m:"Total leverage from all senior claims — the fuller stress-test view of the structure."},
   "Hard Assets / Annual Obligation": {c:"Total hard assets ÷ annual dividend and coupon cost.",
     m:"Years of obligations covered by everything on hand — the big-picture safety margin."},
   "Crypto NAV / Annual Obligation": {c:"Crypto NAV ÷ annual obligations.",
-    m:"Coverage from the bitcoin alone, ignoring cash."},
+    m:"Coverage from the treasury alone, ignoring cash."},
   "Cash / Annual Obligations": {c:"Cash reserve ÷ annual obligations.",
-    m:"Years of dividends payable without selling a single bitcoin or raising a dollar."},
-  "Crypto NAV / Preferred Notional": {c:"Crypto NAV ÷ preferred face value.",
-    m:"Asset coverage on the preferred layer: how many times over the bitcoin covers that claim."},
+    m:"Years of dividends payable without selling any of the treasury or raising a dollar."},
+  "(Crypto NAV − Debt) / Preferred": {c:"(Crypto NAV − senior debt) ÷ preferred notional.",
+    m:"Asset coverage on the preferred layer after the debt that ranks ahead of it: how many times over the treasury covers that claim once lenders are paid. Below 1× the preferred is not fully covered at today's prices."},
 };
 const defLabel = lbl => METRIC_DEFS[lbl] ? `<span>${lbl}<span class="defhint" data-def="${lbl}" aria-label="About this metric">&#9432;</span></span>` : lbl;
 
-// build a metric row: {label, sub, mstr, asst, betterFor, cls}
-function row(cfg){
-  const valCell = (co) => {
-    const isBetter = cfg.betterFor === co;
-    const extra = (cfg.cls && cfg.cls[co]) ? cfg.cls[co] : "";
-    return `<div class="gval ${extra} ${isBetter?'better':''}">${cfg[co] ?? "—"}</div>`;
-  };
+// Which issuers get the ▲: the best value of cmp(o), higher unless dir is "min". A
+// figure counted in BTC or SOL rather than dollars only compares issuers holding the
+// same asset, so sameAsset scores each asset on its own; one issuer alone gets none.
+function winners(cmp, dir, sameAsset){
+  const D = DATA.companies, groups = {}, out = new Set();
+  COS.forEach(co => { const v = cmp(D[co]);
+    if(v != null && isFinite(v)) (groups[sameAsset ? D[co].asset : "all"] ||= []).push([co, v]); });
+  Object.values(groups).forEach(g => {
+    const vs = g.map(x => x[1]), top = dir === "min" ? Math.min(...vs) : Math.max(...vs);
+    if(g.length < 2 || vs.every(v => v === top)) return;
+    g.forEach(([co, v]) => { if(v === top) out.add(co); });
+  });
+  return out;
+}
+
+// One metric row across COS: cell(o) renders each issuer's value, cls(o) adds a class,
+// and cmp(o), when given, decides the ▲ (see winners).
+function row({label, cell, cls, cmp, dir, sameAsset}){
+  const D = DATA.companies, win = cmp ? winners(cmp, dir, sameAsset) : new Set();
   return `<div class="grow">
-    <div class="glabel">${defLabel(cfg.label)}</div>
-    ${valCell("MSTR")}${valCell("ASST")}
+    <div class="glabel">${defLabel(label)}</div>
+    ${COS.map(co => `<div class="gval ${cls ? cls(D[co]) : ""} ${win.has(co) ? "better" : ""}">${cell(D[co]) ?? "—"}</div>`).join("")}
   </div>`;
 }
 
 function headRow(){
   const c = (k)=>{const o=DATA.companies[k];return `<div class="co" style="color:${o.accent}">${o.ticker} <small>· ${o.name} · ${o.prefTicker} pref</small></div>`;};
-  return `<div class="grow headrow"><div class="glabel"></div>${c("MSTR")}${c("ASST")}</div>`;
+  return `<div class="grow headrow"><div class="glabel"></div>${COS.map(c).join("")}</div>`;
 }
+// a section sub-heading inside a metric grid, with an empty cell per issuer
+const subHead = html => `<div class="grow headrow"><div class="glabel" style="color:var(--muted)">${html}</div>${COS.map(()=>"<div></div>").join("")}</div>`;
 
 // ---------- section renderers ----------
 function renderCompany(){
-  const M=DATA.companies.MSTR, A=DATA.companies.ASST;
+  const D = DATA.companies;
   const mcap = o => o.stockPrice*o.sharesOutstanding;             // $mm (shares in millions)
   const ev   = o => mcap(o)+o.seniorDebt+o.prefNotional-o.cash;   // $mm
-  const chg  = v => `<span class="${v>=0?'pos':'neg'}">${sig(v)}${fmt(v,2)}%</span>`;
+  const chg  = v => v==null ? null : `<span class="${v>=0?'pos':'neg'}">${sig(v)}${fmt(v,2)}%</span>`;
 
   // stock-price performance hover (1wk / 1mo / YTD) from the daily series
   const SH = DATA.stockHistory || (typeof SEED!=="undefined"?SEED.stockHistory:null) || {};
-  const yrSfx = "'"+((DATA.asOf||"2026").slice(2,4));
   const perfN = (arr,n) => (arr && arr.length>n && arr[arr.length-1-n]!=null) ? (arr.at(-1)/arr[arr.length-1-n]-1)*100 : null;
-  const perfYtd = arr => { const ds=SH.dates||[]; const i=ds.findIndex(d=>d.includes(yrSfx)); const b=i>0?i-1:0;
-    return (arr && arr[b]!=null) ? (arr.at(-1)/arr[b]-1)*100 : null; };
+  // YTD runs from the prior year's last row. The display labels ("Oct 26") carry no
+  // year, so find this year's first day in the ISO dates; a series that starts inside
+  // the year has no base, and shows "—" rather than a return from its first row.
+  const yr = (DATA.asOf||"2026").slice(0,4);
+  const perfYtd = arr => { const i=(SH.iso||[]).findIndex(d=>d.slice(0,4)===yr);
+    return (arr && i>0 && arr[i-1]!=null) ? (arr.at(-1)/arr[i-1]-1)*100 : null; };
   const pctC = v => v==null ? "—" : `<span class='${v>=0?'pos':'neg'}'>${sig(v)}${fmt(v,1)}%</span>`;
   // stockHistory has a row per calendar day
   const perfRows = arr => [["1 Week",pctC(perfN(arr,7))],["1 Month",pctC(perfN(arr,30))],["YTD",pctC(perfYtd(arr))]].map(r=>r.join("~")).join("|");
-  const priceCell = (o,arr) => `<span class="evhint" data-title="Performance" data-rows="${perfRows(arr)}">${usd(o.stockPrice,2)}</span>`;
+  const priceCell = o => `<span class="evhint" data-title="Performance" data-rows="${perfRows(SH[o.ticker])}">${usd(o.stockPrice,2)}</span>`;
 
   // preferred-by-series breakdown hover (MSTR has STRC, STRF, STRK, STRD)
   const prefCell = o => { const b=o.prefBreakdown;
@@ -1044,11 +1203,10 @@ function renderCompany(){
     return `<span class="evhint" data-title="Preferred by Series" data-rows="${rows}">${bil(o.prefNotional)}</span>`; };
 
   let h = headRow();
-  h += row({label:"Stock Price", sub:"common · hover for performance", MSTR:priceCell(M,SH.MSTR), ASST:priceCell(A,SH.ASST)});
-  h += row({label:"Day Change", MSTR:chg(M.dayChangePct), ASST:chg(A.dayChangePct)});
-  h += row({label:"Market Cap", MSTR:bil(mcap(M)), ASST:bil(mcap(A)),
-    betterFor: mcap(M)>mcap(A)?"MSTR":"ASST"});
-  h += row({label:"Shares Outstanding", MSTR:fmt(M.sharesOutstanding,2)+" <span class='unit'>M</span>", ASST:fmt(A.sharesOutstanding,2)+" <span class='unit'>M</span>"});
+  h += row({label:"Stock Price", cell:priceCell});
+  h += row({label:"Day Change", cell:o => chg(o.dayChangePct)});
+  h += row({label:"Market Cap", cell:o => bil(mcap(o)), cmp:mcap});
+  h += row({label:"Shares Outstanding", cell:o => fmt(o.sharesOutstanding,2)+" <span class='unit'>M</span>"});
   const evRows = o => [
     ["Market Cap", bil(mcap(o))],
     ["+ Senior Debt", bil(o.seniorDebt)],
@@ -1056,29 +1214,30 @@ function renderCompany(){
     ["− Cash", bil(o.cash)],
     ["Enterprise Value", bil(ev(o))]
   ].map(r=>r.join("~")).join("|");
-  const evCell = o => `<span class="evhint" data-title="Enterprise Value" data-rows="${evRows(o)}">${bil(ev(o))}</span>`;
-  h += row({label:"Enterprise Value", sub:"hover for breakdown",
-    MSTR:evCell(M), ASST:evCell(A)});
-  h += row({label:"Beta to BTC", MSTR:fmt(M.betaBtc,2), ASST:fmt(A.betaBtc,2)});
-  h += row({label:"Preferred Price", sub:"vs $100 par", MSTR:usd(M.prefPrice,2), ASST:usd(A.prefPrice,2)});
+  h += row({label:"Enterprise Value", cell:o => `<span class="evhint" data-title="Enterprise Value" data-rows="${evRows(o)}">${bil(ev(o))}</span>`});
+  // each stock against its own treasury asset
+  h += row({label:"Beta to Treasury Asset", cell:o => { const b = o.betaBtc ?? o.betaAsset;
+    return b==null ? null : fmt(b,2)+` <span class='unit'>vs ${assetUnit(o)}</span>`; }});
+  // CHAD's stated amount is $10, not $100, so name it wherever it isn't the usual $100
+  h += row({label:"Preferred Price", cell:o => usd(o.prefPrice,2)
+    + ((o.prefStated||100) !== 100 ? ` <span class='unit'>/ $${fmt(o.prefStated)}</span>` : "")});
   // balance-sheet metrics (relocated from Capital Structure)
   const debtCell = o => { const disp=capFmt(o.seniorDebt);
     return (o.debtSchedule||[]).length ? `<span class="debthint" data-co="${o.ticker}">${disp}</span>` : disp; };
-  h += row({label:"Crypto Holdings", sub:"BTC", MSTR:"₿"+fmt(M.holdings), ASST:"₿"+fmt(A.holdings)});
+  h += row({label:"Crypto Holdings", cell:holdingsHtml});
   // Strive holds 505k STRC and reports it inside "cash"; show the split on hover
-  const cashCell = o => {
-    if(o.cashUsd==null || !o.strcShares) return capFmt(o.cash);
-    const px = M.prefPrice||0, pos = o.strcShares*px/1e6;
+  const strcPx = (D.MSTR && D.MSTR.prefPrice) || 0;
+  const strcHeldCell = o => {
+    const pos = o.strcShares*strcPx/1e6;
     const rows = [["USD Cash", capFmt(o.cashUsd)],
-                  [`STRC Held (${fmt(o.strcShares)} sh × ${usd(px,2)})`, capFmt(pos)],
+                  [`STRC Held (${fmt(o.strcShares)} sh × ${usd(strcPx,2)})`, capFmt(pos)],
                   ["Total Reserve", capFmt(o.cashUsd+pos)]].map(r=>r.join("~")).join("|");
     return `<span class="evhint" data-title="Cash &amp; Equivalents" data-rows="${rows}">${capFmt(o.cash)}</span>`;
   };
   // MSTR cash is the USD Reserve + USD Cash the newest weekly 8-K states; strategy.com's
   // live figure, built from the same balances, is what shows when it answered
-  const mstrCashCell = o => {
-    const f = o.cashFiled;      // a bare number in a data.json from before the 8-K balances
-    if(!f || typeof f !== "object" || typeof f.reserve !== "number") return capFmt(o.cash);
+  const filedCashCell = o => {
+    const f = o.cashFiled;
     const filedTotal = f.reserve + (f.usdCash || 0);
     const rows = [["USD Reserve", capFmt(f.reserve)]];
     if(f.usdCash != null) rows.push(["USD Cash", capFmt(f.usdCash)]);
@@ -1086,86 +1245,84 @@ function renderCompany(){
     if(capFmt(o.cash) !== capFmt(filedTotal)) rows.push(["Shown · strategy.com live", capFmt(o.cash)]);
     return `<span class="evhint" data-title="USD Reserve + USD Cash" data-rows="${rows.map(r=>r.join("~")).join("|")}">${capFmt(o.cash)}</span>`;
   };
-  h += row({label:"Cash & Cash Equivalents", sub:"per latest 8-K · hover for split", MSTR:mstrCashCell(M), ASST:cashCell(A)});
-  h += row({label:"Senior Debt", sub:"convertible notes · hover for schedule", MSTR:debtCell(M), ASST:debtCell(A)});
-  h += row({label:"Preferred Equity Notional", sub:"by series · hover for breakdown", MSTR:prefCell(M), ASST:prefCell(A)});
-  h += row({label:"Annual Obligations", MSTR:capFmt(M.annualObligations), ASST:capFmt(A.annualObligations)});
+  // which hover a cash figure gets depends on what the data carries, not the ticker
+  // (a bare cashFiled number is a data.json from before the 8-K balances)
+  const cashCell = o =>
+      (o.cashFiled && typeof o.cashFiled === "object" && typeof o.cashFiled.reserve === "number") ? filedCashCell(o)
+    : (o.cashUsd != null && o.strcShares) ? strcHeldCell(o)
+    : capFmt(o.cash);
+  h += row({label:"Cash & Cash Equivalents", cell:cashCell});
+  h += row({label:"Senior Debt", cell:debtCell});
+  h += row({label:"Preferred Equity Notional", cell:prefCell});
+  h += row({label:"Annual Obligations", cell:o => capFmt(o.annualObligations)});
   // duration split, per strategy.com: how many years each reserve alone covers the obligations
-  const btcDur = o => o.annualObligations>0 ? o.holdings*btcPrice/1e6/o.annualObligations : null;
-  h += row({label:"BTC Duration", sub:"BTC reserve ÷ obligations", MSTR:fmt(btcDur(M),1)+" yrs", ASST:fmt(btcDur(A),1)+" yrs",
-    betterFor: btcDur(M)>btcDur(A)?"MSTR":"ASST"});
+  const cryptoDur = o => o.annualObligations>0 ? o.holdings*assetPx(o)/1e6/o.annualObligations : null;
+  h += row({label:"Crypto Duration", cell:o => fmt(cryptoDur(o),1)+" yrs", cmp:cryptoDur});
   // "USD" means dollars. ASST parks part of its reserve in STRC (BTC-linked paper,
   // marked live at STRC's price) — headline only true dollars, blend in the hover.
-  const usdOnlyA = A.cashUsd != null ? A.cashUsd : A.cash;
-  const strcValA = (A.strcShares && M.prefPrice) ? A.strcShares*M.prefPrice/1e6 : 0;
-  const usdDurM = M.cash/M.annualObligations, usdDurA = usdOnlyA/A.annualObligations;
-  const asstUsdCell = strcValA > 0.5
-    ? `<span class="evhint" data-title="ASST reserve composition" data-rows="${[
-        ["True USD", "$"+fmt(usdOnlyA)+"M → "+fmt(usdDurA,1)+" yrs"],
-        ["+ STRC held ("+fmt(A.strcShares/1e3)+"k sh @ $"+fmt(M.prefPrice,2)+")", "$"+fmt(strcValA)+"M"],
-        ["= Blended reserve", "$"+fmt(usdOnlyA+strcValA)+"M → "+fmt((usdOnlyA+strcValA)/A.annualObligations,1)+" yrs"],
+  const usdOnly = o => o.cashUsd != null ? o.cashUsd : o.cash;
+  const usdDur = o => o.annualObligations>0 ? usdOnly(o)/o.annualObligations : null;
+  const usdDurCell = o => {
+    const strcVal = (o.strcShares && strcPx) ? o.strcShares*strcPx/1e6 : 0;
+    if(strcVal <= 0.5) return fmt(usdDur(o),1)+" yrs";
+    return `<span class="evhint" data-title="${o.ticker} reserve composition" data-rows="${[
+        ["True USD", "$"+fmt(usdOnly(o))+"M → "+fmt(usdDur(o),1)+" yrs"],
+        ["+ STRC held ("+fmt(o.strcShares/1e3)+"k sh @ $"+fmt(strcPx,2)+")", "$"+fmt(strcVal)+"M"],
+        ["= Blended reserve", "$"+fmt(usdOnly(o)+strcVal)+"M → "+fmt((usdOnly(o)+strcVal)/o.annualObligations,1)+" yrs"],
         ["Caveat", "STRC is BTC-linked paper — weakest exactly when the reserve is needed"]
-      ].map(r=>r.join("~")).join("|")}">${fmt(usdDurA,1)} yrs</span>`
-    : fmt(usdDurA,1)+" yrs";
-  h += row({label:"USD Duration", sub:"true dollars ÷ obligations", MSTR:fmt(usdDurM,1)+" yrs", ASST:asstUsdCell,
-    betterFor: usdDurM>usdDurA?"MSTR":"ASST"});
+      ].map(r=>r.join("~")).join("|")}">${fmt(usdDur(o),1)} yrs</span>`;
+  };
+  h += row({label:"USD Duration", cell:usdDurCell, cmp:usdDur});
   document.getElementById("grid-company").innerHTML = h;
 }
 
 function renderHoldings(){
-  const M=DATA.companies.MSTR, A=DATA.companies.ASST;
   const curYr = (DATA.asOf||"2026").slice(0,4);
   const holdRows = o => {
-    const ye = o.yearEnd || {};
-    const rows = [[`YTD ${curYr}`, fmt(o.holdings)+" ₿"]]
-      .concat(Object.keys(ye).sort().reverse().map(y => [y, fmt(ye[y])+" ₿"]));
+    const ye = o.yearEnd || {}, u = " "+assetSym(o);
+    const rows = [[`YTD ${curYr}`, fmt(o.holdings)+u]]
+      .concat(Object.keys(ye).sort().reverse().map(y => [y, fmt(ye[y])+u]));
     return rows.map(r=>r.join("~")).join("|");
   };
-  const holdCell = o => `<span class="evhint" data-title="BTC Holdings · Year-End" data-rows="${holdRows(o)}">${fmt(o.holdings)} <span class='unit'>BTC</span></span>`;
+  const holdCell = o => `<span class="evhint" data-title="${assetUnit(o)} Holdings · Year-End" data-rows="${holdRows(o)}">${fmt(o.holdings)} <span class='unit'>${assetUnit(o)}</span></span>`;
+  const unit = o => ` <span class='unit'>${assetUnit(o)}</span>`;
   let h = headRow();
-  h += row({label:"Total BTC Holdings", sub:"hover for year-by-year", MSTR:holdCell(M), ASST:holdCell(A)});
-  h += row({label:"% of 21M Supply", MSTR:pct(M.pctSupply,3), ASST:pct(A.pctSupply,3)});
-  h += row({label:"Net Change YTD", sub:"BTC added this year",
-    MSTR:`<span class="pos">${sig(M.netChangeYtd)}${fmt(M.netChangeYtd)}</span>`,
-    ASST:`<span class="pos">${sig(A.netChangeYtd)}${fmt(A.netChangeYtd)}</span>`});
-  h += row({label:"YTD Growth (Relative)", sub:"",
-    MSTR:pct(relGrowth(M)), ASST:pct(relGrowth(A)), betterFor: relGrowth(A)>relGrowth(M)?"ASST":"MSTR"});
-  // average weekly/daily acquisition derived from the real 8-K weeks when available
+  h += row({label:"Total Holdings", cell:holdCell});
+  h += row({label:"% of Supply", cell:o => pct(o.pctSupply,3)
+    + ` <span class='unit'>${o.asset === "SOL" ? "of circ." : "of 21M"}</span>`});
+  h += row({label:"Net Change YTD", cell:o => o.netChangeYtd==null ? null
+    : `<span class="${o.netChangeYtd>=0?'pos':'neg'}">${sig(o.netChangeYtd)}${fmt(o.netChangeYtd)}</span>`+unit(o)});
+  h += row({label:"YTD Growth (Relative)", cell:o => pct(relGrowth(o)), cmp:relGrowth});
+  // average weekly/daily acquisition derived from the real weeks when available
   const W = DATA.weekly || {};
-  const perWk = co => { let a = W[co] && W[co].acquired; if(a) a = a.filter(x=>x!=null);
-    return (a && a.length) ? Math.round(a.reduce((x,y)=>x+y,0)/a.length) : DATA.companies[co].btcPerWeek; };
-  const pwM=perWk("MSTR"), pwA=perWk("ASST");
-  const wkSub = (!W.illustrative && W.MSTR) ? "avg across reported 8-K weeks" : "";
-  h += row({label:"Avg. BTC Acquired / Week", sub:wkSub, MSTR:fmt(pwM), ASST:fmt(pwA),
-    betterFor: (pwA/A.holdings)>(pwM/M.holdings)?"ASST":"MSTR"});
-  h += row({label:"Avg. BTC Acquired / Day", MSTR:fmt(Math.round(pwM/7)), ASST:fmt(Math.round(pwA/7))});
+  const perWk = o => { let a = W[o.ticker] && W[o.ticker].acquired; if(a) a = a.filter(x=>x!=null);
+    return (a && a.length) ? Math.round(a.reduce((x,y)=>x+y,0)/a.length) : o.btcPerWeek; };
+  h += row({label:"Avg. Acquired / Week", cell:o => perWk(o)==null ? null : fmt(perWk(o))+unit(o),
+    cmp:o => perWk(o)!=null && o.holdings ? perWk(o)/o.holdings : null});
+  h += row({label:"Avg. Acquired / Day", cell:o => perWk(o)==null ? null : fmt(Math.round(perWk(o)/7))+unit(o)});
   document.getElementById("grid-holdings").innerHTML = h;
 }
-function relGrowth(o){ const start=o.holdings-o.netChangeYtd; return start>0 ? o.netChangeYtd/start*100 : null; }
+function relGrowth(o){ const start=o.holdings-o.netChangeYtd; return o.netChangeYtd!=null && start>0 ? o.netChangeYtd/start*100 : null; }
 
 function renderCost(){
-  const M=DATA.companies.MSTR, A=DATA.companies.ASST;
-  const plM = M.holdings*(btcPrice-M.avgCost), plA = A.holdings*(btcPrice-A.avgCost);
-  const plPctM=(btcPrice/M.avgCost-1)*100, plPctA=(btcPrice/A.avgCost-1)*100;
-  const plCls = v => v>=0?"pos":"neg";
+  const ret = o => o.avgCost ? (assetPx(o)/o.avgCost-1)*100 : null;
+  // DFDV's cost covers only the SOL in its purchase log (costBasisSol), not all it holds
+  const pl  = o => o.avgCost ? (o.costBasisSol || o.holdings)*(assetPx(o)-o.avgCost) : null;
+  const plCls = v => v==null ? "" : v>=0?"pos":"neg";
   let h = headRow();
-  h += row({label:"Avg Acquisition Cost / BTC", MSTR:usd(M.avgCost), ASST:usd(A.avgCost),
-    betterFor: M.avgCost<A.avgCost?"MSTR":"ASST"});
-  h += row({label:"Current Return on BTC", MSTR:pct(plPctM), ASST:pct(plPctA),
-    cls:{MSTR:plCls(plPctM),ASST:plCls(plPctA)}});
-  h += row({label:"Unrealized P/L", sub:"at live BTC price",
-    MSTR:`<span class="${plCls(plM)}">${sUsdB(plM)}</span>`,
-    ASST:`<span class="${plCls(plA)}">${sUsdM(plA)}</span>`});
+  h += row({label:"Avg Acquisition Cost", cell:o => o.avgCost ? usd(o.avgCost)+` <span class='unit'>/ ${assetUnit(o)}</span>` : null,
+    cmp:o => o.avgCost, dir:"min", sameAsset:true});
+  h += row({label:"Current Return on Holdings", cell:o => ret(o)==null ? null : pct(ret(o)), cls:o => plCls(ret(o))});
+  h += row({label:"Unrealized P/L", cell:o => { const v = pl(o);
+    return v==null ? null : `<span class="${plCls(v)}">${Math.abs(v)>=1e9 ? sUsdB(v) : sUsdM(v)}</span>`; }});
   document.getElementById("grid-cost").innerHTML = h;
 }
 
 function renderPerShare(){
-  const M=DATA.companies.MSTR, A=DATA.companies.ASST;
   const W = DATA.weekly || {};
-  const wkYield = co => { const a = W[co] && W[co].holdings;
+  const wkYield = o => { const a = W[o.ticker] && W[o.ticker].holdings;
     return (a && a.length>=2) ? (a[a.length-1]/a[a.length-2]-1)*100 : null; };
-  const wyM=wkYield("MSTR"), wyA=wkYield("ASST");
-  const cls = v => v>=0?"pos":"neg";
+  const cls = v => v==null ? "" : v>=0?"pos":"neg";
   let h = headRow();
   // hover reconciles to strategy.com, whose headline figure is per assumed-diluted share
   const bpsRows = o => [["Bitcoin held", fmt(o.holdings)+" BTC"],
@@ -1175,47 +1332,44 @@ function renderPerShare(){
       ["Sats / diluted share", fmt(o.satsPerShareDiluted)],
       ["Sats / basic share", fmt(o.satsPerShareBasic)],
       ["Net sats / diluted share", fmt(o.netSatsPerShare)+" ("+fmt(o.netDilutedShares,2)+"M sh)"]].map(r=>r.join("~")).join("|");
-  const bpsCell = o => !o.satsPerShareDiluted ? fmt(o.satsPerShareBasic)
-    : `<span class="evhint" data-title="Sats per Share" data-rows="${bpsRows(o)}">${fmt(o.satsPerShareDiluted)}</span>`;
-  h += row({label:"Sats per Share", sub:"diluted, as each issuer publishes",
-    MSTR:bpsCell(M), ASST:bpsCell(A)});
-  // live: net reserve moves with BTC, so recompute rather than showing a frozen snapshot
-  const netSats = o => { const p=netParts(o), n=o.netDilutedShares||p.shares;
-    return (p.netReserve>0 && btcPrice && n) ? Math.round(p.netReserve*1e8/(btcPrice*n)) : o.netSatsPerShare; };
-  h += row({label:"Net Sats per Share", sub:"after senior claims",
-    MSTR:fmt(netSats(M)), ASST:fmt(netSats(A))});
-  h += row({label:"BTC Yield — 1 Week", sub:"latest 8-K week", MSTR:pct(wyM), ASST:pct(wyA),
-    cls:{MSTR:cls(wyM),ASST:cls(wyA)}, betterFor: (wyA!=null&&wyM!=null&&wyA>wyM)?"ASST":"MSTR"});
-  h += row({label:"BTC Yield — YTD", sub:"since Jan 1", MSTR:pct(M.btcYieldYtd), ASST:pct(A.btcYieldYtd),
-    cls:{MSTR:"pos",ASST:"pos"}, betterFor: A.btcYieldYtd>M.btcYieldYtd?"ASST":"MSTR"});
+  // BTC issuers publish sats per diluted share; DFDV's headline is SOL per basic share
+  const bpsCell = o => o.asset === "SOL" ? perShareHtml(o, o.holdings/(o.sharesOutstanding*1e6))
+    : !o.satsPerShareDiluted ? fmt(o.satsPerShareBasic)+" <span class='unit'>sats</span>"
+    : `<span class="evhint" data-title="Sats per Share" data-rows="${bpsRows(o)}">${fmt(o.satsPerShareDiluted)}</span> <span class='unit'>sats</span>`;
+  h += row({label:"Holdings per Share", cell:bpsCell});
+  // live: net reserve moves with the asset price, so recompute rather than showing a frozen snapshot
+  const netPerShare = o => { const p=netParts(o), n=o.netDilutedShares||p.shares, px=assetPx(o);
+    if(p.netReserve>0 && px && n) return perShareHtml(o, p.netReserve/(px*n));
+    return o.netSatsPerShare!=null ? fmt(o.netSatsPerShare)+" <span class='unit'>sats</span>" : null; };
+  h += row({label:"Net Holdings per Share", cell:netPerShare});
+  h += row({label:"Treasury Yield — 1 Week", cell:o => wkYield(o)==null ? null : pct(wkYield(o)),
+    cls:o => cls(wkYield(o)), cmp:wkYield});
+  const ytd = o => o.btcYieldYtd ?? o.assetYieldYtd;
+  h += row({label:"Treasury Yield — YTD", cell:o => ytd(o)==null ? null : pct(ytd(o)), cls:o => cls(ytd(o)), cmp:ytd});
   document.getElementById("grid-pershare").innerHTML = h;
 }
 
 function renderValuation(){
-  const M=DATA.companies.MSTR, A=DATA.companies.ASST;
   const mcap = o => o.stockPrice*o.sharesOutstanding;            // $mm
-  const nav  = o => o.holdings*btcPrice/1e6;                     // BTC reserve $mm
+  const nav  = o => o.holdings*assetPx(o)/1e6;                   // crypto reserve $mm
   const evv  = o => mcap(o)+o.seniorDebt+o.prefNotional-o.cash;  // enterprise value
   const claims = o => o.seniorDebt+o.prefNotional-o.cash;        // net senior claims
-  const cebeNav = o => nav(o)-claims(o);                         // after-claims BTC NAV
-  const cebeMn = o => (o.stockPrice && o.sharesOutstanding && cebeNav(o)>0) ? mcap(o)/cebeNav(o) : o.cebeMnav;
-  // CEBE per-share metrics (all live from the capital structure + BTC price)
+  // CEBE per-share metrics (all live from the capital structure + asset price)
   const claimsP = o => { const n=nav(o); return n>0 ? claims(o)/n*100 : null; };
-  const cebeBtc = o => o.holdings - claims(o)*1e6/btcPrice;      // BTC owned by common after claims
-  const cebeSats = o => Math.round(cebeBtc(o)*100/o.sharesOutstanding);      // sats / share (shares in M)
-  const satsPer100 = o => { const mc=mcap(o); return mc>0 ? Math.round(cebeBtc(o)*1e8/(mc*1e6)*100) : null; };
-  const mM=evMnav(M), mA=evMnav(A), nM=netMnav(M), nA=netMnav(A);
+  const cebeUnits = o => o.holdings - claims(o)*1e6/assetPx(o);  // BTC or SOL owned by common after claims
+  const cebe = o => cebeUnits(o)/(o.sharesOutstanding*1e6);      // per share
+  const per100 = o => { const mc=mcap(o); return mc>0 ? cebeUnits(o)/(mc*1e6)*100 : null; };  // per $100 of stock
   const cls = v => v>=1?"pos":"neg";
 
   const mnavRows = o => [
     ["Market Cap", bil(mcap(o))], ["+ Senior Debt", bil(o.seniorDebt)],
     ["+ Preferred", bil(o.prefNotional)], ["− Cash", bil(o.cash)],
-    ["= Enterprise Value", bil(evv(o))], ["÷ BTC Reserve", bil(nav(o))],
+    ["= Enterprise Value", bil(evv(o))], [`÷ ${assetUnit(o)} Reserve`, bil(nav(o))],
     ["= EV mNAV", fmt(evMnav(o),2)+"x"]
   ].map(r=>r.join("~")).join("|");
   const netRows = o => { const p = netParts(o); return [
-    ["BTC Reserve", bil(p.nav)], ["+ Cash", bil(o.cash)],
-    ["− OTM Convertible Debt", bil(p.otm)], ["− Preferred", bil(o.prefNotional)],
+    [`${assetUnit(o)} Reserve`, bil(p.nav)], ["+ Cash", bil(o.cash)],
+    ["− OTM Convertible & Straight Debt", bil(p.otm)], ["− Preferred", bil(o.prefNotional)],
     ["= Net Reserve", bil(p.netReserve)],
     [`Mkt Cap (${fmt(p.shares,2)}M fully-diluted sh)`, bil(p.mcap)],
     // the arithmetic shown is always our own, even when the headline takes
@@ -1223,111 +1377,79 @@ function renderValuation(){
     ["= Net mNAV  (mcap ÷ net reserve)",
       fmt(p.netReserve>0 ? p.mcap/p.netReserve : null,2)+"x"]
   ].map(r=>r.join("~")).join("|"); };
-  const cell = (v,rows,title) => `<span class="evhint" data-title="${title}" data-rows="${rows}"><span class="${cls(v)}">${fmt(v,2)}x</span></span>`;
+  const cell = (v,rows,title) => v==null ? null : `<span class="evhint" data-title="${title}" data-rows="${rows}"><span class="${cls(v)}">${fmt(v,2)}x</span></span>`;
 
-  // Strategy's Jul-2026 net-framework stats (computed live for both names)
+  // Strategy's Jul-2026 net-framework stats (computed live for every name)
   const netRes = o => netParts(o).netReserve;
-  const amp = o => { const p=netParts(o); return p.netReserve>0 ? p.nav/p.netReserve : null; };  // BTC reserve ÷ net reserve (Strategy's definition)
+  const amp = o => { const p=netParts(o); return p.netReserve>0 ? p.nav/p.netReserve : null; };  // crypto reserve ÷ net reserve (Strategy's definition)
   const durY = o => o.annualObligations>0 ? (nav(o)+o.cash)/o.annualObligations : null;
   const brkE = o => (nav(o)+o.cash)>0 ? o.annualObligations/(nav(o)+o.cash)*100 : null;
 
   let h = headRow();
-  h += row({label:"EV mNAV", sub:"hover for math",
-    MSTR:cell(mM,mnavRows(M),"EV mNAV"), ASST:cell(mA,mnavRows(A),"EV mNAV")});
-  h += row({label:"Net mNAV", sub:"hover for math",
-    MSTR:cell(nM,netRows(M),"Net mNAV"), ASST:cell(nA,netRows(A),"Net mNAV")});
-  h += row({label:"Net Reserve", sub:"BTC + USD − OTM debt − pref", MSTR:bil(netRes(M)), ASST:bil(netRes(A))});
-  h += row({label:"Amplification", sub:"BTC reserve ÷ net reserve", MSTR:fmt(amp(M),2)+"x", ASST:fmt(amp(A),2)+"x"});
+  h += row({label:"EV mNAV", cell:o => cell(evMnav(o),mnavRows(o),"EV mNAV")});
+  h += row({label:"Net mNAV", cell:o => cell(netMnav(o),netRows(o),"Net mNAV")});
+  h += row({label:"Net Reserve", cell:o => bil(netRes(o))});
+  h += row({label:"Amplification", cell:o => amp(o)==null ? null : fmt(amp(o),2)+"x"});
   // Strategy's headline "Net Leverage": senior debt left uncovered by the USD
-  // assets, as a % of BTC NAV. Hits 0.0% once the reserve fully offsets the
-  // converts. Published verbatim for MSTR; the same arithmetic for ASST, which
-  // has no debt and so sits at 0 by construction.
+  // assets, as a % of the crypto NAV. Hits 0.0% once the reserve fully offsets the
+  // debt. Published verbatim for MSTR; the same arithmetic for the others (ASST
+  // has no debt and so sits at 0 by construction).
   const netLev = o => { const n = nav(o);
     return o.netLeveragePub != null ? o.netLeveragePub
          : n > 0 ? Math.max(0, (o.seniorDebt || 0) - (o.cash || 0)) / n * 100 : null; };
-  h += row({label:"Net Leverage", sub:"debt not covered by USD assets ÷ BTC NAV",
-    MSTR:fmt(netLev(M),1)+"%", ASST:fmt(netLev(A),1)+"%",
-    betterFor: netLev(M) < netLev(A) ? "MSTR" : netLev(A) < netLev(M) ? "ASST" : null});
-  h += row({label:"Duration", sub:"reserve ÷ annual obligations", MSTR:fmt(durY(M),1)+" yrs", ASST:fmt(durY(A),1)+" yrs",
-    betterFor: durY(M)>durY(A)?"MSTR":"ASST"});
-  h += row({label:"Breakeven BTC Rate", sub:"obligations ÷ reserve", MSTR:fmt(brkE(M),2)+"%/yr", ASST:fmt(brkE(A),2)+"%/yr",
-    betterFor: brkE(M)<brkE(A)?"MSTR":"ASST"});
+  h += row({label:"Net Leverage", cell:o => fmt(netLev(o),1)+"%", cmp:netLev, dir:"min"});
+  h += row({label:"Duration", cell:o => fmt(durY(o),1)+" yrs", cmp:durY});
+  h += row({label:"Breakeven Crypto Rate", cell:o => fmt(brkE(o),2)+"%/yr", cmp:brkE, dir:"min"});
   const hurdle = o => o.hurdleArrPub != null ? o.hurdleArrPub
     : ((o.seniorDebt+o.prefNotional)>0 ? o.annualObligations/(o.seniorDebt+o.prefNotional)*100 : null);
-  h += row({label:"BTC Hurdle Rate", sub:"effective cost of credit", MSTR:fmt(hurdle(M),2)+"%/yr", ASST:fmt(hurdle(A),2)+"%/yr",
-    betterFor: hurdle(M)<hurdle(A)?"MSTR":"ASST"});
-  h += row({label:"CEBE", sub:"live", MSTR:fmt(cebeSats(M)), ASST:fmt(cebeSats(A)),
-    betterFor: cebeSats(M)>cebeSats(A)?"MSTR":"ASST"});
-  h += row({label:"Claims % (Drag)", sub:"live", MSTR:pct(claimsP(M)), ASST:pct(claimsP(A)),
-    betterFor: claimsP(M)<claimsP(A)?"MSTR":"ASST"});
-  h += row({label:"Sats per $100 Invested", sub:"live", MSTR:fmt(satsPer100(M)), ASST:fmt(satsPer100(A)),
-    betterFor: satsPer100(M)>satsPer100(A)?"MSTR":"ASST"});
+  h += row({label:"Crypto Hurdle Rate", cell:o => fmt(hurdle(o),2)+"%/yr", cmp:hurdle, dir:"min"});
+  h += row({label:"CEBE", cell:o => perShareHtml(o, cebe(o)), cmp:cebe, sameAsset:true});
+  h += row({label:"Claims % (Drag)", cell:o => pct(claimsP(o)), cmp:claimsP, dir:"min"});
+  h += row({label:"Holdings per $100 Invested", cell:o => per100(o)==null ? null : perShareHtml(o, per100(o)),
+    cmp:per100, sameAsset:true});
   document.getElementById("grid-valuation").innerHTML = h;
 }
 
 // ---------- Capital structure (read-only, reflects current data) ----------
-const CAP_INPUTS = [
-  {k:"holdings", label:"Crypto Holdings", unit:"₿", sub:"BTC", d:0},
-  {k:"cash", label:"Cash & Cash Equivalents", unit:"$", sub:"USD", d:0},
-  {k:"seniorDebt", label:"Senior Debt", unit:"$", sub:"convertible notes · hover for schedule", d:0},
-  {k:"prefNotional", label:"Preferred Equity Notional", unit:"$", sub:"all series · hover to split", d:0},
-  {k:"annualObligations", label:"Annual Obligations", unit:"$", sub:"USD (mostly pref dividends)", d:0},
-];
-
 function renderCapital(){
+  const nav  = o => o.holdings*assetPx(o)/1e6;
+  const hard = o => nav(o) + o.cash;
+  const ratio = (f, d) => o => f(o)==null ? null : fmt(f(o), d)+"x";
+  const pctOf = f => o => fmt(f(o)*100,1)+"%";
+  const sd = o => o.seniorDebt/hard(o), tl = o => (o.seniorDebt+o.prefNotional)/hard(o);
+  const per = (num, den) => o => den(o)>0 ? num(o)/den(o) : null;
+  const hardOb = per(hard, o=>o.annualObligations), navOb = per(nav, o=>o.annualObligations);
+  const cashOb = per(o=>o.cash, o=>o.annualObligations);
+  const navPref = per(o => nav(o) - o.seniorDebt, o => o.prefNotional);   // after the debt ranked ahead of it
+
   let h = headRow();
-
-  // derived
-  const navM = DATA.companies.MSTR.holdings*btcPrice/1e6;
-  const navA = DATA.companies.ASST.holdings*btcPrice/1e6;
-  const hardM = navM + DATA.companies.MSTR.cash;
-  const hardA = navA + DATA.companies.ASST.cash;
-  const M=DATA.companies.MSTR, A=DATA.companies.ASST;
-
-  const drow = (label,sub,vM,vA,better,fmtFn)=>{
-    const f = fmtFn || (x=>fmt(x,2));
-    const bM = better==="MSTR"?"better":"", bA = better==="ASST"?"better":"";
-    return `<div class="grow" style="border-top:1px solid var(--border)">
-      <div class="glabel">${defLabel(label)}</div>
-      <div class="gval ${bM}">${f(vM)}</div><div class="gval ${bA}">${f(vA)}</div></div>`;
-  };
-
-  h += `<div class="grow headrow"><div class="glabel" style="color:var(--muted)">Crypto NAV &amp; Hard Assets</div><div></div><div></div></div>`;
-  h += drow("Crypto NAV", "", navM, navA, null, x=>capFmt(x));
-  h += drow("Total Hard Assets", "", hardM, hardA, null, x=>capFmt(x));
-
-  h += `<div class="grow headrow"><div class="glabel" style="color:var(--muted)">Leverage <small style='color:var(--faint)'>lower = safer</small></div><div></div><div></div></div>`;
-  const sdM=M.seniorDebt/hardM, sdA=A.seniorDebt/hardA;
-  const tlM=(M.seniorDebt+M.prefNotional)/hardM, tlA=(A.seniorDebt+A.prefNotional)/hardA;
-  h += drow("Senior Debt / Hard Assets","",sdM,sdA, sdM<sdA?"MSTR":"ASST", x=>fmt(x*100,1)+"%");
-  h += drow("(Debt + Preferred) / Hard Assets","",tlM,tlA, tlM<tlA?"MSTR":"ASST", x=>fmt(x*100,1)+"%");
-
-  h += `<div class="grow headrow"><div class="glabel" style="color:var(--muted)">Coverage <small style='color:var(--faint)'>higher = safer</small></div><div></div><div></div></div>`;
-  h += drow("Hard Assets / Annual Obligation","",hardM/M.annualObligations,hardA/A.annualObligations,
-    (hardM/M.annualObligations)>(hardA/A.annualObligations)?"MSTR":"ASST", x=>fmt(x,1)+"x");
-  h += drow("Crypto NAV / Annual Obligation","",navM/M.annualObligations,navA/A.annualObligations,
-    (navM/M.annualObligations)>(navA/A.annualObligations)?"MSTR":"ASST", x=>fmt(x,1)+"x");
-  h += drow("Cash / Annual Obligations","",M.cash/M.annualObligations,A.cash/A.annualObligations,
-    (M.cash/M.annualObligations)>(A.cash/A.annualObligations)?"MSTR":"ASST", x=>fmt(x,2)+"x");
-  h += drow("Crypto NAV / Preferred Notional","",navM/M.prefNotional,navA/A.prefNotional,
-    (navM/M.prefNotional)>(navA/A.prefNotional)?"MSTR":"ASST", x=>fmt(x,2)+"x");
-
+  h += subHead("Crypto NAV &amp; Hard Assets");
+  h += row({label:"Crypto NAV", cell:o => capFmt(nav(o))});
+  h += row({label:"Total Hard Assets", cell:o => capFmt(hard(o))});
+  h += subHead("Leverage <small style='color:var(--faint)'>lower = safer</small>");
+  h += row({label:"Senior Debt / Hard Assets", cell:pctOf(sd), cmp:sd, dir:"min"});
+  h += row({label:"(Debt + Preferred) / Hard Assets", cell:pctOf(tl), cmp:tl, dir:"min"});
+  h += subHead("Coverage <small style='color:var(--faint)'>higher = safer</small>");
+  h += row({label:"Hard Assets / Annual Obligation", cell:ratio(hardOb,1), cmp:hardOb});
+  h += row({label:"Crypto NAV / Annual Obligation", cell:ratio(navOb,1), cmp:navOb});
+  h += row({label:"Cash / Annual Obligations", cell:ratio(cashOb,2), cmp:cashOb});
+  h += row({label:"(Crypto NAV − Debt) / Preferred", cell:ratio(navPref,2), cmp:navPref});
   document.getElementById("grid-capital").innerHTML = h;
 }
 
 // ---------- price + orchestration ----------
 function renderPriceHeader(){
   document.getElementById("btcVal").textContent = usd(btcPrice);
+  document.getElementById("solVal").textContent = usd(solPrice,2);
   const pa=document.getElementById("priceAsOf"); if(pa) pa.textContent = DATA.priceAsOf || "—";
   const da=document.getElementById("dataAsOf"); if(da) da.textContent = DATA.asOf || "—";
-  const M=DATA.companies.MSTR, A=DATA.companies.ASST;
+  const D=DATA.companies, A=D.ASST;
   const set=(id,v)=>{const e=document.getElementById(id); if(e) e.innerHTML=v;};
-  set("hdr-px-MSTR", usd(M.stockPrice,2));
-  set("hdr-px-ASST", usd(A.stockPrice,2));
-  set("hdr-mnav-MSTR", fmt(netMnav(M),2)+"x");
-  set("hdr-mnav-ASST", fmt(netMnav(A),2)+"x");
-  set("hdr-strc", usd(M.prefPrice,2));
-  set("hdr-sata", usd(A.prefPrice,2));
+  COS.forEach(co => { const o = D[co];
+    set("hdr-px-"+co, usd(o.stockPrice,2));
+    set("hdr-mnav-"+co, fmt(netMnav(o),2)+"x");
+    set("hdr-pref-"+co, usd(o.prefPrice,2));
+  });
   // SATS listed 2026-10-20 as Strive's second, junior preferred. The tile only
   // appears once there is a quote, so a feed without it renders exactly as before.
   const p2 = A.pref2, sats = document.getElementById("hdr-sats-item"),
@@ -1372,10 +1494,10 @@ function renderPriceHeader(){
       // separator goes with it, rather than stranding a dangling "·"
       : `${head}<span class="secword">${sep}${base}</span>`;
   };
-  set("hdr-px-MSTR-sub", sub(M, M.dayChangePct,  M.rvol,     "_preClose",     "common"));
-  set("hdr-px-ASST-sub", sub(A, A.dayChangePct,  A.rvol,     "_preClose",     "common"));
-  set("hdr-strc-sub",    sub(M, M.prefChangePct, M.prefRvol, "_prefPreClose", "preferred"));
-  set("hdr-sata-sub",    sub(A, A.prefChangePct, A.prefRvol, "_prefPreClose", "preferred"));
+  COS.forEach(co => { const o = D[co];
+    set("hdr-px-"+co+"-sub",   sub(o, o.dayChangePct,  o.rvol,     "_preClose",     "common"));
+    set("hdr-pref-"+co+"-sub", sub(o, o.prefChangePct, o.prefRvol, "_prefPreClose", "preferred"));
+  });
 }
 // One ATM stat tile; its tooltip rides in data-rows, which tipHTML splits on | then ~.
 function atmCell(k, v, sub, tip, color){
@@ -1479,8 +1601,8 @@ async function checkFilingFreshness(){
   const box = document.getElementById('filing-stale'); if(!box) return;
   const behind = [];
   await Promise.all(Object.entries(SEC_CIK).map(async ([tk, cik]) => {
-    const seen = (DATA.companies[tk] || {}).filingWatch?.ingested
-              || Math.max(...(DATA.actions||[]).filter(a=>a.co===tk).map(a=>a.filed||''), '');
+    // the refresh writes filingWatch for both on every run; without it (seed data) say nothing
+    const seen = (DATA.companies[tk] || {}).filingWatch?.ingested;
     try{
       const r = await fetch(`https://data.sec.gov/submissions/CIK${cik}.json`, {cache:'no-store'});
       if(!r.ok) return;
@@ -1605,7 +1727,7 @@ function weekRange(label, year){
 
 function renderCharts(){
   if(typeof Chart === "undefined"){ document.querySelectorAll(".chartwrap").forEach(w=>w.innerHTML='<div style="color:var(--faint);font-size:12px;padding:20px">Charts need network (Chart.js CDN).</div>'); return; }
-  const acc = {MSTR:"#ed1946", ASST:"#4c9fff"};
+  const acc = co => DATA.companies[co].accent;
 
   // per-section status: flip chip + caption (all sections are now real/derived, no modeled history)
   const setStatus = (sec, illus) => {
@@ -1628,13 +1750,17 @@ function renderCharts(){
   const W = DATA.weekly || SEED.weekly;   // weekly series (own date axis)
 
   COS.forEach(co=>{
-    const c = acc[co];
-    // 1. Accumulation: true weekly resolution — bars BTC acquired/week (y1) + line holdings (y2)
+    const c = acc(co), o = DATA.companies[co], u = assetUnit(o);
+    // 1. Accumulation: true weekly resolution — bars acquired/week (y1) + line holdings (y2)
     const wc = W[co];
+    if(!(wc && (wc.dates || W.dates))) showNoData("ch-acc-"+co, "No weekly holdings series yet.");
+    else {
+    clearNoData("ch-acc-"+co);
     const wdates = wc.dates || W.dates;   // per-company dates (EDGAR) or shared (seed)
     const accOpts = baseOpts({ scales:{
       x:{ ticks:{color:AX,font:{size:11},autoSkip:true,maxTicksLimit:9,maxRotation:0}, grid:{color:GRID} },
-      y1:axis("BTC / week","left"), y2:axis("Total BTC","right",{ticks:{color:AX,font:{size:12},callback:v=>(v/1000)+"k"}}) } });
+      y1:axis(u+" / week","left"),
+      y2:axis("Total "+u,"right",{ticks:{color:AX,font:{size:12},callback:v=>v>=1e6 ? (v/1e6).toFixed(2)+"M" : (v/1000)+"k"}}) } });
     accOpts.plugins.tooltip.callbacks = { title: items => {
       const i = items[0].dataIndex;
       if(wc.ranges && wc.ranges[i]) return "Week of "+wc.ranges[i];   // real 8-K period
@@ -1642,27 +1768,31 @@ function renderCharts(){
     }};
     const [wdates_, wacq_, whold_] = clip(PPM_WEEK, wdates, wc.acquired, wc.holdings);
     mkChart("ch-acc-"+co, { data:{ labels: wdates_, datasets:[
-      {type:"bar", label:"BTC / week", data:wacq_, yAxisID:"y1",
+      {type:"bar", label:u+" / week", data:wacq_, yAxisID:"y1",
         backgroundColor:c+"55", borderColor:c, borderWidth:1, borderRadius:2, order:2,
         hoverBackgroundColor:"rgba(255,255,255,0.9)", hoverBorderColor:"#ffffff", hoverBorderWidth:2},
-      {type:"line", label:"Total BTC", data:whold_, yAxisID:"y2",
+      {type:"line", label:"Total "+u, data:whold_, yAxisID:"y2",
         borderColor:"#fff3ff", backgroundColor:"transparent", borderWidth:2, tension:.25, pointRadius:0, order:1}
     ]}, options: accOpts });
+    }
 
-    // 2. BTC per share over time — real series from strategytracker
-    const bh = DATA.companies[co].bpsHistory || {dates:[],sats:[]};
+    // 2. Treasury per share over time — strategytracker's sats for BTC, DFDV's SOL per share
+    const bh = o.bpsHistory || {dates:[],sats:[]};
+    const per = o.asset === "SOL" ? "SOL / share" : "sats / share";
     const bpsOpts = baseOpts({ scales:{
       x:{ ticks:{color:AX,font:{size:11},autoSkip:true,maxTicksLimit:MTL,maxRotation:0}, grid:{color:GRID} },
-      y:axis("sats / share","left") } });
+      y:axis(per,"left") } });
     bpsOpts.plugins.legend.display = false;
-    const [bhd_, bhs_] = clip(PPM_WEEK, bh.dates, bh.sats);
+    const [bhd_, bhs_] = clip(PPM_WEEK, bh.dates, bh.sats || bh.sol);
     mkChart("ch-bps-"+co, { type:"line", data:{ labels: bhd_, datasets:[
-      {label:"sats / share", data:bhs_, borderColor:c, backgroundColor:c+"22",
+      {label:per, data:bhs_, borderColor:c, backgroundColor:c+"22",
         borderWidth:2, tension:.25, pointRadius:0, fill:true} ]},
       options: bpsOpts });
 
-    // 3. Company Stats price chart — daily close (left) + net mNAV (right)
-    const mhs = DATA.companies[co].mnavHistory;
+    // 3. Company Stats price chart — daily close (left) + net mNAV (right). DFDV's
+    // history is its own EV series (no net), so its card plots and averages EV mNAV.
+    const mhs = o.mnavHistory;
+    const mLbl = mhs && mhs.net ? "Net mNAV" : "EV mNAV";
     if(mhs){
       // MSTR from Oct 2025; ASST from Jan 1, 2026
       const _start = co==="ASST" ? Math.max(0, mhs.dates.findIndex(d=>d.startsWith("Jan"))) : 0;
@@ -1670,26 +1800,26 @@ function renderCharts(){
             (mhs.net || mhs.mnav).slice(_start));
       const siOpts = baseOpts({ scales:{
         x:{ ticks:{color:AX,font:{size:11},autoSkip:true,maxTicksLimit:MTL,maxRotation:0}, grid:{color:GRID} },
-        yP:axis("","left",{ticks:{color:c,font:{size:11},callback:v=>"$"+(+v).toFixed(0)}}),
-        yM:axis("net mNAV","right",{ticks:{color:"#ffffff",font:{size:11},callback:v=>(+v).toFixed(2)+"x"}}) } });
+        yP:axis("","left",{ticks:{color:c,font:{size:11},callback:v=>"$"+(+v).toFixed(o.stockPrice<10?2:0)}}),
+        yM:axis(mLbl,"right",{ticks:{color:"#ffffff",font:{size:11},callback:v=>(+v).toFixed(2)+"x"}}) } });
       siOpts.plugins.tooltip.callbacks = { label: ctx => {
         if(ctx.parsed.y==null) return null;
-        return ctx.dataset.yAxisID==="yM" ? "Net mNAV: "+(+ctx.parsed.y).toFixed(2)+"x"
+        return ctx.dataset.yAxisID==="yM" ? mLbl+": "+(+ctx.parsed.y).toFixed(2)+"x"
                                           : co+": $"+(+ctx.parsed.y).toFixed(2);
       }};
       mkChart("ch-si-"+co, { type:"line", data:{ labels, datasets:[
         {label:"Price", data:px, yAxisID:"yP", borderColor:c, backgroundColor:c+"18",
           borderWidth:2, tension:.2, pointRadius:0, fill:false, order:1},
-        {label:"Net mNAV", data:mn, yAxisID:"yM", borderColor:"rgba(255,255,255,0.85)",
+        {label:mLbl, data:mn, yAxisID:"yM", borderColor:"rgba(255,255,255,0.85)",
           backgroundColor:"transparent", borderWidth:2, tension:.2, pointRadius:0, fill:false, order:2} ]},
         options: siOpts });
 
-      // trailing net-mNAV averages, so today's multiple has historical context.
+      // trailing mNAV averages, so today's multiple has historical context.
       // Always computed on the FULL series, not the visible range.
       const ctx = document.getElementById("mnav-ctx-"+co);
       if(ctx){
         const full = (mhs.net || mhs.mnav).filter(v=>v!=null);
-        const live = netMnav(DATA.companies[co]);
+        const live = mhs.net ? netMnav(o) : evMnav(o);
         // only report a window the history actually covers — it starts Oct 2025 (MSTR)
         // and Jan 2026 (ASST), so a shorter average would wear the wrong label
         const avg = n => { const need = Math.round(n*PPM_CAL);
@@ -1697,19 +1827,20 @@ function renderCharts(){
           const w = full.slice(-need); return w.reduce((a,b)=>a+b,0)/w.length; };
         const cell = (lbl, v) => v==null
           ? `<span class="si-chip" title="Not enough history — this chart's data starts less than ${lbl} ago">${lbl} <b style="color:var(--faint)">—</b></span>`
-          : `<span class="si-chip" title="Average net mNAV over the trailing ${lbl}${
+          : `<span class="si-chip" title="Average ${mLbl} over the trailing ${lbl}${
               live!=null ? ` — today is ${Math.abs((live/v-1)*100).toFixed(0)}% ${live>=v?"above":"below"} it` : ""}">`+
             `${lbl} <b class="${live!=null && live<v ? "" : "warn"}">${fmt(v,2)}x</b></span>`;
         ctx.innerHTML = (live!=null
-            ? `<span class="si-chip" title="Net mNAV right now, live with the BTC price">now <b>${fmt(live,2)}x</b></span>`
+            ? `<span class="si-chip" title="${mLbl} right now, live with the ${u} price">now <b>${fmt(live,2)}x</b></span>`
             : "")
           + cell("1M",avg(1)) + cell("3M",avg(3)) + cell("6M",avg(6)) + cell("1Y",avg(12));
       }
     }
 
-    // 4. Preferred price + shares outstanding (STRC / SATA / SATS); shares = notional / $100 par
+    // 4. Preferred price + shares outstanding (STRC / SATA / SATS / CHAD); shares =
+    // notional ÷ stated amount ($100, CHAD $10)
     const useSats = (co === "ASST" && prefSeries === "SATS");
-    const ph = useSats ? DATA.companies[co].pref2History : DATA.companies[co].prefHistory;
+    const ph = useSats ? o.pref2History : o.prefHistory;
     if(co === "ASST"){
       const t = document.getElementById("pref-title"); if(t) t.textContent = prefSeries;
       if(useSats && (!ph || (ph.px || []).filter(v=>v!=null).length < 2)){
@@ -1719,16 +1850,17 @@ function renderCharts(){
       } else clearNoData("ch-pref-ASST");
     }
     if(ph && !(useSats && (ph.px || []).filter(v=>v!=null).length < 2)){
-      const pt = useSats ? "SATS" : DATA.companies[co].prefTicker;
+      const pt = useSats ? "SATS" : o.prefTicker;
+      const stated = (useSats ? o.pref2 && o.pref2.stated : o.prefStated) || 100;
       const [phd_, phpx_, phn_] = clip(PPM_DAY, ph.dates, ph.px, ph.notional);
-      const shOut = phn_.map(n => n ? n/100 : null);              // $M notional -> M shares
+      const shOut = phn_.map(n => n ? n/stated : null);           // $M notional -> M shares
       const prefOpts = baseOpts({ scales:{
         x:{ ticks:{color:AX,font:{size:11},autoSkip:true,maxTicksLimit:MTL,maxRotation:0}, grid:{color:GRID} },
-        yP:axis("","left",{ticks:{color:c,font:{size:11},callback:v=>"$"+(+v).toFixed(0)}}),
-        yS:axis("shares out","right",{ticks:{color:"#ffffff",font:{size:11},callback:v=>(+v).toFixed(0)+"M"}}) } });
+        yP:axis("","left",{ticks:{color:c,font:{size:11},callback:v=>"$"+(+v).toFixed(stated<100?2:0)}}),
+        yS:axis("shares out","right",{ticks:{color:"#ffffff",font:{size:11},callback:v=>(+v).toFixed(stated<100?2:0)+"M"}}) } });
       prefOpts.plugins.tooltip.callbacks = { label: ctx => {
         if(ctx.parsed.y==null) return null;
-        return ctx.dataset.yAxisID==="yS" ? "Shares outstanding: "+(+ctx.parsed.y).toFixed(1)+"M"
+        return ctx.dataset.yAxisID==="yS" ? "Shares outstanding: "+(+ctx.parsed.y).toFixed(stated<100?3:1)+"M"
                                           : pt+": $"+(+ctx.parsed.y).toFixed(2);
       }};
       mkChart("ch-pref-"+co, { type:"line", data:{ labels: phd_, datasets:[
@@ -1745,11 +1877,11 @@ function renderCharts(){
     // equity holder is actually buying. The EV series (mh.mnav) is still carried
     // in the data and is the coverage view credit holders want; the table above
     // shows both, so the chart plots the one the section is asking about.
-    const mh = DATA.companies[co].mnavHistory;
+    const mh = o.mnavHistory;
     if(mh){
       const mnOpts = baseOpts({ scales:{
         x:{ ticks:{color:AX,font:{size:11},autoSkip:true,maxTicksLimit:MTL,maxRotation:0}, grid:{color:GRID} },
-        yP:axis("","left",{ticks:{color:c,font:{size:11},callback:v=>"$"+(+v).toFixed(0)}}),
+        yP:axis("","left",{ticks:{color:c,font:{size:11},callback:v=>"$"+(+v).toFixed(o.stockPrice<10?2:0)}}),
         // both multiples share one axis: same unit, and the gap between them IS
         // the drag from debt and preferred, which only reads if they are to scale
         yM:axis("mNAV","right",{ticks:{color:"#ffffff",font:{size:11},callback:v=>(+v).toFixed(2)+"x"}}) } });
@@ -1767,8 +1899,8 @@ function renderCharts(){
           borderWidth:2, tension:.2, pointRadius:0, fill:false, order:1},
         // Net solid and bright — the section is about what is left for common.
         // EV dashed and dimmer: the same structure before debt and preferred.
-        {label:"Net mNAV", data:mhnet_, yAxisID:"yM", borderColor:"rgba(255,255,255,0.9)",
-          backgroundColor:"transparent", borderWidth:2, tension:.2, pointRadius:0, fill:false, order:2},
+        ...(mh.net ? [{label:"Net mNAV", data:mhnet_, yAxisID:"yM", borderColor:"rgba(255,255,255,0.9)",
+          backgroundColor:"transparent", borderWidth:2, tension:.2, pointRadius:0, fill:false, order:2}] : []),
         {label:"EV mNAV", data:mhev_, yAxisID:"yM", borderColor:EV_LINE,
           backgroundColor:"transparent", borderWidth:2, borderDash:[6,3], tension:.2,
           pointRadius:0, fill:false, order:3} ]},
@@ -1777,21 +1909,35 @@ function renderCharts(){
   });
 
   // 6. Short Interest section — bars: shorts % of float · line: days to cover (10d avg volume)
+  const D = DATA.companies;
   const shortSpecs = [
-    ["MSTR", DATA.companies.MSTR.shortInterest,     acc.MSTR, DATA.companies.MSTR.borrowFee],
-    ["ASST", DATA.companies.ASST.shortInterest,     acc.ASST, DATA.companies.ASST.borrowFee],
-    ["STRC", DATA.companies.MSTR.prefShortInterest, acc.MSTR, DATA.companies.MSTR.prefBorrowFee],
-    ["SATA", siSeries === "SATS" ? DATA.companies.ASST.pref2ShortInterest
-                                 : DATA.companies.ASST.prefShortInterest,
-             acc.ASST, siSeries === "SATS" ? DATA.companies.ASST.pref2BorrowFee
-                                           : DATA.companies.ASST.prefBorrowFee],
+    ["MSTR", D.MSTR.shortInterest,     acc("MSTR"), D.MSTR.borrowFee],
+    ["ASST", D.ASST.shortInterest,     acc("ASST"), D.ASST.borrowFee],
+    ["DFDV", D.DFDV.shortInterest,     acc("DFDV"), D.DFDV.borrowFee],
+    ["STRC", D.MSTR.prefShortInterest, acc("MSTR"), D.MSTR.prefBorrowFee],
+    ["SATA", siSeries === "SATS" ? D.ASST.pref2ShortInterest
+                                 : D.ASST.prefShortInterest,
+             acc("ASST"), siSeries === "SATS" ? D.ASST.pref2BorrowFee
+                                              : D.ASST.prefBorrowFee],
+    ["CHAD", D.DFDV.prefShortInterest, acc("DFDV"), D.DFDV.prefBorrowFee],
   ];
+  // DFDV and CHAD are newer to the page; an empty card should say why, not look broken
+  ["DFDV","CHAD"].forEach(sym => {
+    const si = shortSpecs.find(x => x[0] === sym)[1];
+    if(si && si.pctFloat) clearNoData("ch-short-"+sym);
+    else {
+      const chips = document.getElementById("si-chips-"+sym); if(chips) chips.innerHTML = "";
+      showNoData("ch-short-"+sym, sym === "CHAD"
+        ? "CHAD listed 8 Sep 2026. No FINRA short-interest settlement for it has been published yet."
+        : "No FINRA short-interest settlements for "+sym+" yet.");
+    }
+  });
   // The SATA card doubles as the SATS card. FINRA settles twice a month and
   // publishes about a week later, so a listing from 20 Oct has nothing to show
   // until mid-November — an empty card would just look broken.
   {
     const t = document.getElementById("si-title"); if(t) t.textContent = siSeries;
-    const s2 = DATA.companies.ASST.pref2ShortInterest;
+    const s2 = D.ASST.pref2ShortInterest;
     if(siSeries === "SATS" && !(s2 && s2.pctFloat)){
       const chips = document.getElementById("si-chips-SATA"); if(chips) chips.innerHTML = "";
       showNoData("ch-short-SATA",
@@ -1802,7 +1948,7 @@ function renderCharts(){
   let anyShorts = false;
   shortSpecs.forEach(([sym, si, ac, fee]) => {
     if(!si || !si.pctFloat) return;
-    if(sym === "SATA" && siSeries === "SATS" && !(DATA.companies.ASST.pref2ShortInterest || {}).pctFloat) return;
+    if(sym === "SATA" && siSeries === "SATS" && !(D.ASST.pref2ShortInterest || {}).pctFloat) return;
     anyShorts = true;
     const chips = document.getElementById("si-chips-"+sym);
     if(chips){
@@ -1814,7 +1960,8 @@ function renderCharts(){
       }
       if(fee && fee.pct!=null){
         const cls = fee.pct>=10 ? "hot" : fee.pct>=2 ? "warn" : "";
-        parts.push(`<span class="si-chip" title="Annualized stock-borrow fee — IBKR indicative rate">`+
+        // the date shows a stalled scrape: on 2026-10-25 these chips were 3 weeks old
+        parts.push(`<span class="si-chip" title="Annualized stock-borrow fee — IBKR indicative rate${fee.asOf ? `, as of ${esc(String(fee.asOf).slice(0, 16))} ET` : ""}">`+
           `<b class="${cls}">${fmt(fee.pct, fee.pct>=10?1:2)}%</b>/yr to borrow</span>`);
       }
       const pf = (si.pctFloat||[]).filter(v=>v!=null).slice(-1)[0];
@@ -1919,26 +2066,31 @@ window.addEventListener("scroll", () => { if(tipPinned) hideTip(); }, {passive:t
 
 // (label-definition tooltips share the unified handler above)
 
-// ---------- debt schedule tooltip (convertible notes) ----------
+// ---------- debt schedule tooltip (convertible notes, and DFDV's loans) ----------
 function debtTipHTML(co){
   const o=DATA.companies[co], ds=o.debtSchedule||[]; if(!ds.length) return null;
   const tot=ds.reduce((s,x)=>s+x.principal,0);
   const wac=ds.reduce((s,x)=>s+x.principal*x.coupon,0)/tot;
   const now=new Date((DATA.asOf||"2026-06-26")+"T00:00:00");
   const yrs=x=>(new Date(x.maturity+"T00:00:00")-now)/(365.25*864e5);
-  const wam=ds.reduce((s,x)=>s+x.principal*yrs(x),0)/tot;
-  const btcPar=(tot*1e6)/o.holdings;                     // BTC price at which reserve covers the debt
+  // weighted over the tranches that mature: DFDV's loans roll monthly or are open-ended
+  const dated=ds.filter(x=>x.maturity), datedTot=dated.reduce((s,x)=>s+x.principal,0);
+  const wam=datedTot ? dated.reduce((s,x)=>s+x.principal*yrs(x),0)/datedTot : null;
+  // the asset price at which the reserve covers the debt. SOL loans are owed in SOL, so
+  // they come off the SOL held rather than being priced: P × held = dollar debt + P × owed
+  const owed=ds.reduce((s,x)=>s+(x.solAmount||0),0), usdDebt=ds.reduce((s,x)=>s+(x.solAmount?0:x.principal),0);
+  const u=assetUnit(o), assetPar=o.holdings>owed ? usdDebt*1e6/(o.holdings-owed) : null;
   const px=o.stockPrice;
-  const mDate=s=>new Date(s+"T00:00:00").toLocaleDateString("en-US",{month:"short",year:"2-digit"});
-  const parity=x=>px*x.convRate/10;                       // conversion value as % of par
+  const mDate=s=>s ? new Date(s+"T00:00:00").toLocaleDateString("en-US",{month:"short",year:"2-digit"}) : "—";
+  const parity=x=>x.convRate ? px*x.convRate/10 : null;   // conversion value as % of par
   const SH=DATA.stockHistory||{}, arr=SH[co]||[];
   const chg=n=>(arr.length>n&&arr[arr.length-1-n])?(arr.at(-1)/arr[arr.length-1-n]-1)*100:null;
   const cc=v=>v==null?"—":`<span class='${v>=0?'pos':'neg'}'>${sig(v)}${fmt(v,1)}%</span>`;
-  const rows=ds.map(x=>`<tr><td>${x.note}</td><td>${fmt(x.coupon,3)}%</td><td>${mDate(x.maturity)}</td><td>${mDate(x.put)}</td><td>$${fmt(x.principal/1000,2)}B</td><td>$${fmt(x.convPrice,2)}</td><td>${fmt(parity(x),0)}%</td></tr>`).join("");
-  return `<div class="et-title">Convertible Notes · ${o.capStructAsOf||""}</div>
-    <div class="dt-sum"><b>$${fmt(tot/1000,2)}B</b> total · Wtd coupon <b>${fmt(wac,2)}%</b> · Wtd maturity <b>${fmt(wam,1)} yr</b> · BTC par <b>$${fmt(btcPar,0)}</b></div>
+  const rows=ds.map(x=>`<tr><td>${esc(x.note)}${x.solAmount ? ` <span style="color:var(--faint);font-weight:400">${fmt(x.solAmount)} SOL</span>` : ""}</td><td>${fmt(x.coupon,3)}%</td><td>${mDate(x.maturity)}</td><td>${mDate(x.put)}</td><td>${capFmt(x.principal)}</td><td>${x.convPrice ? "$"+fmt(x.convPrice,2) : "—"}</td><td>${parity(x)==null ? "—" : fmt(parity(x),0)+"%"}</td></tr>`).join("");
+  return `<div class="et-title">${ds.every(x=>x.convPrice) ? "Convertible Notes" : "Debt"} · ${esc(o.capStructAsOf)}</div>
+    <div class="dt-sum"><b>${capFmt(tot)}</b> total · Wtd coupon <b>${fmt(wac,2)}%</b>${wam!=null ? ` · Wtd maturity${dated.length<ds.length ? " of dated notes" : ""} <b>${fmt(wam,1)} yr</b>` : ""} · ${u} par <b>${assetPar==null ? "—" : "$"+fmt(assetPar, assetPar<1000?2:0)}</b></div>
     <table class="dt"><tr><th>Note</th><th>Coupon</th><th>Maturity</th><th>Put</th><th>Principal</th><th>Conv $</th><th>Parity</th></tr>${rows}</table>
-    <div class="dt-note">BTC par = BTC price at which reserves cover the bonds. Parity = conversion value ÷ par at live stock ($${fmt(px,2)}); stock 7d ${cc(chg(7))}, 1mo ${cc(chg(30))}. Actual bond prices trade above parity (bond floor) and need a TRACE/dealer feed.</div>`;
+    <div class="dt-note">${u} par = ${u} price at which reserves cover the debt${owed ? ", with the SOL loans repaid in SOL" : ""}. Parity = conversion value ÷ par at live stock ($${fmt(px,2)}); stock 7d ${cc(chg(7))}, 1mo ${cc(chg(30))}. Actual bond prices trade above parity (bond floor) and need a TRACE/dealer feed.${ds.some(x=>x.solAmount) ? " SOL loans are marked at the live SOL price." : ""}</div>`;
 }
 const debttip=document.createElement("div"); debttip.id="debttip"; document.body.appendChild(debttip);
 document.addEventListener("mouseover", e => {
@@ -1964,34 +2116,57 @@ function paintFresh(){
 }
 setInterval(paintFresh, 30000);
 
-async function fetchBtcPrice(){
-  const sub = document.getElementById("btcSub");
+async function fetchCryptoPrices(){
+  const sub = document.getElementById("btcSub"), ssub = document.getElementById("solSub");
+  const live = (el, ch) => { el.innerHTML = `live · CoinGecko · 24h <span class="${ch>=0?'pos':'neg'}">${sig(ch)}${fmt(ch,2)}%</span>`;
+                             el.className = "sub live"; };
   try{
     sub.textContent = "fetching live price…"; sub.className="sub";
-    const r = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true");
+    const r = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,solana&vs_currencies=usd&include_24hr_change=true");
     if(!r.ok) throw new Error(r.status);
     const j = await r.json();
-    btcPrice = j.bitcoin.usd;
-    const ch = j.bitcoin.usd_24h_change;
-    sub.innerHTML = `live · CoinGecko · 24h <span class="${ch>=0?'pos':'neg'}">${sig(ch)}${fmt(ch,2)}%</span>`;
-    sub.classList.add("live");
-    renderAll(); markFresh();
+    btcPrice = j.bitcoin.usd; liveBtc = true;
+    live(sub, j.bitcoin.usd_24h_change);
+    if(j.solana && j.solana.usd > 0){ solPrice = j.solana.usd; liveSol = true; live(ssub, j.solana.usd_24h_change); }
+    markSolLoans(); renderAll(); markFresh();
   }catch(e){
     sub.textContent = `latest · ${usd(DATA.btcPriceUsd)} · as of ${DATA.priceAsOf}`;
+    ssub.textContent = `latest · ${usd(DATA.solPriceUsd,2)} · as of ${DATA.priceAsOf}`;
   }
+}
+
+// A data.json written before an issuer (or SOL) joined the page has no column for it;
+// take SEED's rather than rendering undefined.
+function seedMissingIssuers(){
+  COS.forEach(tk => { if(!DATA.companies[tk]) DATA.companies[tk] = JSON.parse(JSON.stringify(SEED.companies[tk])); });
+  if(!(DATA.solPriceUsd > 0)) DATA.solPriceUsd = SEED.solPriceUsd;
+}
+
+// DFDV's SOL loans are SOL owed, and data.json values them at the refresh's SOL price.
+// Re-mark them, and the senior debt that holds them, at the live price whenever it
+// moves, so the debt moves with the SOL held instead of staying at the refresh's price.
+function markSolLoans(){
+  if(!(solPrice > 0)) return;
+  Object.values(DATA.companies).forEach(o => (o.debtSchedule || []).forEach(t => {
+    if(!t.solAmount) return;
+    const v = t.solAmount*solPrice/1e6;
+    o.seniorDebt += v - t.principal; t.principal = v;
+  }));
 }
 
 async function loadData(){
   // 1) data.js (window.__DATA__) — instant paint, works even on file:// — but the
   //    browser may cache it, so over http(s) always re-fetch data.json uncached
   //    and let the fresh copy win (2); embedded SEED (3) is the last resort.
-  if(window.__DATA__){ DATA = window.__DATA__; btcPrice = DATA.btcPriceUsd; }
+  if(window.__DATA__){ DATA = window.__DATA__; }
   if(location.protocol !== "file:"){
     try{
       const r = await fetch("./data.json", {cache:"no-store"});
-      if(r.ok){ DATA = await r.json(); btcPrice = DATA.btcPriceUsd; }
+      if(r.ok){ DATA = await r.json(); }
     }catch(e){ /* keep data.js / SEED */ }
   }
+  seedMissingIssuers();
+  btcPrice = DATA.btcPriceUsd; solPrice = DATA.solPriceUsd; markSolLoans();
   if(typeof derivePrevClose === "function") derivePrevClose();
   if(!DATA.history && SEED.history) DATA.history = SEED.history;  // per-block fallbacks
   if(!DATA.weekly && SEED.weekly) DATA.weekly = SEED.weekly;
@@ -1999,161 +2174,170 @@ async function loadData(){
   renderAll();
   renderCharts();
   initCalc();
-  fetchBtcPrice();
+  fetchCryptoPrices();
   checkFilingFreshness();
 }
 
 // ---------- implied price calculator ----------
 // Month-by-month engine (per the CEBE framework): implied price = CEBE NAV/share × mNAV.
-// Preferred/common issuance buys BTC at that month's (linear-path) price; dividends are
-// funded by issuing common or selling BTC; mNAV interpolates linearly to the ending target.
+// Preferred/common issuance buys the treasury asset at that month's (linear-path) price;
+// dividends, interest and operating costs are paid from today's cash, then by issuing
+// common or selling the asset; mNAV interpolates linearly to the ending target.
 let calcCo = "MSTR";
+// The Digital Credit buttons and the issuer each one models: a preferred is valued from
+// its holder's seat on the issuer's whole balance sheet.
+const CREDIT = { STRC:"MSTR", SATA:"ASST", CHAD:"DFDV" };
+const isCredit = co => co in CREDIT;
+const calcIssuer = co => DATA.companies[CREDIT[co] || co];
+
+// Today's treasury, cash and debt as both engines read them. DFDV's SOL loans are SOL
+// owed, so they stay in units (`owed`) and each month marks them at that month's price:
+// a SOL move changes both sides of the balance sheet.
+function balanceSheet(o){
+  const ds = o.debtSchedule || [], spot = assetPx(o);
+  const owed = ds.reduce((s, t) => s + (t.solAmount || 0), 0);
+  return { spot, hold:o.holdings, cash:o.cash, owed,
+           // the dollar debt: senior debt less the SOL loans in it, which `owed` carries in SOL
+           debtUsd: o.seniorDebt - ds.reduce((s, t) => s + (t.solAmount ? t.principal : 0), 0),
+           // yearly coupons: dollar debt in $M, SOL loans in SOL
+           intUsd: ds.reduce((s, t) => s + (t.solAmount ? 0 : t.principal*t.coupon/100), 0),
+           intUnits: ds.reduce((s, t) => s + (t.solAmount ? t.solAmount*t.coupon/100 : 0), 0) };
+}
+// The preferred series other than `tk`: their notional and yearly dividends in $M,
+// each series at its own rate. Both engines read them.
+function otherSeries(o, tk){
+  const others = (o.prefBreakdown || []).filter(r => r[0] !== tk);
+  return { otherNotional: others.reduce((s, r) => s + r[2], 0),
+           otherDivs: others.reduce((s, r) => s + r[2]*(r[3] || 0)/100, 0) };
+}
+// The preferred a button issues and whose rate the rate input sets: the button's own
+// for a Digital Credit one, the issuer's main series (STRC, SATA, CHAD) for a common.
+const issuedSeries = co => isCredit(co) ? co : (DATA.companies[co].prefTicker || "Preferred");
 function calcSnapshot(co){
   const o = DATA.companies[co];
-  return { px:o.stockPrice, sharesM:o.sharesOutstanding, hold:o.holdings,
-           cash:o.cash, debt:o.seniorDebt, pref:o.prefNotional, btc:btcPrice };
+  return { px:o.stockPrice, sharesM:o.sharesOutstanding, pref:o.prefNotional, ...balanceSheet(o),
+           ...otherSeries(o, o.prefTicker) };
 }
-function simulate(s, cfg){
-  // EV mNAV framing: mNAV = (mcap + debt + pref - cash) / BTC NAV, so each month
-  // market cap backs out as mNAV x NAV - claims and price = mcap / shares.
-  // `buf` is the dividend cash runway: issuance proceeds parked as cash to
-  // pre-fund dividends. It offsets claims at face value but never earns the
-  // mNAV multiple, so parked dollars are per-share neutral (vs BTC-bought
-  // dollars, which capture the mNAV premium spread).
-  const nav = (hold,b)=> hold*b/1e6;                                   // $mm
-  const claims = (pref,buf) => s.debt + pref - s.cash - buf;           // $mm
-  // ending-multiple basis: EV prices the whole structure (mcap = mn×NAV − claims);
-  // net prices the common's residual (mcap = mn×(NAV − claims)). Converts are held
-  // at notional throughout — the model doesn't flip ITM tranches into share count.
-  const priceAt = (hold,b,pref,buf,sh,mn)=> Math.max(
-    (cfg.basis==="net" ? mn*(nav(hold,b) - claims(pref,buf))
-                       : mn*nav(hold,b) - claims(pref,buf)) / sh, 0.01);
-  const cebeShare = (hold,b,pref,buf,sh)=> (nav(hold,b) - claims(pref,buf)) / sh;
-  const nav0 = nav(s.hold, s.btc);
-  if(nav0<=0) return null;
-  const mnav0 = (s.px*s.sharesM + claims(s.pref,0)) / nav0;            // current EV mNAV
-  const netNav0 = nav0 - claims(s.pref,0);
-  const net0 = netNav0>0 ? (s.px*s.sharesM)/netNav0 : null;            // current net mNAV
-  const mn0 = (cfg.basis==="net" && net0) ? net0 : mnav0;              // interpolation start
-  const cebe0 = cebeShare(s.hold, s.btc, s.pref, 0, s.sharesM);
-  let hold=s.hold, sharesM=s.sharesM, pref=s.pref, buf=0, p=s.px;
-  let raised=0, raisedMnWt=0, parked=0, premCap=0;
-  let pausedMo=0, forcedDiv=0, divBtcSold=0, broke=null;
-  const idxStock=[100], idxBtc=[100], labels=["0"];
-  for(let m=1;m<=cfg.months;m++){
-    const b  = s.btc + (cfg.btcTarget - s.btc)*m/cfg.months;
-    const mn = mn0 + (cfg.endMnav - mn0)*m/cfg.months;
-    if(broke){                                                         // structure is gone;
-      idxStock.push(0); idxBtc.push(b/s.btc*100); labels.push(String(m)); continue;
-    }
-    // Is the common ATM open this month? Management issues only when the stock
-    // trades above the accretion threshold (Strategy states a hard 1.0x on the
-    // net multiple; Strive behaves the same). Evaluated on the NET multiple
-    // regardless of which basis the user is modelling in, before this month's
-    // issuance — the same information a board would act on.
-    const nav_ = nav(hold,b), cl_ = claims(pref,buf), netNav_ = nav_ - cl_;
-    const netMn = netNav_>0 ? (cfg.basis==="net" ? mn : (mn*nav_ - cl_)/netNav_) : 0;
-    const atmOpen = netNav_>0 && netMn >= cfg.atmFloor;
-    if(!atmOpen && cfg.commonMo>0) pausedMo++;
-    pref += cfg.prefMo;
-    const divMo = pref*cfg.rate/100/12;
-    let gap = Math.max(0, cfg.runway*divMo - buf);                     // cash still to park
-    const pc = Math.min(cfg.prefMo, gap); gap -= pc;                   // preferred ATM:
-    buf += pc; hold += (cfg.prefMo - pc)*1e6/b;                        // runway first, rest -> BTC
-    premCap += (cfg.prefMo - pc)*(mn-1);
-    p = priceAt(hold,b,pref,buf,sharesM,mn);
-    const commonMo = atmOpen ? cfg.commonMo : 0;                       // ATM shut below the floor
-    if(commonMo>0){                                                    // common ATM: same split
-      const cc = Math.min(commonMo, gap);
-      buf += cc; sharesM += commonMo/p; hold += (commonMo - cc)*1e6/b;
-      parked += cc; premCap += (commonMo - cc)*(mn-1);
-    }
-    parked += pc;
-    raised += cfg.prefMo + commonMo; raisedMnWt += (cfg.prefMo + commonMo)*mn;
-    // dividend waterfall: runway cash -> common issuance (only while the ATM is
-    // open) -> forced BTC sales for whatever is left. The mix slider is a
-    // preference, not a guarantee: below the floor, selling coin is the only door.
-    let div = divMo;
-    const fb = Math.min(div, buf); buf -= fb; div -= fb;
-    if(div>0){
-      let viaBtc = div*cfg.fundMix, viaEq = div - viaBtc;
-      if(!atmOpen && viaEq>0){ forcedDiv += viaEq; viaBtc += viaEq; viaEq = 0; }
-      if(viaBtc>0){ hold -= viaBtc*1e6/b; divBtcSold += viaBtc; }
-      if(viaEq>0){ p = priceAt(hold,b,pref,buf,sharesM,mn); sharesM += viaEq/p; }
-    }
-    p = priceAt(hold,b,pref,buf,sharesM,mn);
-    // structural break: reserves gone, or senior claims have eaten them entirely
-    if(hold<=0 || (nav(hold,b) - claims(pref,buf))<=0){
-      broke = { month:m, btc:Math.round(b),
-                why: hold<=0 ? "BTC reserve exhausted by dividend sales"
-                             : "senior claims exceed total reserves" };
-      hold = Math.max(hold, 0); p = 0.01;
-    }
-    idxStock.push(p/s.px*100); idxBtc.push(b/s.btc*100); labels.push(String(m));
-  }
-  const cebeEnd = cebeShare(hold, cfg.btcTarget, pref, buf, sharesM);
-  const stockX = p/s.px, btcX = cfg.btcTarget/s.btc;
-  // sats-per-share accretion (BTC-denominated, so the decomposition is exact:
-  // stock = BTC move x CEBE accretion x residual mNAV re-rate)
-  const satsAcc = cebe0>0 && cebeEnd>0 ? (cebeEnd/cfg.btcTarget)/(cebe0/s.btc) : 1;
-  return { implied:p, stockX, btcX,
-           cebe0, cebeEnd, cebeX:satsAcc, mnav0, net0, mn0, mnavX:stockX/(btcX*satsAcc),
-           endHold:hold, endSharesM:sharesM, endPref:pref, endCash:buf,
-           raised, avgIssMn: raised>0 ? raisedMnWt/raised : null, parked, premCap,
-           pausedMo, forcedDiv, divBtcSold, broke,
-           endClaims:claims(pref,buf)/nav(hold,cfg.btcTarget)*100,
-           idxStock, idxBtc, labels };
+// A common's mNAV today on the given basis ("net" or "ev"), to the input's 0.05 step:
+// an ending target at it re-rates nothing.
+function todaysMultiple(co, basis){
+  const s = calcSnapshot(co), nav0 = s.hold*s.spot/1e6, mcap = s.px*s.sharesM;
+  const cl = s.debtUsd + s.owed*s.spot/1e6 + s.pref - s.cash;
+  const cur = basis==="net" ? (nav0-cl>0 ? mcap/(nav0-cl) : 1) : (mcap + cl)/nav0;
+  return (Math.round(cur*20)/20).toFixed(2);
 }
+// simulate(), simulateCredit() and breakEven() live in calc-engine.js, which the tests load too.
+
+// The selected preferred and the rest of its issuer's stack, as simulateCredit reads them.
+function creditSnapshot(tk){
+  const o = calcIssuer(tk), today = etDateStr();
+  const rows = o.prefBreakdown || [];
+  const me = rows.find(r => r[0] === tk) || [tk, "", o.prefNotional, null];
+  const monthOf = iso => Math.max(1, Math.round((Date.parse(iso) - Date.parse(today))/(30.44*864e5)));
+  // A tranche comes due at its next put or maturity. Out of the money today, it is
+  // repaid in cash then (no refinancing); in the money, it converts into shares.
+  // Loans with neither date roll over.
+  const tranches = (o.debtSchedule || []).map(t => {
+    const date = [t.put, t.maturity].filter(d => d && d > today).sort()[0];
+    const itm = t.convPrice && o.stockPrice >= t.convPrice;
+    return { note:t.note, principal:t.principal, coupon:t.coupon, units:t.solAmount || 0,
+             repay: date && !itm ? monthOf(date) : null, convert: date && itm ? monthOf(date) : null };
+  });
+  return { ...balanceSheet(o), stated:o.prefStated || 100, quote:o.prefPrice,
+           series:me[2], rate:me[3], ...otherSeries(o, tk),
+           tranches };
+}
+
 // Every calculator input, read once. runCalc() and shareCard() need the same field
 // list and the same coercions, so a new input is added here and works in both.
 function readCalcCfg(){
   const gv = id => calcInputValue(document.getElementById(id))||0;
-  return { btcTarget:gv("ci-btc"), months:Math.max(1,Math.round(gv("ci-months"))),
+  const sol = calcIssuer(calcCo).asset === "SOL";
+  return { target:gv(sol ? "ci-sol" : "ci-btc"), months:Math.max(1,Math.round(gv("ci-months"))),
     prefMo:gv("ci-pref"), commonMo:gv("ci-common"), rate:gv("ci-rate"),
     fundMix:gv("ci-fund")/100, endMnav:gv("ci-mnav"), runway:Math.max(0,gv("ci-runway")),
     basis:(document.getElementById("ci-basis")||{}).value || "ev",
-    atmFloor:Math.max(0, gv("ci-floor")) };
+    atmFloor:Math.max(0, gv("ci-floor")),
+    stake: sol ? gv("ci-stake") : 0, opex:gv("ci-opex"),
+    issuePx:gv("ci-issue") || 0.01, reqYield:gv("ci-ry"),
+    crash:gv("ci-crash"), crashMo:gv("ci-crashmo") };
 }
+// an amount of the treasury asset as plain text, for alerts and the share card
+const unitsTxt = (o, n) => o.asset === "SOL" ? fmt(Math.round(n))+" SOL" : "₿"+fmt(Math.round(n));
+const pxTxt = v => "$"+fmt(v, v<1000 ? 2 : 0);
+// a $M axis tick: "$250M", or "$120B" once the stack runs to billions
+const moneyTick = v => Math.abs(v) >= 1000 ? "$"+fmt(v/1000)+"B" : "$"+fmt(v)+"M";
+const yrTxt = m => m>=12 ? `year ${fmt(m/12,1)}` : `month ${m}`;
+// the share cards' horizon, with any crash folded in so the row count holds
+const horizonTxt = cfg => cfg.months+" months"+(cfg.crash > 0 && cfg.months > 1 ? `  ·  ${fmt(cfg.crash)}% crash at mo ${crashMonth(cfg)}` : "");
+// "-27%", or "-99.6%" where a whole number would round to -100%
+const pctFrom = (v, base) => { const d = (v/base - 1)*100; return sig(d)+fmt(d, Math.abs(d) >= 99.5 ? 1 : 0)+"%"; };
+
+// Defaults that stand for "today" (a flat price target, a common's multiple today, a
+// preferred's yield and issue price at its last trade) follow the live values as they
+// tick, so a flat target stays flat while BTC moves. Each follows until its box holds
+// anything else: a typed value, a target a growth rate set, or a link's.
+const liveDefaults = {};          // input id -> [the value last written, how to get today's]
+function followLive(id, get){
+  const el = document.getElementById(id);
+  el.value = get(); liveDefaults[id] = [el.value, get];
+}
+function syncLiveDefaults(){
+  for(const id in liveDefaults){
+    const el = document.getElementById(id), [was, get] = liveDefaults[id];
+    if(el.value !== was){ delete liveDefaults[id]; continue; }
+    el.value = get(); liveDefaults[id][0] = el.value;
+  }
+}
+
 function runCalc(){
   const out=document.getElementById("calc-out"); if(!out || !DATA.companies) return;
-  const s = calcSnapshot(calcCo);
+  syncLiveDefaults();
+  syncGrowth();
+  syncCrashLabel();
+  if(isCredit(calcCo)) runCredit(out); else runCommon(out);
+}
+function runCommon(out){
+  const s = calcSnapshot(calcCo), o = DATA.companies[calcCo], u = assetUnit(o);
   const cfg = readCalcCfg();
   const lbl = document.getElementById("ci-fund-lbl");
   if(lbl){ const m=Math.round(cfg.fundMix*100);
-    lbl.textContent = m===0 ? "100% common issuance" : m===100 ? "100% BTC sales" : m+"% BTC sales · "+(100-m)+"% common"; }
+    lbl.textContent = m===0 ? "100% common issuance" : m===100 ? `100% ${u} sales` : `${m}% ${u} sales · ${100-m}% common`; }
   const rlbl = document.getElementById("ci-runway-lbl");
-  if(rlbl){ const divMo0 = s.pref*cfg.rate/100/12;
-    rlbl.textContent = cfg.runway<=0 ? "0 — every $ raised buys BTC"
+  if(rlbl){ const divMo0 = prefDivsMo(s, s.pref - s.otherNotional, cfg.rate);
+    rlbl.textContent = cfg.runway<=0 ? `0 — every $ raised buys ${u}`
       : "parks ~$"+fmt(Math.round(cfg.runway*divMo0))+"M of dividends as cash first"; }
   const r = simulate(s, cfg);
-  const o = DATA.companies[calcCo];
   document.getElementById("calc-snap").textContent =
-    `Starting today: $${fmt(s.px,2)} · ₿${fmt(s.hold)} · BTC $${fmt(s.btc)} · EV mNAV ${r?fmt(r.mnav0,2):"—"}x · Net ${r&&r.net0?fmt(r.net0,2):"—"}x`;
-  if(!r){ out.innerHTML = '<div class="calc-decomp">BTC NAV is unavailable — model cannot run.</div>'; return; }
+    `Starting today: $${fmt(s.px,2)} · ${unitsTxt(o, s.hold)} · ${u} ${pxTxt(s.spot)} · EV mNAV ${r?fmt(r.mnav0,2):"—"}x · Net ${r&&r.net0?fmt(r.net0,2):"—"}x`;
+  if(!r){ out.innerHTML = `<div class="calc-decomp">${u} NAV is unavailable — model cannot run.</div>`; return; }
   const cls = r.stockX>=1 ? "pos":"neg";
-  const yr = m => m>=12 ? `year ${fmt(m/12,1)}` : `month ${m}`;
-  out.innerHTML = `${ r.broke ? `
-    <div class="calc-alert"><b>Structure breaks in month ${r.broke.month}</b> (${yr(r.broke.month)}, BTC ≈ $${fmt(r.broke.btc)}) — ${r.broke.why}.
-      Common equity is wiped out before the horizon ends; the implied price below is a floor, not a forecast.</div>` : `` }
+  // underwater at the horizon wipes the common out; underwater only in a dip doesn't
+  const wiped = r.broke && r.broke.atEnd;
+  out.innerHTML = `${ wiped ? `
+    <div class="calc-alert"><b>Structure breaks in month ${r.broke.month}</b> (${yrTxt(r.broke.month)}, ${u} ≈ ${pxTxt(r.broke.px)}) — ${r.broke.why}.
+      Common equity is wiped out before the horizon ends; the implied price below is a floor, not a forecast.</div>`
+    : r.broke ? `
+    <div class="calc-alert"><b>Underwater from month ${r.broke.month}</b> (${yrTxt(r.broke.month)}, ${u} ≈ ${pxTxt(r.broke.px)}) — senior claims exceed total reserves for ${r.broke.months} month${r.broke.months>1 ? "s" : ""}, and the common is worth nothing until ${u} recovers.</div>` : `` }
     <div class="calc-cell"><div class="k">Implied ${calcCo} Price</div>
-      <div class="v" style="color:${r.broke ? "#ff7a7a" : o.accent}">${r.broke ? "$0" : "$"+fmt(r.implied,2)}</div>
-      <div class="s">${r.broke ? "equity wiped out" : "in "+cfg.months+" months"}</div></div>
+      <div class="v" style="color:${wiped ? "#ff7a7a" : o.accent}">${wiped ? "$0" : "$"+fmt(r.implied,2)}</div>
+      <div class="s">${wiped ? "equity wiped out" : "in "+cfg.months+" months"}</div></div>
     <div class="calc-cell"><div class="k">Stock Return</div>
       <div class="v ${cls}">${fmt(r.stockX,2)}x</div>
       <div class="s">${sig((r.stockX-1)*100)}${fmt((r.stockX-1)*100,0)}%</div></div>
-    <div class="calc-cell"><div class="k">BTC Return</div>
-      <div class="v">${fmt(r.btcX,2)}x</div>
-      <div class="s">${sig((r.btcX-1)*100)}${fmt((r.btcX-1)*100,0)}%</div></div>
-    <div class="calc-cell"><div class="k">Return vs BTC</div>
-      <div class="v ${r.stockX>=r.btcX?"pos":"neg"}">${fmt(r.stockX/r.btcX,2)}x</div>
-      <div class="s">stock ÷ BTC multiple</div></div>
-    <div class="calc-decomp">Decomposition: BTC <b>${fmt(r.btcX,2)}x</b> × CEBE/share accretion <b>${fmt(r.cebeX,2)}x</b> × mNAV re-rate <b>${fmt(r.mnavX,2)}x</b> = <b>${fmt(r.stockX,2)}x</b>
-      &nbsp;·&nbsp; Ending: ₿${fmt(Math.round(r.endHold))} held · ${fmt(r.endSharesM,1)}M shares · CEBE NAV $${fmt(r.cebeEnd,2)}/sh · claims ${fmt(r.endClaims,1)}% of NAV${
-      r.raised>0 ? `<br>Issuance: $${fmt(Math.round(r.raised))}M raised @ avg ${fmt(r.avgIssMn,2)}× mNAV — $${fmt(Math.round(r.raised - r.parked))}M → BTC (premium captured ≈ ${sig(r.premCap/(r.implied*r.endSharesM)*100)}${fmt(r.premCap/(r.implied*r.endSharesM)*100,1)}% of ending equity) · $${fmt(Math.round(r.parked))}M parked as dividend cash (per-share neutral)${r.endCash>0.5 ? ` · $${fmt(Math.round(r.endCash))}M runway cash left` : ``}` : ``}${
-      (r.pausedMo>0 || r.divBtcSold>0.5) ? `<br>Stress: ${
+    <div class="calc-cell"><div class="k">${u} Return</div>
+      <div class="v">${fmt(r.assetX,2)}x</div>
+      <div class="s">${sig((r.assetX-1)*100)}${fmt((r.assetX-1)*100,0)}%</div></div>
+    <div class="calc-cell"><div class="k">Return vs ${u}</div>
+      <div class="v ${r.stockX>=r.assetX?"pos":"neg"}">${fmt(r.stockX/r.assetX,2)}x</div>
+      <div class="s">stock ÷ ${u} multiple</div></div>
+    <div class="calc-decomp">Decomposition: ${u} <b>${fmt(r.assetX,2)}x</b> × CEBE/share accretion <b>${fmt(r.cebeX,2)}x</b> × mNAV re-rate <b>${fmt(r.mnavX,2)}x</b> = <b>${fmt(r.stockX,2)}x</b>
+      &nbsp;·&nbsp; Ending: ${unitsTxt(o, r.endHold)} held · ${fmt(r.endSharesM,1)}M shares · $${fmt(Math.round(r.endOpenCash))}M of today's cash left · CEBE NAV $${fmt(r.cebeEnd,2)}/sh · claims ${fmt(r.endClaims,1)}% of NAV${
+      r.raised>0 ? `<br>Issuance: $${fmt(Math.round(r.raised))}M raised @ avg ${fmt(r.avgIssMn,2)}× mNAV — $${fmt(Math.round(r.raised - r.parked))}M → ${u} (premium captured ≈ ${sig(r.premCap/(r.implied*r.endSharesM)*100)}${fmt(r.premCap/(r.implied*r.endSharesM)*100,1)}% of ending equity) · $${fmt(Math.round(r.parked))}M parked as dividend cash (${cfg.basis === "net" ? "counted in net NAV" : "per-share neutral"})${r.endCash>0.5 ? ` · $${fmt(Math.round(r.endCash))}M runway cash left` : ``}` : ``}${
+      (r.pausedMo>0 || r.assetSold>0.5) ? `<br>Stress: ${
         r.pausedMo>0 ? `common ATM shut <b>${r.pausedMo} of ${cfg.months} months</b> (net mNAV below ${fmt(cfg.atmFloor,2)}×)` : `ATM open all ${cfg.months} months`}${
-        r.divBtcSold>0.5 ? ` · <b>$${fmt(Math.round(r.divBtcSold))}M</b> of BTC sold to pay dividends${
-          r.forcedDiv>0.5 ? ` (<b>$${fmt(Math.round(r.forcedDiv))}M</b> forced — no ATM to issue into)` : ``}` : ``}` : ``}</div>`;
+        r.assetSold>0.5 ? ` · <b>$${fmt(Math.round(r.assetSold))}M</b> of ${u} sold to pay dividends, interest and costs${
+          r.forcedDiv>0.5 ? ` (<b>$${fmt(Math.round(r.forcedDiv))}M</b> forced — the ATM was shut or stock couldn't cover it)` : ``}` : ``}` : ``}</div>`;
   if(typeof Chart!=="undefined"){
     const mnOpts = baseOpts({ scales:{
       x:{ title:{display:true,text:"months",color:AX,font:{size:11}}, ticks:{color:AX,font:{size:11},autoSkip:true,maxTicksLimit:MTL+2}, grid:{color:GRID} },
@@ -2161,13 +2345,92 @@ function runCalc(){
           title:{display:true,text:"indexed (start = 100)",color:AX,font:{size:11}} } }});
     mkChart("ch-calc", { type:"line", data:{ labels:r.labels, datasets:[
       {label:calcCo+" (implied)", data:r.idxStock, borderColor:o.accent, backgroundColor:o.accent+"18", borderWidth:2, tension:.15, pointRadius:0},
-      {label:"BTC", data:r.idxBtc, borderColor:"#f7931a", backgroundColor:"transparent", borderWidth:2, tension:.15, pointRadius:0} ]},
+      {label:u, data:r.idxAsset, borderColor:assetColor(o), backgroundColor:"transparent", borderWidth:2, tension:.15, pointRadius:0} ]},
       options: mnOpts });
+  }
+}
+// the asset's own line colour on the calculator's charts: bitcoin orange, Solana green
+const assetColor = o => o.asset === "SOL" ? "#14f195" : "#f7931a";
+
+// Everything the Digital Credit view shows, computed once for the page and the share card.
+function creditResult(){
+  const tk = calcCo, o = calcIssuer(tk), cfg = readCalcCfg();
+  const s = creditSnapshot(tk), r = simulateCredit(s, cfg);
+  const pref0 = s.otherNotional + s.series;
+  const cover0 = pref0 > 0 ? (s.hold*s.spot/1e6 + s.cash - s.debtUsd - s.owed*s.spot/1e6)/pref0 : null;
+  // the asset price at which (treasury + cash − debt) just equals the preferred stack
+  const p1x = s.hold > s.owed && pref0 > 0 ? (pref0 + s.debtUsd - s.cash)/(s.hold - s.owed)*1e6 : null;
+  const funded = r.unpaid <= 1e-6;
+  // a price at today's yield only means something while the payments are made and the
+  // preferred is still covered after debt at the end; otherwise it is withheld
+  const covered = r.coverEnd == null || r.coverEnd >= 1;
+  const implied = funded && covered && cfg.reqYield > 0 ? cfg.rate*s.stated/cfg.reqYield : null;
+  const ret = implied != null && s.quote ? (cfg.rate/100*s.stated*cfg.months/12 + implied - s.quote)/s.quote : null;
+  // the next debt repaid after the horizon, so a short horizon can't hide a maturity just past it
+  const next = s.tranches.filter(t => t.repay && t.repay > cfg.months).sort((a, b) => a.repay - b.repay)[0];
+  const be = breakEven(s, cfg), be0 = cfg.prefMo > 0 ? breakEven(s, {...cfg, prefMo:0}) : be;   // be0: without the raise
+  return { tk, o, u:assetUnit(o), cfg, s, r, be, be0, cover0, p1x, funded, covered, implied, ret, next };
+}
+function runCredit(out){
+  const c = creditResult(), {tk, o, u, cfg, s, r, be} = c;
+  document.getElementById("calc-snap").textContent =
+    `Starting today: ${tk} $${fmt(s.quote,2)} · ${fmt(s.rate,2)}% on $${fmt(s.stated)} · $${fmt(s.series,1)}M outstanding · ${o.ticker} ${unitsTxt(o, s.hold)} · ${u} ${pxTxt(s.spot)}`;
+  const issue = document.getElementById("ci-issue-lbl");
+  if(issue) issue.textContent = cfg.issuePx < s.stated
+    ? `below the $${fmt(s.stated)} stated: $1 raised adds $${fmt(s.stated/cfg.issuePx,2)} of claim`
+    : `last trade $${fmt(s.quote,2)} · stated $${fmt(s.stated)}`;
+  const withCrash = cfg.crash > 0 && cfg.months > 1 ? `, with your ${fmt(cfg.crash)}% crash in month ${crashMonth(cfg)}` : ``;
+  // what a break-even says, given what pays when the treasury doesn't have to
+  const beSays = (v, payers) => v === 0 ? `${payers} cover every payment through month ${cfg.months}, whatever ${u} does`
+    : v == null ? `no ending ${u} price up to 20× today funds every payment through month ${cfg.months}${withCrash}`
+    : `every payment stays funded through month ${cfg.months} unless ${u} ends below <b>${pxTxt(v)}</b> (${pctFrom(v, s.spot)} from today)${withCrash}`;
+  const cashAlone = `cash${cfg.stake > 0 ? " and staking" : ""} alone`;
+  // a raise pays bills the cash and treasury would otherwise meet, and the model sells it
+  // in full at any price, so name it and give the break-even without it too
+  const beTxt = cfg.prefMo > 0
+    ? `with $${fmt(cfg.prefMo,1)}M of new ${tk} sold every month, ${beSays(be, `cash${cfg.stake > 0 ? ", staking" : ""} and the raise`)} — if the raise keeps selling. Without the raise, ${beSays(c.be0, cashAlone)}`
+    : beSays(be, cashAlone);
+  out.innerHTML = `${ c.funded ? `` : `
+    <div class="calc-alert"><b>Modeled funding gap from month ${r.firstGap}</b> (${yrTxt(r.firstGap)}, ${u} ≈ ${pxTxt(r.gapPx)}) — cash and the treasury run out before every payment is met: $${fmt(r.unpaid,1)}M unpaid by month ${cfg.months}${
+      r.unpaidDebt > 0.05 ? `, $${fmt(r.unpaidDebt,1)}M of it debt that ranks ahead of ${tk}` : ``}.
+      A model, not a legal default: the company could still raise money${r.unpaidDebt > 0.05 ? " or refinance" : ""}, and unpaid ${tk} dividends accrue.</div>` }
+    <div class="calc-cell"><div class="k">Payments</div>
+      <div class="v ${c.funded ? "pos" : "neg"}">${c.funded ? "Funded" : "Gap · mo "+r.firstGap}</div>
+      <div class="s">${c.funded ? "every payment through month "+cfg.months : "$"+fmt(r.unpaid,1)+"M unpaid"}</div></div>
+    <div class="calc-cell"><div class="k">Cash Runway</div>
+      <div class="v">${r.cashOut == null ? cfg.months+"+ mo" : (r.cashOut - 1)+" mo"}</div>
+      <div class="s">${r.firstSale ? u+" sales from month "+r.firstSale : "no "+u+" sold"}</div></div>
+    <div class="calc-cell"><div class="k">Preferred Coverage</div>
+      <div class="v ${r.coverEnd != null && r.coverEnd < 1 ? "neg" : ""}">${fmt(r.coverEnd,2)}x</div>
+      <div class="s">after debt, month ${cfg.months} · today ${fmt(c.cover0,2)}x</div></div>
+    <div class="calc-cell"><div class="k">Implied ${tk} Price</div>
+      <div class="v" style="color:${c.implied == null ? "#ff7a7a" : o.accent}">${c.implied == null ? "—" : "$"+fmt(c.implied,2)}</div>
+      <div class="s">${c.implied != null ? "at "+fmt(cfg.reqYield,2)+"% required yield"
+        : !c.funded ? "withheld: a payment goes unfunded" : "withheld: not covered by month "+cfg.months}</div></div>
+    <div class="calc-decomp">When it can't pay: ${beTxt}.${c.p1x != null ? ` The preferred stack is covered 1× after debt down to ${u} <b>${pxTxt(c.p1x)}</b>.` : ``}${
+      // paid in cash every month, yet left short of its claims by the end
+      c.funded && r.coverEnd != null && r.coverEnd < 1 ? `<br><b style="color:#ff7a7a">Paid, but not covered:</b> by month ${cfg.months} ${r.coverEnd < 0
+        ? `the treasury no longer covers even the debt ahead of ${tk}` : `the treasury covers only ${fmt(r.coverEnd*100,0)}% of the preferred stack after debt`} — the payments were met by selling down the cushion.` : ``}
+      <br>Paid for by: ${r.soldUsd > 0.05 ? `<b>${unitsTxt(o, r.sold)}</b> sold ($${fmt(r.soldUsd,1)}M)` : `no ${u} sold`}${
+        r.repaid > 0.05 ? ` · <b>$${fmt(r.repaid,1)}M</b> of converts repaid in cash` : ``}${
+        c.next ? ` · next due after this horizon: ${esc(c.next.note)}, $${fmt(c.next.units ? c.next.units*cfg.target/1e6 : c.next.principal,1)}M in month ${c.next.repay}` : ``}${
+        cfg.opex > 0 ? ` · operating costs $${fmt(cfg.opex,1)}M/yr` : ``}${
+      cfg.prefMo > 0 ? `<br>Raising $${fmt(cfg.prefMo,1)}M of ${tk} a month at $${fmt(cfg.issuePx,2)} adds $${fmt(cfg.prefMo*s.stated/cfg.issuePx,2)}M of stated notional a month — $${fmt(r.endSeries,1)}M outstanding by month ${cfg.months}.` : ``}${
+      c.ret != null ? `<br>Investor return: <b>${sig(c.ret*100)}${fmt(c.ret*100,1)}%</b> over ${cfg.months} months — ${fmt(cfg.rate,2)}% dividends plus the move to the implied price, before tax.` : ``}</div>`;
+  if(typeof Chart!=="undefined"){
+    const opts = baseOpts({ scales:{
+      x:{ title:{display:true,text:"months",color:AX,font:{size:11}}, ticks:{color:AX,font:{size:11},autoSkip:true,maxTicksLimit:MTL+2}, grid:{color:GRID} },
+      y:{ ticks:{color:AX,font:{size:11},callback:moneyTick}, grid:{color:GRID}, beginAtZero:true,
+          title:{display:true,text:"$M",color:AX,font:{size:11}} } }});
+    mkChart("ch-calc", { type:"line", data:{ labels:r.labels, datasets:[
+      {label:"Treasury + cash", data:r.assets, borderColor:o.accent, backgroundColor:o.accent+"18", borderWidth:2, tension:.15, pointRadius:0, fill:true},
+      {label:"Debt + preferred", data:r.claims, borderColor:"rgba(255,255,255,0.85)", backgroundColor:"transparent", borderWidth:2, borderDash:[6,3], tension:.15, pointRadius:0} ]},
+      options: opts });
   }
 }
 // ---------- image export: the share card, and a PNG of any registered chart ----------
 const EXPORT_SCALE = 2;                 // 2x, so axis labels survive being reposted
-const APYX_EYEBROW = "APYX  ·  BTC TREASURY & DIGITAL CREDIT TRACKER";
+const APYX_EYEBROW = "APYX  ·  TREASURY & DIGITAL CREDIT TRACKER";
 const EXPORT_FONT = w => `${w} 'Google Sans Flex','Google Sans',sans-serif`;
 
 // Copy plain objects and arrays; pass everything else through by reference. That
@@ -2330,19 +2593,82 @@ function wireExportButtons(){
     btn.onclick = () => downloadChartImage(cv.id, chartExportMeta(cv.id, card), btn);
   });
 }
+// What the share card shows for a common: the implied price, its return against the
+// treasury asset, and the assumptions behind it.
+function commonCardContent(cfg){
+  const snap = calcSnapshot(calcCo), r = simulate(snap, cfg), o = DATA.companies[calcCo], u = assetUnit(o);
+  if(!r) return null;
+  return {
+    head:`${calcCo} → `, tail:`$${fmt(r.implied,2)}`, tailColor:o.accent,
+    note:`implied in ${cfg.months} months`,
+    stats:[["STOCK RETURN", fmt(r.stockX,2)+"x", r.stockX>=1?"#34d399":"#ff7a7a", u+" "+fmt(r.assetX,2)+"x over same period"],
+           ["RETURN VS "+u, fmt(r.stockX/r.assetX,2)+"x", r.stockX>=r.assetX?"#34d399":"#ff7a7a", "vs holding "+u]],
+    rows:[
+      [u+" Price Target", pxTxt(cfg.target)],
+      ["Horizon", horizonTxt(cfg)],
+      [issuedSeries(calcCo)+" Issued", "$"+fmt(cfg.prefMo)+"M / mo"],
+      ["Common Issued", "$"+fmt(cfg.commonMo)+"M / mo"],
+      [issuedSeries(calcCo)+" Dividend Rate", fmt(cfg.rate,1)+"% / yr"],
+      ["Dividend Funding Mix", Math.round(cfg.fundMix*100)+"% "+u+" sales / "+Math.round((1-cfg.fundMix)*100)+"% common"],
+      ["ATM Pauses Below", fmt(cfg.atmFloor,2)+"x net mNAV"],
+      ...(cfg.runway>0 ? [["Div. Cash Runway", fmt(cfg.runway)+" months pre-funded"]] : []),
+      ...(cfg.stake>0 ? [["Staking Yield", fmt(cfg.stake,1)+"% / yr in "+u]] : []),
+      ...(cfg.opex>0 ? [["Operating Costs", "$"+fmt(cfg.opex,1)+"M / yr"]] : []),
+      [cfg.basis==="net" ? "Ending Net mNAV" : "Ending EV mNAV",
+        fmt(cfg.endMnav,2)+"x  (now "+fmt(r.mn0,2)+"x)"],
+      ["Starting Today", "$"+fmt(snap.px,2)+"  ·  "+unitsTxt(o, snap.hold)+"  ·  "+u+" "+pxTxt(snap.spot)],
+    ],
+    labels:r.labels, yTitle:"indexed (start = 100%)", yTick:v=>v+"%",
+    datasets:[{label:calcCo+" (implied)", data:r.idxStock, color:o.accent},
+              {label:u, data:r.idxAsset, color:assetColor(o)}],
+    file:`apyx-${calcCo.toLowerCase()}-implied-price.png`,
+  };
+}
+// What the share card shows for a preferred: whether every payment is funded, the
+// break-even treasury price, coverage, and the assumptions behind them.
+function creditCardContent(){
+  const {tk, o, u, cfg, s, r, be, be0, cover0, funded, implied} = creditResult();
+  const bePx = v => v===0 ? "any price" : v==null ? "none" : pxTxt(v);
+  return {
+    // the headline stays short enough to clear the stat boxes; the detail goes beneath
+    head:`${tk} → `, tail: funded ? "funded" : "gap",
+    tailColor: funded ? o.accent : "#ff7a7a",
+    note:[funded ? `every payment through month ${cfg.months}` : `first gap in month ${r.firstGap} · $${fmt(r.unpaid,1)}M unpaid by month ${cfg.months}`,
+          implied != null ? `implied $${fmt(implied,2)} at ${fmt(cfg.reqYield,2)}% yield`
+            : funded ? `but not covered after debt by month ${cfg.months}` : ""].filter(Boolean),
+    stats:[["PREFERRED COVERAGE", fmt(r.coverEnd,2)+"x", r.coverEnd!=null && r.coverEnd<1 ? "#ff7a7a" : "#34d399", "after debt · today "+fmt(cover0,2)+"x"],
+           ["BREAK-EVEN "+u, bePx(be), "#f5f6f7",
+            cfg.prefMo>0 ? "with the raise · without: "+bePx(be0)
+              : be ? pctFrom(be, s.spot)+" from today" : be===0 ? "cash covers the horizon" : "up to 20× today"]],
+    rows:[
+      [u+" Price Target", pxTxt(cfg.target)+"  (now "+pxTxt(s.spot)+")"],
+      ["Horizon", horizonTxt(cfg)],
+      [tk+" Issued", "$"+fmt(cfg.prefMo,1)+"M / mo at $"+fmt(cfg.issuePx,2)],
+      ["Dividend Rate", fmt(cfg.rate,2)+"% on $"+fmt(s.stated)+" stated"],
+      ["Required Yield", fmt(cfg.reqYield,2)+"%"],
+      ...(cfg.stake>0 ? [["Staking Yield", fmt(cfg.stake,1)+"% / yr in "+u]] : []),
+      ["Operating Costs", cfg.opex>0 ? "$"+fmt(cfg.opex,1)+"M / yr" : "not modeled"],
+      ["Cash Runway", r.cashOut==null ? cfg.months+"+ months" : (r.cashOut-1)+" months"],
+      ["Debt Repaid", r.repaid>0.05 ? "$"+fmt(r.repaid,1)+"M of converts" : "none due"],
+      ["Starting Today", tk+" $"+fmt(s.quote,2)+"  ·  "+o.ticker+" "+unitsTxt(o, s.hold)],
+    ],
+    labels:r.labels, yTitle:"$M", yTick:moneyTick,
+    datasets:[{label:"Treasury + cash", data:r.assets, color:o.accent},
+              {label:"Debt + preferred", data:r.claims, color:"#f5f6f7", dash:[6,3]}],
+    file:`apyx-${tk.toLowerCase()}-coverage.png`,
+  };
+}
 async function shareCard(){
   const btn = document.getElementById("ci-share");
-  const cfg = readCalcCfg();
-  const snap = calcSnapshot(calcCo), r = simulate(snap, cfg), o = DATA.companies[calcCo];
-  if(!r) return;
+  const card = isCredit(calcCo) ? creditCardContent() : commonCardContent(readCalcCfg());
+  if(!card) return;
   const W=1200, H=675, SCALE=EXPORT_SCALE;      // render 2x for crisp social images
   const cv=document.createElement("canvas"); cv.width=W*SCALE; cv.height=H*SCALE;
   const x = cv.getContext("2d"); x.scale(SCALE, SCALE);
   const F = EXPORT_FONT;
-  apyxFrame(x, W, H, {eyebrow:APYX_EYEBROW, head:`${calcCo} \u2192 `,
-                      tail:`$${fmt(r.implied,2)}`, tailColor:o.accent,
-                      note:`implied in ${cfg.months} months`, titlePx:62});
-  // stat boxes beside the price: stock return (BTC subtly noted) + amplification
+  apyxFrame(x, W, H, {eyebrow:APYX_EYEBROW, head:card.head, tail:card.tail, tailColor:card.tailColor,
+                      note:card.note, titlePx:62});
+  // two stat boxes beside the headline
   const statBox = (bx, label, val, valColor, sub) => {
     x.strokeStyle="rgba(255,255,255,0.18)"; x.fillStyle="rgba(255,255,255,0.02)";
     x.fillRect(bx,70,215,96); x.strokeRect(bx,70,215,96);
@@ -2350,28 +2676,14 @@ async function shareCard(){
     x.font=F("italic 700 30px"); x.fillStyle=valColor; x.fillText(val, bx+16, 133);
     x.font=F("400 14px"); x.fillStyle="#9aa0a6"; x.fillText(sub, bx+16, 155);
   };
-  statBox(660, "STOCK RETURN", fmt(r.stockX,2)+"x", r.stockX>=1?"#34d399":"#ff7a7a", "BTC "+fmt(r.btcX,2)+"x over same period");
-  statBox(895, "RETURN VS BTC", fmt(r.stockX/r.btcX,2)+"x", r.stockX>=r.btcX?"#34d399":"#ff7a7a", "vs holding BTC");
+  card.stats.forEach((st, i) => statBox(660 + i*235, ...st));
   // assumptions
-  const rows = [
-    ["BTC Price Target", "$"+fmt(cfg.btcTarget)],
-    ["Horizon", cfg.months+" months"],
-    ["Preferred Issued", "$"+fmt(cfg.prefMo)+"M / mo"],
-    ["Common Issued", "$"+fmt(cfg.commonMo)+"M / mo"],
-    ["Dividend Rate", fmt(cfg.rate,1)+"% / yr"],
-    ["Dividend Funding Mix", Math.round(cfg.fundMix*100)+"% BTC sales / "+Math.round((1-cfg.fundMix)*100)+"% common"],
-    ["ATM Pauses Below", fmt(cfg.atmFloor,2)+"x net mNAV"],
-    ...(cfg.runway>0 ? [["Div. Cash Runway", fmt(cfg.runway)+" months pre-funded"]] : []),
-    [cfg.basis==="net" ? "Ending Net mNAV" : "Ending EV mNAV",
-      fmt(cfg.endMnav,2)+"x  (now "+fmt(r.mn0,2)+"x)"],
-    ["Starting Today", "$"+fmt(snap.px,2)+"  ·  ₿"+fmt(snap.hold)+"  ·  BTC $"+fmt(snap.btc)],
-  ];
   let y=248;
   x.font=F("700 15px"); x.fillStyle="#ed1946"; x.fillText("ASSUMPTIONS", 56, y); y+=30;
-  for(const [k,v] of rows){
+  for(const [k,v] of card.rows){
     x.font=F("400 19px"); x.fillStyle="#9aa0a6"; x.fillText(k, 56, y);
     x.font=F("700 19px"); x.fillStyle="#f5f6f7"; x.fillText(v, 290, y);
-    y+=34;
+    y+=card.rows.length > 10 ? 30 : 34;
   }
   // chart panel: render a dedicated high-res chart (copying the small on-page
   // canvas produces an unreadable, pixelated chart)
@@ -2382,30 +2694,31 @@ async function shareCard(){
     oc.width = 480*SCALE; oc.height = 344*SCALE;
     const AXC="#b9bdc2", GRC="rgba(255,255,255,0.09)";
     const tmp = new Chart(oc.getContext("2d"), { type:"line",
-      data:{ labels:r.labels, datasets:[
-        {label:calcCo+" (implied)", data:r.idxStock, borderColor:o.accent, borderWidth:2*SCALE, tension:.15, pointRadius:0},
-        {label:"BTC", data:r.idxBtc, borderColor:"#f7931a", borderWidth:2*SCALE, tension:.15, pointRadius:0} ]},
+      data:{ labels:card.labels, datasets:card.datasets.map(d => ({label:d.label, data:d.data, borderColor:d.color,
+        borderDash:(d.dash||[]).map(v=>v*SCALE), borderWidth:2*SCALE, tension:.15, pointRadius:0})) },
       options:{ responsive:false, animation:false, devicePixelRatio:1,
         plugins:{ legend:{ labels:{ color:AXC, font:{size:13*SCALE, family:"'Google Sans Flex',sans-serif"}, boxWidth:13*SCALE, boxHeight:13*SCALE } }, tooltip:{enabled:false} },
         scales:{
           x:{ title:{display:true,text:"months",color:AXC,font:{size:12*SCALE}}, ticks:{color:AXC,font:{size:12*SCALE},maxTicksLimit:9,maxRotation:0}, grid:{color:GRC} },
-          y:{ title:{display:true,text:"indexed (start = 100%)",color:AXC,font:{size:12*SCALE}}, ticks:{color:AXC,font:{size:12*SCALE},callback:v=>v+"%"}, grid:{color:GRC} } } } });
+          y:{ title:{display:true,text:card.yTitle,color:AXC,font:{size:12*SCALE}}, ticks:{color:AXC,font:{size:12*SCALE},callback:card.yTick}, grid:{color:GRC} } } } });
     await new Promise(res=>setTimeout(res,80));
     x.drawImage(oc, 652, 222, 480, 344);
     tmp.destroy();
   }
   await apyxFooter(x, W, H, {left:"a model, not investment advice"});
-  exportCanvas(cv, `apyx-${calcCo.toLowerCase()}-implied-price.png`, btn);
+  exportCanvas(cv, card.file, btn);
 }
 
 // ---------- calculator permalinks: the scenario travels in the URL ----------
 // Short keys keep the link readable; the DOM id is the source of truth for bounds.
-const CALC_HASH_KEYS = { btc:"ci-btc", m:"ci-months", pref:"ci-pref", common:"ci-common",
-  floor:"ci-floor", rate:"ci-rate", fund:"ci-fund", runway:"ci-runway", mnav:"ci-mnav" };
-// The markup is the schema -- every input carries min and step -- but only four
-// carry max. These are the ceilings for the five that do not, so a hand-edited
-// link cannot push simulate() somewhere it renders NaN all the way through.
-const CALC_HASH_MAX = { "ci-btc":1e7, "ci-pref":1e5, "ci-common":1e5, "ci-rate":100, "ci-mnav":100 };
+const CALC_HASH_KEYS = { btc:"ci-btc", sol:"ci-sol", m:"ci-months", pref:"ci-pref", common:"ci-common",
+  floor:"ci-floor", rate:"ci-rate", fund:"ci-fund", runway:"ci-runway", mnav:"ci-mnav",
+  issue:"ci-issue", ry:"ci-ry", stake:"ci-stake", opex:"ci-opex", crash:"ci-crash", low:"ci-crashmo" };
+// The markup is the schema -- every input carries min and step -- but not all carry
+// max. These are the ceilings for the ones that do not, so a hand-edited link cannot
+// push either engine somewhere it renders NaN all the way through.
+const CALC_HASH_MAX = { "ci-btc":1e7, "ci-sol":1e5, "ci-pref":1e5, "ci-common":1e5, "ci-rate":100, "ci-mnav":100,
+  "ci-issue":1e4, "ci-opex":1e4 };
 
 function clampCalcInput(el, raw){
   const v = parseFloat(raw);
@@ -2419,15 +2732,15 @@ function clampCalcInput(el, raw){
 // what was on screen. An empty box is 0 here; dropping it would reopen the default.
 function calcInputValue(el){ return clampCalcInput(el, el.value === "" ? 0 : el.value); }
 
-// Everything in the hash is untrusted: numbers are clamped, the company and the
-// mNAV basis are whitelists. Returns null when the link carries no query at all.
+// Everything in the hash is untrusted: numbers are clamped, the button and the mNAV
+// basis are whitelists. Returns null when the link carries no query at all.
 function parseCalcHash(){
   const q = location.hash.indexOf("?");
   if(q < 0) return null;
   const p = new URLSearchParams(location.hash.slice(q+1));
   const out = { inputs:{} };
   const co = (p.get("co") || "").toUpperCase();
-  if(DATA.companies && DATA.companies[co]) out.co = co;
+  if(DATA.companies && (DATA.companies[co] || isCredit(co))) out.co = co;
   for(const key in CALC_HASH_KEYS){
     if(!p.has(key)) continue;
     const el = document.getElementById(CALC_HASH_KEYS[key]);
@@ -2446,6 +2759,7 @@ function applyCalcHash(link){
   for(const id in link.inputs){
     const el = document.getElementById(id);
     if(el) el.value = link.inputs[id];
+    delete liveDefaults[id];      // a link's value is the one it was sent with, not today's
   }
   if(link.basis){
     const sel = document.getElementById("ci-basis");
@@ -2463,10 +2777,12 @@ function writeCalcToHash(){
   p.set("co", calcCo);
   for(const key in CALC_HASH_KEYS){
     const el = document.getElementById(CALC_HASH_KEYS[key]);
-    const v = el ? calcInputValue(el) : null;
+    // an input the selected button hides doesn't apply to it, so the link leaves it out
+    if(!el || el.closest("label[hidden]")) continue;
+    const v = calcInputValue(el);
     if(v != null) p.set(key, v);
   }
-  p.set("basis", readCalcCfg().basis);
+  if(!isCredit(calcCo)) p.set("basis", readCalcCfg().basis);
   lastCalcQuery = p.toString();
   // The 400ms debounce can land after the user has left the tab: keep the scenario
   // for the way back, but never put #calc on the dashboard's URL.
@@ -2480,6 +2796,38 @@ let lastCalcQuery = "";
 function queueCalcHash(){
   clearTimeout(calcHashTimer);
   calcHashTimer = setTimeout(writeCalcToHash, 400);
+}
+
+// Show the inputs that apply to the selected button: the common-only or credit-only
+// ones, and the SOL ones (target, staking) only for DFDV and CHAD.
+function syncCalcInputs(){
+  const credit = isCredit(calcCo), o = calcIssuer(calcCo), view = credit ? "credit" : "common";
+  document.querySelectorAll(".calc-inputs [data-view]").forEach(el => el.hidden = el.dataset.view !== view);
+  document.querySelectorAll(".calc-inputs [data-asset]").forEach(el => el.hidden = el.dataset.asset !== o.asset);
+  document.querySelectorAll("[data-calcfoot]").forEach(el => el.hidden = el.dataset.calcfoot !== view);
+  // its bull-market peaks are MSTR's own; ASST and DFDV have no cycle of their own yet
+  document.getElementById("ci-mnav-hint").hidden = calcCo !== "MSTR";
+  document.getElementById("ci-pref-name").textContent = issuedSeries(calcCo);
+  document.getElementById("ci-rate-name").textContent = issuedSeries(calcCo);
+  document.getElementById("ci-opex-lbl").textContent =
+    o.opexYr ? `${o.ticker}'s stated run-rate: $${fmt(o.opexYr)}M` : "0 = not modeled";
+}
+// The growth box shows the annual rate the price target implies over the horizon;
+// typing a rate sets the target instead. Only the target travels in the permalink.
+function syncGrowth(){
+  const g = document.getElementById("ci-growth");
+  if(!g || document.activeElement === g) return;
+  const spot = assetPx(calcIssuer(calcCo)), cfg = readCalcCfg();
+  g.value = spot > 0 && cfg.target > 0 ? Math.round((Math.pow(cfg.target/spot, 12/cfg.months) - 1)*1000)/10 : "";
+}
+// The crash box's note: where the dip bottoms, in the treasury asset's own price.
+function syncCrashLabel(){
+  const lbl = document.getElementById("ci-crash-lbl"); if(!lbl) return;
+  const o = calcIssuer(calcCo), cfg = readCalcCfg(), spot = assetPx(o);
+  if(!(cfg.crash > 0)){ lbl.textContent = "0 = straight line to your target"; return; }
+  if(cfg.months < 2){ lbl.textContent = "needs a horizon of 2+ months"; return; }
+  const m = crashMonth(cfg), low = pathPrice(spot, cfg, m);
+  lbl.textContent = `${assetUnit(o)} bottoms at ${pxTxt(low)} in month ${m} (${pctFrom(low, spot)} from today)`;
 }
 
 function initCalc(){
@@ -2520,6 +2868,10 @@ function initCalc(){
       const link = parseCalcHash();
       if(link){
         if(link.co && link.co !== calcCo){ calcCo = link.co; setDefaults(); }
+        // A link without the crash inputs (one made before they existed) opens with no
+        // crash, as it does on a fresh load, not with the open scenario's.
+        ["ci-crash","ci-crashmo"].forEach(id => {
+          const el = document.getElementById(id); if(!(id in link.inputs)) el.value = el.defaultValue; });
         applyCalcHash(link);
         runCalc();
       }
@@ -2528,13 +2880,46 @@ function initCalc(){
     else if(!location.hash && document.body.classList.contains("tab-calc")) setTab("dash");
     // any other hash is a section anchor — leave it to the browser
   });
+  const val = (id, v) => { document.getElementById(id).value = v; };
+  let group = null;
   const setDefaults = () => {
-    const o = DATA.companies[calcCo];
-    document.getElementById("ci-rate").value = calcCo==="MSTR" ? 12 : 13;
-    // STRC ATM is paused (trading below par), so MSTR preferred defaults to $0;
-    // ASST keeps its rolling 3-month SATA pace
-    document.getElementById("ci-pref").value = calcCo==="MSTR" ? 0 : ((o.trail3m && o.trail3m.prefMo) || 0);
-    document.getElementById("ci-common").value = (o.trail3m && o.trail3m.commonMo) || 0;
+    const o = calcIssuer(calcCo), credit = isCredit(calcCo);
+    // a preferred is a multi-year question, a common's price target a one-year one;
+    // switching within a group keeps the horizon the user chose
+    const g = credit ? "credit" : "common";
+    // A preferred also asks whether it can pay if BTC goes nowhere, as CHAD's SOL target
+    // does; a common starts from a $150,000 target.
+    if(g !== group){
+      val("ci-months", credit ? 60 : 12);
+      if(credit) followLive("ci-btc", () => Math.round(btcPrice));
+      else { val("ci-btc", 150000); delete liveDefaults["ci-btc"]; }
+      group = g;
+    }
+    const series = (o.prefBreakdown || []).find(r => r[0] === (credit ? calcCo : o.prefTicker));
+    const rate = series && series[3] != null ? series[3] : (calcCo==="MSTR" ? 12 : 13);
+    val("ci-rate", rate);
+    val("ci-opex", o.opexYr || 0);
+    val("ci-stake", o.asset === "SOL" ? (o.organicYield ?? 0) : 0);
+    const co = calcCo;            // the getters below look it up as they run: a repoll replaces DATA
+    if(credit){
+      // no new money unless you add it; required yield starts at today's, so the
+      // implied price starts at the last trade
+      const quote = () => { const p = calcIssuer(co); return p.prefPrice || p.prefStated || 100; };
+      val("ci-pref", 0);
+      followLive("ci-issue", () => quote().toFixed(2));
+      followLive("ci-ry", () => (rate*(calcIssuer(co).prefStated || 100)/quote()).toFixed(4));   // to 2 places STRC opened at $99.34, not its $99.36
+      delete liveDefaults["ci-mnav"];
+    } else {
+      // STRC ATM is paused (trading below par), so MSTR preferred defaults to $0;
+      // ASST keeps its rolling 3-month SATA pace
+      val("ci-pref", calcCo==="MSTR" ? 0 : ((o.trail3m && o.trail3m.prefMo) || 0));
+      val("ci-common", (o.trail3m && o.trail3m.commonMo) || 0);
+      // each company's own multiple today (DFDV's is twice MSTR's), so the default
+      // re-rates nothing and any re-rate is one you set
+      followLive("ci-mnav", () => todaysMultiple(co, document.getElementById("ci-basis").value));
+      delete liveDefaults["ci-issue"]; delete liveDefaults["ci-ry"];
+    }
+    syncCalcInputs();
   };
   document.querySelectorAll(".cobtn[data-co]").forEach(b => b.addEventListener("click", () => {
     calcCo = b.dataset.co;
@@ -2543,16 +2928,21 @@ function initCalc(){
     runCalc();
     queueCalcHash();
   }));
-  ["ci-btc","ci-months","ci-pref","ci-common","ci-rate","ci-mnav","ci-runway","ci-floor"].forEach(id =>
+  ["ci-btc","ci-sol","ci-months","ci-pref","ci-common","ci-rate","ci-mnav","ci-runway","ci-floor",
+   "ci-issue","ci-ry","ci-stake","ci-opex","ci-crash","ci-crashmo"].forEach(id =>
     document.getElementById(id).addEventListener("input", () => { runCalc(); queueCalcHash(); }));
+  document.getElementById("ci-growth").addEventListener("input", e => {
+    const g = parseFloat(e.target.value); if(!isFinite(g)) return;
+    const o = calcIssuer(calcCo), sol = o.asset === "SOL", spot = assetPx(o);
+    const t = spot*Math.pow(1 + Math.max(-99, g)/100, readCalcCfg().months/12);
+    val(sol ? "ci-sol" : "ci-btc", sol ? t.toFixed(2) : Math.round(t));
+    runCalc(); queueCalcHash();
+  });
   const basisSel = document.getElementById("ci-basis");
   if(basisSel) basisSel.addEventListener("change", () => {
     // prefill the target with today's multiple on the chosen basis (no re-rate)
-    const o = DATA.companies[calcCo];
-    const nav0 = o.holdings*btcPrice/1e6, cl = o.seniorDebt + o.prefNotional - o.cash;
-    const cur = basisSel.value==="net" ? (nav0-cl>0 ? o.stockPrice*o.sharesOutstanding/(nav0-cl) : 1)
-                                       : (o.stockPrice*o.sharesOutstanding + cl)/nav0;
-    document.getElementById("ci-mnav").value = (Math.round(cur*20)/20).toFixed(2);
+    const co = calcCo;
+    followLive("ci-mnav", () => todaysMultiple(co, basisSel.value));
     runCalc();
     queueCalcHash();
   });
@@ -2579,7 +2969,9 @@ function initCalc(){
     clearTimeout(linkFlash);
     linkFlash = setTimeout(() => linkBtn.innerHTML = linkLabel, 2500);
   });
-  // Order matters: the company decides the defaults, and the link overrides both.
+  // the SOL target starts at today's price: what happens if SOL goes nowhere
+  if(!document.getElementById("ci-sol").value) followLive("ci-sol", () => (+solPrice).toFixed(2));
+  // Order matters: the button decides the defaults, and the link overrides both.
   // A section anchor can carry its own ?query (#valuation?ref=x); only #calc is ours.
   const link = isCalcHash() ? parseCalcHash() : null;
   if(link && link.co) calcCo = link.co;
@@ -2661,16 +3053,17 @@ function isPreClose(stamp){
 
 /* ── Cboe relay ───────────────────────────────────────────────────────────────
    Cboe carries an explicit `close` field — the official 4:00pm consolidated
-   print, separate from the after-hours last trade — for all four tickers. It
+   print, separate from the after-hours last trade — for every ticker here. It
    sends no CORS header and 403s preflight, so it is read through our own Worker
-   (worker/quotes-worker.js: fixed upstream, four hardcoded symbols, our origin
-   only — not an open relay).
+   (worker/quotes-worker.js: fixed upstream, hardcoded symbols, our origin only —
+   not an open relay).
 
    Division of labour:
      during the session  strategy.com is real-time for MSTR/STRC, so it wins there;
                          Cboe (15-min delayed) drives ASST/SATA, which otherwise sit
-                         on yesterday's close for the first ~40 minutes.
-     after 16:00 ET      Cboe's `close` is authoritative for all four.
+                         on yesterday's close for the first ~40 minutes, and DFDV/CHAD,
+                         which only the cron's DFDV-dashboard read otherwise moves.
+     after 16:00 ET      Cboe's `close` is authoritative for all of them.
    Leave QUOTE_RELAY empty and everything below is a no-op — the page keeps its
    existing behaviour. */
 const QUOTE_RELAY = "https://treasurytracker-quotes.apxusd-supply-1337.workers.dev/";
@@ -2709,6 +3102,11 @@ async function fetchCboe(){
   }
   apply(A, "stockPrice", "dayChangePct",  "_preClose",     "ASST");
   apply(A, "prefPrice",  "prefChangePct", "_prefPreClose", "SATA");
+  const F = DATA.companies.DFDV;            // DFDV's own API sends no CORS header
+  if(F){
+    apply(F, "stockPrice", "dayChangePct",  "_preClose",     "DFDV");
+    apply(F, "prefPrice",  "prefChangePct", "_prefPreClose", "CHAD");
+  }
   // SATS lives on its own object rather than a prefPrice field, since ASST's
   // flagship preferred is still SATA
   if(A.pref2 && q.SATS){
@@ -2832,7 +3230,7 @@ function sessionDayName(iso){
 // Tuesday's $123.18 instead of Wednesday's $137.40, turning a -7.2% day into +3.0%.
 function derivePrevClose(){
   const today = etDateStr();
-  for(const tk of ["MSTR","ASST"]){
+  for(const tk of COS){
     const c = DATA.companies && DATA.companies[tk];
     if(!c || !c.stockPrice) continue;
     // priceDateET is stamped by the cron; priceAsOf is the pre-stamp fallback
@@ -2861,7 +3259,11 @@ async function repollData(){
   try{
     const r = await fetch("./data.json", {cache:"no-store"});
     if(r.ok){
-      DATA = await r.json(); btcPrice = DATA.btcPriceUsd;
+      DATA = await r.json(); seedMissingIssuers();
+      // the snapshot's BTC and SOL are hours old next to CoinGecko's minute-old ticks
+      if(!liveBtc) btcPrice = DATA.btcPriceUsd;
+      if(!liveSol) solPrice = DATA.solPriceUsd;
+      markSolLoans();
       derivePrevClose();
       renderAll(); renderCharts();
       // re-apply the freshest tape on top, strategy.com last
@@ -2913,7 +3315,7 @@ setInterval(() => {
   (marketOpenET() ? fetchLiveEquity().then(fetchLivePrefs) : Promise.resolve())
     .then(fetchStrategyLive).then(fetchCboe);
 }, 60000);
-setInterval(fetchBtcPrice, 60000);          // BTC trades 24/7 — tick every minute always
+setInterval(fetchCryptoPrices, 60000);      // BTC and SOL trade 24/7 — tick every minute always
 setInterval(() => { if(marketOpenET()) repollData(); }, 5*60*1000);
 </script>
 </body>

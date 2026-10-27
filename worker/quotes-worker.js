@@ -8,9 +8,10 @@
  *      it covers only MSTR and STRC.
  *   2. The strategytracker feed republishes yesterday's close for the first
  *      ~30-45 minutes of each session, which is where ASST gets stuck, and SATA
- *      has no browser-reachable quote source at all.
+ *      has no browser-reachable quote source at all. Neither feed carries DFDV
+ *      or CHAD, and DFDV's own dashboard API sends no CORS header either.
  *
- * Cboe publishes exactly what is needed for all four tickers — an explicit
+ * Cboe publishes exactly what is needed for every ticker here — an explicit
  * `close` field carrying the official 4:00pm print, separate from the
  * after-hours last trade — but sends no Access-Control-Allow-Origin and 403s
  * preflight, so a page cannot read it. This relays it.
@@ -26,7 +27,7 @@
  */
 
 const UPSTREAM = 'https://cdn.cboe.com/api/global/delayed_quotes/quotes/';
-const SYMBOLS = ['MSTR', 'STRC', 'ASST', 'SATA', 'SATS'];   // allowlist — do not make dynamic
+const SYMBOLS = ['MSTR', 'STRC', 'ASST', 'SATA', 'SATS', 'DFDV', 'CHAD'];   // allowlist — do not make dynamic
 const ALLOWED_ORIGINS = [
   'https://treasurytracker.net',
   'https://www.treasurytracker.net',

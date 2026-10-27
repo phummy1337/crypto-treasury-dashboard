@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-refresh_data.py — repopulate data.json for the BTC Treasury Tracker.
+refresh_data.py — repopulate data.json for TreasuryTracker.NET.
 
 The dashboard (index.html) reads ./data.json on load. Run this script (or
 schedule it) to refresh the numbers without editing the HTML.
@@ -9,7 +9,7 @@ schedule it) to refresh the numbers without editing the HTML.
   python3 refresh_data.py --dry-run  # print what would change, write nothing
 
 WHAT WORKS OUT OF THE BOX
-  - Live BTC price + circulating supply  -> CoinGecko public API (no key)
+  - Live BTC + SOL price and circulating supply -> CoinGecko public API (no key)
 
   - Stock price, day change, 52-week range, 1-year price history, beta-to-BTC,
     relative volume -> strategytracker (no key). See fetch_strategytracker().
@@ -96,26 +96,31 @@ def log(msg):
 
 
 # --------------------------------------------------------------------------- #
-# WORKING: BTC price + supply (CoinGecko)
+# WORKING: BTC + SOL price and supply (CoinGecko)
 # --------------------------------------------------------------------------- #
-def fetch_btc_market(data):
+def fetch_crypto_market(data):
     try:
-        j = get_json(
-            "https://api.coingecko.com/api/v3/coins/bitcoin"
-            "?localization=false&tickers=false&market_data=true"
-            "&community_data=false&developer_data=false"
-        )
-        price = j["market_data"]["current_price"]["usd"]
-        circ = j["market_data"]["circulating_supply"]
-        data["btcPriceUsd"] = round(price, 2)
-        _BTC_PX["usd"] = price
+        coins = {c["id"]: c for c in get_json(
+            "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=bitcoin,solana")}
+        btc = coins["bitcoin"]
+        data["btcPriceUsd"] = round(btc["current_price"], 2)
+        _BTC_PX["usd"] = btc["current_price"]
         data["priceAsOf"] = datetime.date.today().isoformat()
-        if circ:
-            data["btcCirculating"] = int(circ)
-        log(f"BTC price = ${price:,.0f}  (circulating {circ:,.0f})")
-        # recompute % of 21M supply from current holdings
+        if btc.get("circulating_supply"):
+            data["btcCirculating"] = int(btc["circulating_supply"])
+        log(f"BTC price = ${btc['current_price']:,.0f}  (circulating {btc.get('circulating_supply') or 0:,.0f})")
+        sol = coins.get("solana")
+        if sol and sol.get("current_price"):
+            data["solPriceUsd"] = round(sol["current_price"], 2)
+            if sol.get("circulating_supply"):
+                data["solCirculating"] = int(sol["circulating_supply"])
+            log(f"SOL price = ${sol['current_price']:,.2f}  (circulating {sol.get('circulating_supply') or 0:,.0f})")
+        # % of supply against each treasury's own asset: BTC's 21M cap, SOL's
+        # circulating supply (SOL has no cap)
         for t, c in data["companies"].items():
-            c["pctSupply"] = round(c["holdings"] / data["btcSupply"] * 100, 4)
+            base = data.get("solCirculating") if c.get("asset") == "SOL" else data["btcSupply"]
+            if base and c.get("holdings"):
+                c["pctSupply"] = round(c["holdings"] / base * 100, 4)
         return True
     except Exception as e:
         log(f"[skip] CoinGecko failed: {e}")
@@ -188,7 +193,7 @@ MSTR_CASH_STEPS = [("2025-06-30", 50.1), ("2025-09-30", 54.3),
 # were repurchased and cancelled 2026-05-19 (Q2 10-Q). Live steps take strategy.com's
 # figure after that.
 MSTR_DEBT_STEPS = [("2025-02-21", 8213.75), ("2026-05-19", 6713.75)]
-MNAV_START = {"MSTR": "2025-10-01", "ASST": "2026-01-01"}   # chart windows
+MNAV_START = {"MSTR": "2025-10-01", "ASST": "2026-01-01", "DFDV": "2026-01-01"}   # chart windows
 
 
 def _step(steps, iso):
@@ -207,10 +212,12 @@ def _save_live_step(live, key, day, value):
     live[key] = [x for x in live.get(key, []) if x[0] != day] + [[day, value]]
 
 
-# The USD stated amount Strategy carries STRE at in its own preferred total: the
-# issue-date conversion of the €775M, fixed since Nov 2025. Kept as a constant
-# rather than EUR x spot so our five-series sum ties to strategy.com's figure.
-STRE_USD_STATED = 899.0
+def _end_at(steps, point):
+    """A (date, value) step series that ends on `point`, the issuer's own current
+    figure: a step dated on or after it can only be a lagging source's."""
+    if not point:
+        return steps
+    return [s for s in steps if s[0] < point[0]] + [tuple(point)]
 
 # Insider super-voting Class B shares (millions) — never part of the float.
 # From the 2026-03-31 10-Q covers (iXBRL dei:EntityCommonStockSharesOutstanding):
@@ -237,6 +244,9 @@ _PREF_DVOL = {}
 # 8-K filing index per company: [(filing date, primary doc url)] — lets each
 # action in the log link back to the filing that disclosed it
 _FILINGS = {}
+# filing date of the newest 8-K this run fetched per company, whatever it carried:
+# the filing watermark's "ingested"
+_READ_8K = {}
 
 def _cboe_last(sym):
     """Delayed last trade from Cboe, for a listing no other source here carries yet."""
@@ -254,7 +264,7 @@ def _cboe_last(sym):
 
 PREF_LABEL = {"STRC": "Stretch · {r}% var", "STRK": "Strike · {r}%", "STRF": "Strife · {r}%",
               "STRD": "Stride · {r}%", "STRE": "STRE · {r}% (EUR)", "SATA": "Strive pref · {r}%",
-              "SATS": "Strive pref · {r}% (jr)"}
+              "SATS": "Strive pref · {r}% (jr)", "CHAD": "CHAD · {r}% var"}
 
 # Strive's SATS closed 2026-10-20: 7,000,000 shares at a $100 stated amount, 15.00%,
 # sold at $90 for $630M gross and ~$608.15M net (8-K and 424B5 of 2026-10-16, closing
@@ -425,7 +435,7 @@ def fetch_strategytracker(data):
         snap = datetime.datetime.now(datetime.timezone.utc)
     tracker_date = _et_date(snap)
     snap_et = (snap if snap.tzinfo else snap.replace(tzinfo=datetime.timezone.utc)).astimezone(ET)
-    data.pop("eurUsd", None)    # STRE is carried at STRE_USD_STATED; nothing reads the rate
+    data.pop("eurUsd", None)    # STRE's USD figure comes from strategy.com; nothing reads the rate
     hist = {}
     for tk in ("MSTR", "ASST"):
         c = comps.get(tk)
@@ -527,18 +537,21 @@ def fetch_strategytracker(data):
                 f"{SATS['rate']}%" + (f", last ${px:,.2f}" if px else ", no quote"))
         if ps:
             bd = []
-            mkt = 0.0
+            kpi = _strategy_pref_notional() if tk == "MSTR" else {}
             for p in ps:
                 t = p["ticker"]
+                # the ticker lands in the "Preferred by Series" hover as HTML (index.html's
+                # tipHTML, which escaping can't protect), so it has to be a plain ticker
+                if not re.fullmatch(r"[A-Z]{2,6}", str(t or "")):
+                    log(f"[skip] {tk} preferred with ticker {str(t)[:20]!r}: not a ticker")
+                    continue
                 notM = p.get("notionalMillions") or round((p.get("notionalUSD") or 0) / 1e6)
-                if t == "STRE":
-                    # Carry STRE at the fixed USD stated amount Strategy itself uses
-                    # ($899M, the issue-date conversion of €775M), NOT a live-FX mark.
-                    # Marking it to spot made our total read ~$9M under theirs, and
-                    # readers reconcile this page against strategy.com. The economic
-                    # argument for a live mark is real — the claim is EUR-denominated —
-                    # but matching the source everyone checks against wins here.
-                    notM = STRE_USD_STATED
+                if t in kpi:
+                    # Strategy's own figure, which readers reconcile this page against.
+                    # Its STRE moves with EUR/USD: until Oct 2026 strategy.com carried
+                    # the €775M at a fixed $899M, and once it stopped, our copy of that
+                    # constant pushed the STRC residual below $28M short.
+                    notM = kpi[t][1]
                 if t == "SATA" and _SATA.get("steps"):
                     filed = _SATA["steps"][-1][1]     # filed count x par; filings win
                     if abs(filed - notM) > 1:
@@ -547,11 +560,7 @@ def fetch_strategytracker(data):
                     notM = filed
                 rate = p.get("dividendRate")
                 lab = PREF_LABEL.get(t, "{r}%").format(r=("%g" % rate) if rate is not None else "?")
-                bd.append([t, lab, round(notM)])
-                # market value of the series: notional scaled by price/par
-                # (par $100 for USD series; STRE is EUR-denominated with a €10 par)
-                par = 10 if t == "STRE" else 100
-                mkt += notM * (p.get("price") or par) / par
+                bd.append([t, lab, round(notM), rate])     # rate: the calculator's per-series default
                 if t == co.get("prefTicker"):
                     co["prefPrice"] = round(p["price"], 2)
                     co["prefChangePct"] = round(p.get("priceChangePercent") or 0, 2)
@@ -561,10 +570,9 @@ def fetch_strategytracker(data):
                     chg = sorted((e for e in (p.get("history") or [])
                                   if e.get("effective_date") and e.get("notional_millions") is not None),
                                  key=lambda x: x["effective_date"])
-                    if t == "STRC":     # splice in the SEC-filing backfill before the tracker log starts
-                        first = chg[0]["effective_date"] if chg else "9999-99-99"
-                        chg = [{"effective_date": d, "notional_millions": n}
-                               for d, n in STRC_BACKFILL if d < first] + chg
+                    if t == "STRC":     # the filed weeks, not the tracker's lagging log
+                        chg = [{"effective_date": d, "notional_millions": n} for d, n in _strc_steps(
+                            [(e["effective_date"], e["notional_millions"]) for e in chg])]
                         co["strcNotionalSteps"] = [[e["effective_date"], e["notional_millions"]] for e in chg]
                     if t == "SATA" and _SATA.get("steps"):
                         # same stall as the scalar: the tracker's change log ends at
@@ -607,7 +615,10 @@ def fetch_strategytracker(data):
             # total $132M over theirs. Strategy publishes the authoritative preferred
             # total in its KPI API, so back STRC out as the residual: the other four
             # series are static between issuances, so the residual IS STRC, and this
-            # self-corrects every week without us chasing buyback disclosures.
+            # self-corrects every week without us chasing buyback disclosures. With
+            # each series read from strategy.com too, this only absorbs the rounding,
+            # so the five rows add up to the published total; it still carries STRC
+            # through a run where strategy.com's per-series read fails.
             pub_total = (_KPI.get("MSTR") or {}).get("prefTotal")
             if tk == "MSTR" and pub_total and len(bd) >= 4:
                 others = sum(x[2] for x in bd if x[0] != "STRC")
@@ -615,14 +626,17 @@ def fetch_strategytracker(data):
                 for row in bd:
                     if row[0] == "STRC" and implied > 0:
                         if abs(implied - row[2]) > 1:
-                            log(f"[drift] STRC notional: tracker ${row[2]:,.0f}M vs "
+                            log(f"[drift] STRC notional: per-series ${row[2]:,.0f}M vs "
                                 f"${implied:,.0f}M implied by strategy.com's ${pub_total:,.0f}M "
                                 f"preferred total — using implied")
                         row[2] = round(implied)
             bd.sort(key=lambda x: -x[2])
             co["prefBreakdown"] = bd
             co["prefNotional"] = round(sum(x[2] for x in bd))
-            co["prefMarket"] = round(mkt)
+            # The preferred stack at market prices had no reader, and it was wrong: the
+            # tracker's STRE quote (10.23) isn't a price per its €100 stated amount
+            # (strategy.com: €78.88). Drop the copy earlier refreshes stored.
+            co.pop("prefMarket", None)
             corr = {x[0]: x[2] for x in bd}   # FX-corrected notionals
             pref_div = sum(corr.get(p["ticker"], 0) * (p.get("dividendRate") or 0) / 100 for p in ps)
             debt_int = sum(x["principal"] * x["coupon"] / 100 for x in (co.get("debtSchedule") or []))
@@ -682,19 +696,21 @@ def fetch_strategytracker(data):
             start = MNAV_START[tk]
             today = datetime.date.today().isoformat()
             if tk == "MSTR":
-                # STRC: SEC backfill + tracker change log; other series: 8-K step
-                # constants, extended live (append a step whenever the tracker's
-                # current notional moves off the last known step; persisted in data.json)
+                # STRC: the SEC backfill and the weeks filed since (_strc_steps); other
+                # series: 8-K step constants, extended live (append a step whenever the
+                # tracker's current notional moves off the last known step; persisted in
+                # data.json). Each ends on strategy.com's current figure, as the valuation
+                # tiles do.
                 live = co.get("histStepsLive") or {}
                 series = {}
+                kpi = _strategy_pref_notional()
                 for p in ps:
                     t = p["ticker"]
                     lg = sorted(((e["effective_date"], e["notional_millions"])
                                  for e in (p.get("history") or [])
                                  if e.get("effective_date") and e.get("notional_millions") is not None))
                     if t == "STRC":
-                        first = lg[0][0] if lg else "9999-99-99"
-                        series[t] = [x for x in STRC_BACKFILL if x[0] < first] + lg
+                        series[t] = _strc_steps(lg)
                         continue
                     cur = p.get("notionalMillions") or (p.get("notionalUSD") or 0) / 1e6
                     # one step per date, the later source winning (as for cash and debt
@@ -703,7 +719,7 @@ def fetch_strategytracker(data):
                     if st and cur and abs(st[-1][1] - cur) > 0.6:
                         st.append((today, round(cur, 1)))
                         _save_live_step(live, t, today, round(cur, 1))
-                    series[t] = st
+                    series[t] = _end_at(st, kpi.get(t))
                 # live steps only extend the filed constants; those dated before the last
                 # include the retired roll-forward's and the tracker's (Jul 9–Aug 24 2026,
                 # $1.1–1.6B off). live is co["histStepsLive"], so data.json drops them too
@@ -891,6 +907,11 @@ def _edgar_json(url):
 _WEEKLY_MARKERS = ("Aggregate BTC Holdings", "bitcoin at an average price",
                    "aggregate purchase price", "Bitcoin held")
 _DOC_FOR = {}
+# Filings whose weekly tables may sit in an exhibit this run couldn't list or fetch.
+# _filing_doc hands back the cover page for them, and reading that isn't reading the
+# filing: counted as read, a failed exhibit GET would mark the 8-K ingested, clear the
+# page's notice and let the workflow's gate skip the retries.
+_DOC_PARTIAL = set()
 
 
 def _filing_doc(base, primary, markers=_WEEKLY_MARKERS):
@@ -903,6 +924,7 @@ def _filing_doc(base, primary, markers=_WEEKLY_MARKERS):
     try:
         txt = _edgar_text(url)
     except Exception:
+        _DOC_PARTIAL.add(url)                 # its exhibits went unchecked
         return url
     low = txt.lower()
     if any(m.lower() in low for m in markers):
@@ -914,6 +936,7 @@ def _filing_doc(base, primary, markers=_WEEKLY_MARKERS):
     try:                                      # Archives rejects get_json's UA
         items = _edgar_json(base + "index.json")["directory"]["item"]
     except Exception:
+        _DOC_PARTIAL.add(url)
         return url
     for n in [it["name"] for it in items
               if re.search(r"ex-?99", it["name"], re.I)
@@ -921,9 +944,11 @@ def _filing_doc(base, primary, markers=_WEEKLY_MARKERS):
         try:
             t = _edgar_text(base + n)
         except Exception:
+            _DOC_PARTIAL.add(url)
             continue
         if any(m.lower() in t.lower() for m in markers):
             _DOC_FOR[url] = base + n
+            _DOC_PARTIAL.discard(url)
             break
     return _DOC_FOR[url]
 
@@ -1244,7 +1269,8 @@ _ALLOC = [(r"repurchases? of (STRC|STRF|STRK|STRD|MSTR) Stock", lambda m: f"{m.g
           (r"dividend", lambda m: "dividends"),
           (r"bitcoin", lambda m: "bitcoin"),
           (r"USD Cash", lambda m: "USD Cash"),
-          (r"USD Reserve", lambda m: "USD Reserve")]
+          (r"USD Reserve", lambda m: "USD Reserve"),
+          (r"cash balance", lambda m: "cash")]
 
 
 def _alloc_label(phrase):
@@ -1258,18 +1284,23 @@ def _alloc_label(phrase):
 def _atm_allocation(text, raised):
     """['STRC buybacks $136M', 'USD Reserve $300M', 'USD Cash ~$1,570M'] from the
     footnote under the ATM table. The 'remaining net proceeds' bucket carries no
-    figure of its own, so it is backed out of the total."""
+    figure of its own, so it is backed out of the total; so is 'The net proceeds',
+    the wording when the whole raise went one way (from Oct 2026)."""
     tbl, parts, named = _atm_table(text), [], 0.0
-    for m in re.finditer(r"\$\s?([\d,.]+)\s*(million|billion)\s+in net proceeds[^.$]{0,80}?"
-                         r"were used to ([^,.]{0,90})", tbl):
+    # The purpose stops at "$" too: the 2026-09-28 footnote joins its two amounts with
+    # a bare "and", and the first purpose swallowed the second's "$103". Aug 2026's
+    # footnotes say "in proceeds" and "were added to Strategy's cash balance".
+    for m in re.finditer(r"\$\s?([\d,.]+)\s*(million|billion)\s+in (?:net )?proceeds[^.$]{0,80}?"
+                         r"were (?:used|added) to ([^,.$]{0,90})", tbl):
         v = float(m.group(1).replace(",", "")) * (1000 if m.group(2) == "billion" else 1)
         lab = _alloc_label(m.group(3))
         if lab:
             parts.append(f"{lab} ${v:,.0f}M"); named += v
-    rem = re.search(r"remaining net proceeds[^.]{0,80}?were used to ([^,.]{0,90})", tbl)
+    rem = re.search(r"(?:remaining|The) net proceeds[^.]{0,80}?were used to ([^,.$]{0,90})", tbl)
     if rem and (lab := _alloc_label(rem.group(1))):
         left = raised - named
-        parts.append(f"{lab} ~${left:,.0f}M" if left > 1 else lab)
+        approx = "~" if named else ""      # backed out of the itemised buckets, or the whole raise
+        parts.append(f"{lab} {approx}${left:,.0f}M" if left > 1 else lab)
     elif parts and raised and abs(raised - named) > max(1.0, raised * 0.02):
         # every bucket is itemised (no "remaining" catch-all) yet they don't add up:
         # a purpose phrase we don't recognise got dropped on the floor
@@ -1296,6 +1327,34 @@ def _convert_retirement(text):
     v = float(m.group(1).replace(",", "")) * (1000 if m.group(2) == "billion" else 1)
     verb = "Agreed to repurchase" if m.group(0).startswith("agreed") else "Repurchased"
     return f"{verb} ~${v:,.0f}M principal of {m.group(3) or m.group(4)} convertible notes"
+
+
+# The share repurchase programs' table (Jun-2026 framework). Like the ATM table it has a
+# "During Period" block per period, two across a quarter end, with rows that read
+# "<SER> Stock (1) <shares> $ <amount>" and dashes for a series nothing was bought of.
+_MSTR_REPURCHASE = re.compile(r"Repurchase Program Update(.*?)(?:BTC Update|ATM Update|Item\s+7|$)", re.S)
+
+
+def _mstr_repurchases(text):
+    """[(from, to, {series: (shares, $M)})] for each period of an MSTR 8-K's Repurchase
+    Program Update table, oldest first, with the dates None where a table states no
+    period; [] when the filing has no such table. Dashed rows are left out."""
+    sec = _MSTR_REPURCHASE.search(text)
+    if not sec:
+        return []
+    body = sec.group(1)
+    marks = list(_MSTR_PERIOD.finditer(body))
+    blocks = [(m.groups(), body[m.end():marks[k + 1].start() if k + 1 < len(marks) else len(body)])
+              for k, m in enumerate(marks)] or [((None, None), body)]
+    out = []
+    for (start, end), block in blocks:
+        rows = {}
+        for s in ("STRC", "STRF", "STRK", "STRD", "MSTR"):
+            m = re.search(rf"{s} Stock\s*(?:\(\d\))?\s*([\d,]+)\s*\$\s*([\d,.]+)", block)
+            if m:
+                rows[s] = (int(m.group(1).replace(",", "")), float(m.group(2).replace(",", "")))
+        out.append((start and _pdate(start).isoformat(), end and _pdate(end).isoformat(), rows))
+    return out
 
 
 def _mstr_actions(text, rec, fl, whole_filing=True):
@@ -1328,13 +1387,9 @@ def _mstr_actions(text, rec, fl, whole_filing=True):
     if rm and "STRC" in text:
         items.append(f"{'Raised' if float(rm.group(2)) > float(rm.group(1)) else 'Cut'} STRC dividend rate "
                      f"{rm.group(1)}% → {rm.group(2)}%")
-    # share repurchase program (Jun-2026 framework): "<SEC> Stock (1) <shares> $<amt>"
-    rp = re.search(r"Repurchase Program Update(.*?)(?:BTC Update|ATM Update|Item\s+7|$)", text, re.S)
-    if rp:
-        for s in ("STRC", "STRF", "STRK", "STRD", "MSTR"):
-            m = re.search(rf"{s} Stock\s*(?:\(\d\))?\s*([\d,]+)\s*\$\s*([\d,.]+)", rp.group(1))
-            if m and int(m.group(1).replace(",", "")) > 0:
-                sh, amt = int(m.group(1).replace(",", "")), float(m.group(2).replace(",", ""))
+    for _start, _end, rows in _mstr_repurchases(text):
+        for s, (sh, amt) in rows.items():
+            if sh > 0:
                 items.append(f"Repurchased {sh:,} {s} shares (~${amt:,.0f}M)")
     # convertible note retirements (no dedicated table yet — prose disclosure)
     if (retired := _convert_retirement(text)):
@@ -1395,7 +1450,7 @@ def _asst_actions(text):
                 f"{issued - ex:,} ATM/other)")
         else:
             items.append(f"Issued {issued:,} Class A shares (ATM)")
-    pm = re.search(r"SATA Stock[^0-9]{0,60}([\d,]{6,})\s*([\d,]{6,})\s*([\d,]+)", text)
+    pm = re.search(_SATA_ROW + r"[^0-9]{0,60}([\d,]{6,})\s*([\d,]{6,})\s*([\d,]+)", text)
     if pm and int(pm.group(3).replace(",", "")) > 1000:
         items.append(f"Issued {pm.group(3)} SATA preferred shares")
     rm = re.search(r"dividend rate[^.]{0,200}?from ([\d.]+)% to ([\d.]+)%", text)
@@ -1433,6 +1488,9 @@ def _asst_snapshot(text):
 
 
 _SATA = {}
+# The SATA row of Strive's weekly table, with the footnote marker a filing can add: Oct 19
+# 2026 wrote "SATA Stock (6) 14,030,176 14,030,176", and every reader of the row missed it
+_SATA_ROW = r"SATA Stock(?:\s*\(\d+\))?"
 
 
 def _asst_sata_counts(text):
@@ -1445,7 +1503,7 @@ def _asst_sata_counts(text):
     """
     out = []
     per = re.search(r"As of ([A-Z][a-z]+ \d{1,2}, \d{4}) As of ([A-Z][a-z]+ \d{1,2}, \d{4})", text)
-    m = re.search(r"SATA Stock ([\d,]+) ([\d,]+)", text)
+    m = re.search(_SATA_ROW + r" ([\d,]+) ([\d,]+)", text)
     if per and m:
         for d, v in zip(per.groups(), m.groups()):
             try:
@@ -1540,7 +1598,7 @@ def fetch_sata_notional(data):
     steps = {d: n for d, n in (co.get("sataNotionalSteps") or [])}
     known = set(steps)
     try:
-        sub = get_json(f"https://data.sec.gov/submissions/CIK{CIK['ASST']}.json")
+        sub = _edgar_json(f"https://data.sec.gov/submissions/CIK{CIK['ASST']}.json")
     except Exception as e:
         log(f"[skip] SATA notional: {e} — keeping filed steps")
         _SATA["steps"] = co.get("sataNotionalSteps") or []
@@ -1576,6 +1634,90 @@ def fetch_sata_notional(data):
             f"from {len(steps)} filed steps, {scanned} filings scanned")
 
 
+# STRC's filed weekly steps since STRC_BACKFILL, for _strc_steps
+_STRC = {}
+
+
+def fetch_strc_notional(data):
+    """STRC's notional at the end of every week Strategy has filed since STRC_BACKFILL.
+
+    The history took these from strategytracker's change log, which dates each change a
+    week or more late, folds some weeks into the next, and on 2026-10-26 still lacked
+    the Oct 5-18 buybacks ($387M). Each weekly 8-K states that week's STRC sales (the
+    ATM table) and, since the Jun-2026 framework, its STRC buybacks (the Repurchase
+    Program Update), so the level rolls forward from the backfill's last week at $100
+    stated a share, one step per period end it moves on. Rolled from 2026-03-02 it came
+    to within $0.2M of strategy.com's figure on 2026-10-26. The steps stop before the
+    first week no filing covers. Nothing persists: fetch_holdings reads the same 8-Ks
+    through _edgar_text's memo. Leaves _STRC empty, and the tracker's log in use, when
+    no week can be read.
+    """
+    if not data["companies"].get("MSTR"):
+        return
+    start, level = STRC_BACKFILL[-1]
+    try:
+        rec = _edgar_json(f"https://data.sec.gov/submissions/CIK{CIK['MSTR']}.json")["filings"]["recent"]
+    except Exception as e:
+        log(f"[skip] STRC notional from filings: {e} — using the tracker's change log")
+        return
+    sold, bought = {}, {}         # (from, to) -> STRC shares; newest filing first, so a later one stands
+    for i in range(len(rec["form"])):          # EDGAR lists newest first
+        if rec["form"][i] != "8-K":
+            continue
+        filed = rec["filingDate"][i]
+        if filed <= start:
+            break
+        base = f"https://www.sec.gov/Archives/edgar/data/{int(CIK['MSTR'])}/{rec['accessionNumber'][i].replace('-', '')}/"
+        fresh = base + rec["primaryDocument"][i] not in _EDGAR_TXT
+        try:
+            text = _edgar_text(_filing_doc(base, rec["primaryDocument"][i]))
+            for w in _mstr_strc_atm(text):
+                sold.setdefault((w["from"], w["to"]), w["shares"])
+            for a, b, rows in _mstr_repurchases(text):
+                if a and "STRC" in rows:
+                    bought.setdefault((a, b), rows["STRC"][0])
+        except Exception as e:                  # its week shows up below as a gap
+            log(f"[drift] STRC notional: the 8-K filed {filed} couldn't be read: {e}")
+        if fresh:
+            time.sleep(0.12)
+    n, steps, through, expect = level, [], None, _iso_plus(start, 1)
+    for a, b, sh in sorted((a, b, sh) for (a, b), sh in sold.items() if b > start):
+        if a != expect:
+            log(f"[drift] STRC notional: no filed week starts {expect} (the next runs {a} to {b}) — "
+                f"the filed steps stop at {through or start}")
+            break
+        # a quarter end can split a week's buybacks where its ATM line didn't
+        back = sum(s for (x, y), s in bought.items() if a <= x and y <= b)
+        if sh or back:
+            n += (sh - back) * 100 / 1e6        # shares x $100 stated, in $M
+            steps.append((b, round(n, 1)))
+        through, expect = b, _iso_plus(b, 1)
+    if not through:
+        log(f"[skip] STRC notional from filings: no week since {start} could be read — "
+            f"using the tracker's change log")
+        return
+    _STRC.update(steps=steps, through=through)
+    now = _strategy_pref_notional().get("STRC")
+    if now and abs(n - now[1]) > 1:
+        log(f"[drift] STRC notional: the filings come to ${n:,.1f}M by {through} but strategy.com "
+            f"shows ${now[1]:,.1f}M on {now[0]} — a week's sales or buybacks went unread")
+    else:
+        log(f"[STRC] notional from filings: ${n:,.1f}M by {through}, {len(steps)} steps since {start}")
+
+
+def _strc_steps(tracker_log):
+    """STRC's notional steps for the history: STRC_BACKFILL and the weeks filed since
+    (fetch_strc_notional), then strategy.com's figure unless the filings are newer (a
+    Monday 8-K read before strategy.com's first quote of the day). When no filed week
+    could be read, the tracker's change log stands in from where it starts."""
+    now = _strategy_pref_notional().get("STRC")
+    if _STRC.get("through"):
+        steps = STRC_BACKFILL + _STRC["steps"]
+        return steps + [tuple(now)] if now and now[0] > _STRC["through"] else steps
+    first = tracker_log[0][0] if tracker_log else "9999-99-99"
+    return _end_at([x for x in STRC_BACKFILL if x[0] < first] + list(tracker_log), now)
+
+
 def fetch_holdings(data, max_points=60):
     """Rebuild data['weekly'] per company from the issuers' 8-Ks, from Jan 1 onward.
 
@@ -1589,7 +1731,7 @@ def fetch_holdings(data, max_points=60):
     acts = []
     for tk, cik in CIK.items():
         try:
-            sub = get_json(f"https://data.sec.gov/submissions/CIK{cik}.json")
+            sub = _edgar_json(f"https://data.sec.gov/submissions/CIK{cik}.json")
         except Exception as e:
             log(f"[skip] EDGAR submissions {tk} failed: {e}")
             continue
@@ -1615,6 +1757,8 @@ def fetch_holdings(data, max_points=60):
                 t8 = ""
                 try:
                     t8 = _edgar_text(url)
+                    if url not in _DOC_PARTIAL:       # a cover page whose exhibit failed isn't read
+                        _READ_8K[tk] = max(_READ_8K.get(tk, ""), filed)
                     # newest period first, as EDGAR lists filings; one unless a quarter
                     # end split the week (see _period_texts)
                     periods = [(t, _parse_mstr(t)) for t in reversed(_period_texts(t8))]
@@ -1711,7 +1855,8 @@ def fetch_holdings(data, max_points=60):
                 for row in bd:
                     if row[0] == "STRC":
                         row[1] = f"Stretch · {strc_rate:g}% var"
-                    pref_div += row[2] * fixed.get(row[0], 10.0) / 100
+                    row[3:] = [fixed.get(row[0], 10.0)]
+                    pref_div += row[2] * row[3] / 100
                 coup = sum(x["principal"] * x["coupon"] / 100 for x in (co.get("debtSchedule") or []))
                 co["annualObligations"] = round(pref_div + coup)
                 log(f"MSTR STRC rate from 8-K: {strc_rate}% -> annualObligations {co['annualObligations']}")
@@ -1727,6 +1872,8 @@ def fetch_holdings(data, max_points=60):
             for url, base, _filed in docs():
                 try:
                     t8 = _edgar_text(url)
+                    if url not in _DOC_PARTIAL:       # a cover page whose exhibit failed isn't read
+                        _READ_8K[tk] = max(_READ_8K.get(tk, ""), _filed)
                     obs_dates = []
                     for d, h in _asst_obs(t8):
                         allobs[d] = h
@@ -1949,6 +2096,13 @@ def fetch_holdings(data, max_points=60):
         log(f"{tk}: {len(weekly[tk]['dates'])} points via EDGAR ({weekly[tk]['dates'][0]} -> "
             f"{weekly[tk]['dates'][-1]}), latest {cur:,} BTC")
     if "MSTR" in weekly or "ASST" in weekly:
+        # carry over every series this run didn't rebuild: DFDV's comes from fetch_dfdv,
+        # not EDGAR, and an issuer whose EDGAR read failed keeps its last series rather
+        # than losing it because the other issuer's succeeded
+        kept = {k: v for k, v in (data.get("weekly") or {}).items() if k not in weekly}
+        for k in kept.keys() & CIK.keys():
+            log(f"[keep] weekly {k}: EDGAR rebuild failed — keeping the last series")
+        weekly.update(kept)
         data["weekly"] = weekly
     if acts:    # merge with previously stored actions so old weeks never drop off
         # link each action to its source filing: the earliest 8-K filed on or after
@@ -1999,20 +2153,38 @@ NASDAQ_UA = {"User-Agent": UA["User-Agent"], "Accept": "application/json",
              "Origin": "https://www.nasdaq.com", "Referer": "https://www.nasdaq.com/"}
 
 
-def _nasdaq_vol(sym, days=420):
-    """Daily share volume [(iso date, volume), ...] from Nasdaq (split-adjusted)."""
+def _nasdaq_rows(sym, days=420):
+    """Nasdaq's daily history rows for sym, newest first (split-adjusted)."""
     frm = (datetime.date.today() - datetime.timedelta(days=days)).isoformat()
     url = (f"https://api.nasdaq.com/api/quote/{sym}/historical?assetclass=stocks"
            f"&limit=9999&fromdate={frm}&todate={datetime.date.today().isoformat()}")
     req = urllib.request.Request(url, headers=NASDAQ_UA)
     raw = urllib.request.urlopen(req, timeout=25, context=_SSL_CTX).read().decode("utf-8", "ignore")
-    rows = ((json.loads(raw)["data"] or {}).get("tradesTable") or {}).get("rows") or []
+    return ((json.loads(raw)["data"] or {}).get("tradesTable") or {}).get("rows") or []
+
+
+def _nasdaq_vol(sym, days=420):
+    """Daily share volume [(iso date, volume), ...] from Nasdaq (split-adjusted)."""
     out = []
-    for r in rows:
+    for r in _nasdaq_rows(sym, days):
         d = datetime.datetime.strptime(r["date"], "%m/%d/%Y").date().isoformat()
         v = str(r.get("volume") or "").replace(",", "")
         if v.isdigit() and int(v):
             out.append((d, int(v)))
+    return sorted(out)
+
+
+def _nasdaq_closes(sym, days=420):
+    """Daily [(iso date, close, volume), ...] from Nasdaq, oldest first."""
+    out = []
+    for r in _nasdaq_rows(sym, days):
+        try:
+            d = datetime.datetime.strptime(r["date"], "%m/%d/%Y").date().isoformat()
+            c = float(str(r.get("close") or "").replace("$", "").replace(",", ""))
+            v = int(str(r.get("volume") or "0").replace(",", "") or 0)
+        except ValueError:
+            continue
+        out.append((d, c, v))
     return sorted(out)
 
 
@@ -2054,7 +2226,10 @@ def _nasdaq_si(sym):
     dts, isod, dtc, si = [], [], [], []
     for r in rows:
         d = datetime.datetime.strptime(r["settlementDate"], "%m/%d/%Y").date()
-        shares = int(str(r["interest"]).replace(",", ""))
+        v = str(r["interest"]).replace(",", "")
+        if not v.isdigit():     # a settlement with no figure reads "N/A" (CHAD's first, 09/15/2026)
+            continue
+        shares = int(v)
         for eff, ratio in SI_SPLITS.get(sym, []):     # normalize pre-split settlements
             if d.isoformat() < eff:
                 shares = round(shares / ratio)
@@ -2102,13 +2277,15 @@ def fetch_short_interest(data):
             try:
                 sih = _nasdaq_si(pref)
                 if sih:
-                    # % of float: preferred float = notional outstanding / $100 par
+                    # % of float: preferred float = notional outstanding / stated amount
+                    # ($100 for STRC and SATA, $10 for CHAD)
                     ph = co.get("prefHistory") or {}
+                    stated = co.get("prefStated") or 100
                     steps = [(d, n) for d, n in zip(ph.get("iso") or [], ph.get("notional") or []) if n]
                     pct = []
                     for iso, s in zip(sih["iso"], sih["si"]):
                         ns = [n for d2, n in steps if d2 <= iso]
-                        pct.append(round(s / (ns[-1] * 1e4) * 100, 2) if ns else None)
+                        pct.append(round(s / (ns[-1] * 1e6 / stated) * 100, 2) if ns else None)
                     sih["pctFloat"] = pct
                     if pref in _VOL_HIST:
                         sih["dtc10"] = _dtc10(sih, _VOL_HIST[pref])
@@ -2124,6 +2301,27 @@ def fetch_short_interest(data):
 _KPI = {}
 # live BTC price, shared with the per-share helper
 _BTC_PX = {}
+MSTR_PREF_SERIES = ("STRC", "STRF", "STRK", "STRD", "STRE")
+
+
+def _strategy_pref_notional():
+    """{ticker: (session date, $M)}: each preferred series' notional as strategy.com
+    publishes it, read once per run. This is the figure Strategy's own preferred
+    total adds up, with STRE's €775M at today's EUR/USD. A series whose read fails
+    is left out, and the tracker's figure stands in for it."""
+    if "notional" not in _KPI:
+        out = {}
+        for t in MSTR_PREF_SERIES:
+            try:
+                k = get_json(f"https://api.strategy.com/btc/{t.lower()}KpiData")[0]
+                day = datetime.datetime.strptime(k["timeStamp"], "%m/%d/%Y %I:%M %p").date().isoformat()
+                usd_m = float(k["notional"]) / 1e6
+                if usd_m > 0:
+                    out[t] = (day, round(usd_m, 2))
+            except Exception as e:
+                log(f"[skip] strategy.com {t} notional: {e} — using the tracker's")
+        _KPI["notional"] = out
+    return _KPI["notional"]
 
 
 def _apply_per_share(co, tk):
@@ -2252,25 +2450,23 @@ CE_UA = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWeb
 
 def _ce_borrow(sym):
     """Latest IBKR indicative borrow fee for one symbol, via ChartExchange.
-    Two-step: the symbol page embeds a cxuid, then /xhr/tabledata/ serves the
-    borrow_fee table (source: the IBKR shortstock file, updated ~15 min)."""
-    page = f"https://chartexchange.com/symbol/nasdaq-{sym.lower()}/borrow-fee/"
+    The borrow-fee page server-renders the newest reading of the IBKR shortstock
+    file (updated ~15 min) as a summary line; ?source=ib pins IBKR, since the page
+    can show Robinhood's rate instead. The page used to embed a cxuid for a second
+    request to /xhr/tabledata/, until ChartExchange's Oct 2026 rebuild dropped it."""
+    page = f"https://chartexchange.com/symbol/nasdaq-{sym.lower()}/borrow-fee/?source=ib"
     req = urllib.request.Request(page, headers={**CE_UA, "Referer": "https://chartexchange.com/"})
     html = urllib.request.urlopen(req, timeout=25, context=_SSL_CTX).read().decode("utf-8", "ignore")
-    m = re.search(r'"data_adapter":"borrow_fee","data_adapter_opts":\{"cxuid":"(\d+)"', html)
+    # As of <strong>2026-10-25 08:52:43 AM EDT</strong>, there were <strong>10,000,000</strong>
+    # shares available with a fee of <strong>0.25<!-- -->%</strong>.
+    m = re.search(r'bf-summary">As of <strong>([^<]+)</strong>, there were <strong>([\d,]+)</strong>'
+                  r' shares available with a fee of <strong>([\d,.]+)', html)
     if not m:
-        raise ValueError("cxuid not found in page")
-    body = json.dumps({"op": "getpage", "dataname": "borrow_fee", "cxuid": m.group(1),
-                       "page": 1, "perpage": 3, "sort": "desc", "opts": {"bf_source": "ib"}}).encode()
-    req = urllib.request.Request("https://chartexchange.com/xhr/tabledata/", data=body,
-                                 headers={**CE_UA, "Content-Type": "application/json", "Referer": page})
-    rows = (json.loads(urllib.request.urlopen(req, timeout=25, context=_SSL_CTX).read())
-            .get("rows") or [])
-    if not rows:
-        raise ValueError("no borrow_fee rows")
-    r = rows[0]
-    return {"pct": round(float(r["fee"]["value"]), 2), "avail": int(r["avail"]["value"]),
-            "asOf": r["date"]["value"]}
+        raise ValueError("borrow-fee summary not found in page")
+    as_of = datetime.datetime.strptime(m.group(1).rsplit(" ", 1)[0], "%Y-%m-%d %I:%M:%S %p")
+    return {"pct": round(float(m.group(3).replace(",", "")), 2),
+            "avail": int(m.group(2).replace(",", "")),
+            "asOf": as_of.strftime("%Y-%m-%d %H:%M:%S")}      # ET, the page's own clock
 
 
 # --------------------------------------------------------------------------- #
@@ -2346,12 +2542,12 @@ _MSTR_STRC_CAPACITY_ONLY = re.compile(r"STRC Stock(?:\s*\(\d\))?\s+\$\s*([\d,.]+
 # back to the week before. Strategy's heading has read four ways since Aug 2025 ("ATM
 # Update", "ATM Updates", "ATM and BTC Update", "... for the Period"), so its second mark
 # is the "During Period" line every weekly table carries; Strive's are the table's header
-# pair and its SATA row ("SATA Stock (1) ...", "As of Sept. 4" would each slip one). In
+# pair and its SATA row, footnoted or not (_SATA_ROW; "As of Sept. 4" would slip the first). In
 # the 80 newest 8-Ks of either company, none fires on a filing that isn't an ATM report.
 _MSTR_ATM_SECTION = re.compile(r"ATM (?:and BTC )?Updates?|did not sell any shares under"
                                r"|During Period [A-Z][a-z]+ \d{1,2}, \d{4} to")
 _ASST_ATM_SECTION = re.compile(r"As of [A-Z][a-z]+ \d{1,2}, \d{4} As of [A-Z][a-z]+ \d{1,2}, \d{4}"
-                               r"|SATA Stock\s+[\d,]{6,}")
+                               r"|" + _SATA_ROW + r"\s+[\d,]{6,}")
 
 
 def _mstr_strc_atm(text):
@@ -2389,7 +2585,7 @@ def _asst_sata_atm(text):
     Proceeds are the share-count change x $100 par; the filing states no dollars.
     """
     per = re.search(r"As of ([A-Z][a-z]+ \d+, \d{4}) As of ([A-Z][a-z]+ \d+, \d{4})", text)
-    m = re.search(r"SATA Stock ([\d,]+) ([\d,]+)", text)
+    m = re.search(_SATA_ROW + r" ([\d,]+) ([\d,]+)", text)
     if not (per and m):
         return []
     a, b = (int(x.replace(",", "")) for x in m.groups())
@@ -2424,7 +2620,7 @@ def _filed_atm_windows(pref, cik, parser, reports_atm, first_day_offset):
     newer 8-Ks. A network error raises, so the caller keeps the last values rather than
     publishing a span that one failed fetch cut short.
     """
-    rec = get_json(f"https://data.sec.gov/submissions/CIK{cik}.json")["filings"]["recent"]
+    rec = _edgar_json(f"https://data.sec.gov/submissions/CIK{cik}.json")["filings"]["recent"]
     found, examined, oldest_filing_date = {}, 0, ""
     for i in range(len(rec["form"])):          # EDGAR lists newest first
         if rec["form"][i] != "8-K":
@@ -2617,8 +2813,11 @@ def fetch_atm(data):
 def fetch_borrow_fees(data):
     """Annualized cost to short (IBKR indicative rate) for commons + preferreds.
     Also accumulates a daily history in data.json (one point per calendar day)."""
+    # SATS has no row: ChartExchange's nasdaq-sats is EchoStar, not Strive's preferred
     targets = [("MSTR", "MSTR", "borrowFee"), ("ASST", "ASST", "borrowFee"),
-               ("STRC", "MSTR", "prefBorrowFee"), ("SATA", "ASST", "prefBorrowFee")]
+               ("DFDV", "DFDV", "borrowFee"),
+               ("STRC", "MSTR", "prefBorrowFee"), ("SATA", "ASST", "prefBorrowFee"),
+               ("CHAD", "DFDV", "prefBorrowFee")]
     for sym, co_tk, key in targets:
         co = data["companies"].get(co_tk)
         if not co:
@@ -2637,7 +2836,7 @@ def fetch_borrow_fees(data):
             log(f"[borrow fee] {sym}: {bf['pct']}%/yr, {bf['avail']:,} shares available")
         except Exception as e:
             log(f"[skip] borrow fee {sym}: {e} — keeping existing values")
-        time.sleep(1)                       # be polite: 8 requests total per refresh
+        time.sleep(1)                       # be polite: one request per symbol
 
 
 # --------------------------------------------------------------------------- #
@@ -2679,6 +2878,332 @@ def fetch_lending(data):
         log(f"[lending] apxUSD up to {best['apy']:.2f}% ({best['name']}) across {len(options)} options")
     except Exception as e:
         log(f"[skip] Morpho lending APY: {e} — keeping existing values")
+
+
+# --------------------------------------------------------------------------- #
+# DFDV: DeFi Development Corp, a SOL treasury, and its CHAD preferred
+# --------------------------------------------------------------------------- #
+# DFDV's own dashboard API (defidevcorp.com/dashboard) is the primary source. It
+# sends no CORS header, so only this script can read it; between runs the page ticks
+# DFDV and CHAD quotes through the Cboe relay instead. Routes usually answer in a
+# second or two but stall for 10-30s at times, so each gets a long timeout and a
+# retry, and a figure whose route fails keeps the previous run's value. The API has
+# no stock price history, so DFDV's daily closes come from Nasdaq.
+DFDV_API = "https://defidevcorp.com/api/dashboard/"
+
+# CHAD terms the API doesn't serve (DFDV's own CHAD page hard-codes them). The rate
+# is variable and declared monthly by 8-K, so each new rate needs a row here; a month
+# without one is logged [stale]. $10 stated and 13.00% at the Sep 8 2026 IPO (424B5
+# dated 2026-09-03); 14.00% for periods from Nov 1 2026 (8-K filed 2026-10-15).
+# The notional steps date the IPO close (1,375,000 sh) and the over-allotment
+# (206,250 sh, press release 2026-09-21); /chad/notional carries the latest.
+CHAD = {"stated": 10.0,
+        "rates": [("2026-09-08", 13.0), ("2026-11-01", 14.0)],
+        "notional": [("2026-09-08", 13.75), ("2026-09-20", 15.8125)]}
+
+# Not in the API either: the Q2 2026 shareholder letter puts operating costs at about
+# $17M a year, before roughly $10M of interest. The calculator's default for DFDV.
+DFDV_OPEX_M = 17.0
+
+
+def _dfdv(route, timeout=30, tries=2):
+    """`data` from one DFDV dashboard route, or None once every try has failed."""
+    err = None
+    for _ in range(tries):
+        try:
+            j = get_json(DFDV_API + route, timeout=timeout)
+            if j.get("success"):
+                return j.get("data")
+            err = "success=false"
+        except Exception as e:
+            err = e
+    log(f"[skip] DFDV {route}: {err} — keeping existing values")
+    return None
+
+
+# DFDV's API is a third party, and some of what it sends reaches the page as HTML, so
+# every string it supplies is checked against a narrow shape before it is stored.
+def _iso(v):
+    """v if it is an ISO date (yyyy-mm-dd), else None."""
+    return v if isinstance(v, str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", v) else None
+
+
+def _guard(what, fn, *args):
+    """fn(*args), logging and swallowing any error, so one bad route can't end the run."""
+    try:
+        return fn(*args)
+    except Exception as e:
+        log(f"[skip] {what}: {e} — keeping existing values")
+        return None
+
+
+def _last_weekday(iso):
+    """iso itself on a weekday, else the Friday before it (no holiday calendar)."""
+    d = datetime.date.fromisoformat(iso)
+    while d.weekday() >= 5:
+        d -= datetime.timedelta(days=1)
+    return d.isoformat()
+
+
+def _dfdv_balance_sheet(co, data):
+    """Price, shares, SOL held, 52-week range, cash, and the debt schedule.
+
+    Two converts (put/maturity, conversion price) and three loans, two of them in
+    SOL; SOL loans are marked at the live SOL price, matching the net debt DFDV
+    publishes. Straight debt carries no convPrice."""
+    d = _dfdv("dfdv")
+    if d and d.get("price") and d.get("shares_outstanding") and d.get("sol_count"):
+        stamp = datetime.datetime.fromisoformat(str(d["updated_at"]).replace("Z", "+00:00"))
+        co["stockPrice"] = round(float(d["price"]), 2)
+        _stamp_price(co, co["stockPrice"], round(float(d.get("price_change_percent") or 0), 2),
+                     _last_weekday(_et_date(stamp)))
+        co["sharesOutstanding"] = round(float(d["shares_outstanding"]) / 1e6, 2)
+        co["holdings"] = int(d["sol_count"])
+        if data.get("solCirculating"):
+            co["pctSupply"] = round(co["holdings"] / data["solCirculating"] * 100, 4)
+    si = _dfdv("investor-relations/stock-info")
+    if si and si.get("week_52_low") and si.get("week_52_high"):
+        co["week52Low"] = round(float(si["week_52_low"]), 2)
+        co["week52High"] = round(float(si["week_52_high"]), 2)
+    nav = _dfdv("nav")
+    if nav and nav.get("total_cash_including_eloc") is not None:
+        co["cash"] = round(float(nav["total_cash_including_eloc"]) / 1e6, 2)
+    debt, sol_px = _dfdv("debt"), data.get("solPriceUsd")
+    if debt and sol_px:
+        sched = []
+        for r in debt:
+            name = r.get("name") if re.fullmatch(r"[\w .%$/()&-]{1,60}", str(r.get("name") or "")) else "Debt"
+            sol_amt = float(r["sol_amount"]) if r.get("sol_amount") else None
+            conv = float(r["conversion_price"]) if r.get("conversion_price") else None
+            t = {"note": name, "coupon": float(r.get("coupon_rate") or 0),
+                 "maturity": _iso(r.get("maturity_date")), "put": _iso(r.get("put_date")),
+                 "principal": round((sol_amt * sol_px if sol_amt else float(r.get("notional_amount") or 0)) / 1e6, 3),
+                 "convPrice": conv, "convRate": round(1000 / conv, 4) if conv else None}
+            if sol_amt:
+                t["solAmount"] = sol_amt
+            sched.append(t)
+        co["debtSchedule"] = sched
+        co["seniorDebt"] = round(sum(t["principal"] for t in sched), 2)
+        co["capStructAsOf"] = f"{datetime.date.today().isoformat()} (DFDV dashboard)"
+
+
+def _dfdv_chad(co):
+    """CHAD's notional, rate, quote and daily closes, plus annual obligations.
+    Returns the notional steps, which the mNAV history needs."""
+    today = datetime.date.today().isoformat()
+    rate = _step(CHAD["rates"], today)
+    if CHAD["rates"][-1][0][:7] < today[:7]:
+        log(f"[stale] CHAD rate table ends {CHAD['rates'][-1][0]} — add this month's declared rate")
+    steps = list(CHAD["notional"])
+    cn = _dfdv("chad/notional")
+    if cn and cn.get("notional_usd"):
+        n = round(float(cn["notional_usd"]) / 1e6, 4)
+        if abs(steps[-1][1] - n) > 0.001:
+            steps.append((_iso(cn.get("as_of_date")) or today, n))
+    notional = steps[-1][1]
+    co["prefNotional"] = round(notional, 2)
+    co["prefBreakdown"] = [["CHAD", PREF_LABEL["CHAD"].format(r="%g" % rate), round(notional, 2), rate]]
+    interest = sum(t["principal"] * t["coupon"] / 100 for t in co.get("debtSchedule") or [])
+    co["annualObligations"] = round(notional * rate / 100 + interest, 2)
+    q = _dfdv("chad/quote", timeout=20)
+    if q and q.get("price"):
+        co["prefPrice"] = round(float(q["price"]), 2)
+        co["prefChangePct"] = round(float(q.get("price_change_percent") or 0), 2)
+    # Daily closes and volume come from Nasdaq, as DFDV's do. DFDV's chad/history is
+    # not the consolidated tape: it gave 2,364 shares for 2026-10-23 against 33,422 in
+    # its own chad/quote and on Nasdaq, and a "close" that was the day's low. Divided
+    # into FINRA's short interest, its volume read 6.3 days to cover, not about 0.3.
+    # If Nasdaq fails, its prices still draw the chart, without the volume.
+    snap_et = datetime.datetime.now(ET)
+    rows = _nasdaq_closes("CHAD")
+    if not rows:
+        ch = _dfdv("chad/history", timeout=40, tries=3)
+        rows = sorted((r["date"], float(r["close"]), None)
+                      for r in ch or [] if _iso(r.get("date")) and r.get("close"))
+    if rows:
+        co["prefHistory"] = {"dates": [_iso_lbl(d, "%b %-d") for d, _c, _v in rows],
+                             "iso": [d for d, _c, _v in rows],
+                             "px": [round(c, 2) for _d, c, _v in rows],
+                             "notional": [_step(steps, d) for d, _c, _v in rows]}
+    if rows and rows[-1][2] is not None:
+        _VOL_HIST["CHAD"] = [(d, v) for d, _c, v in rows]
+        rv = _rvol([(d, v * c) for d, c, v in rows], snap_et)
+        if rv:
+            co["prefRvol"] = rv
+        # Once the session is over chad/quote rolls previous_close to the close, so its
+        # change reads 0.00 all evening and weekend; base it on the settled sessions.
+        settled = _settled_sessions([(d, c) for d, c, _v in rows], snap_et)
+        if co.get("prefPrice") and len(settled) >= 2:
+            quote = _quote_session(settled, co["prefPrice"], snap_et)
+            if not quote:                     # an after-hours print: the close is the quote
+                co["prefPrice"] = settled[-1][1]
+                quote = (settled[-1][0], settled[-2][1])
+            co["prefChangePct"] = round((co["prefPrice"] / quote[1] - 1) * 100, 2)
+    return steps
+
+
+def _dfdv_holdings(co, data):
+    """Date of the latest SOL update, year-end balance, YTD change and the weekly
+    accumulation series. Returns DFDV's daily SOL prices, for beta."""
+    year = datetime.date.today().year
+    h = _dfdv("history", timeout=40) or []
+    held = sorted((r["date"], int(r["total_sol_holdings"])) for r in h
+                  if _iso(r.get("date")) and r.get("total_sol_holdings"))
+    # A row's sol_price is CoinGecko's 00:00 UTC print on its date: 8pm ET the evening
+    # before (it matched exactly on 2026-10-18, -20 and -23). File each under that ET
+    # evening, four hours after its session's close, so beta pairs a close with SOL that
+    # night rather than twenty hours earlier, which read beta 0.32 against about 1.3.
+    day_before = lambda iso: (datetime.date.fromisoformat(iso) - datetime.timedelta(days=1)).isoformat()
+    sol_hist = sorted((day_before(r["date"]), float(r["sol_price"])) for r in h
+                      if _iso(r.get("date")) and r.get("sol_price"))
+    if not held:
+        return sol_hist
+    i = len(held) - 1
+    while i > 0 and held[i - 1][1] == held[-1][1]:
+        i -= 1
+    co["treasuryDate"] = held[i][0]
+    ye = _step(held, f"{year - 1}-12-31")
+    if ye:
+        co["yearEnd"] = {str(year - 1): ye}
+        co["netChangeYtd"] = co.get("holdings", held[-1][1]) - ye
+    # from Jan 1, like the EDGAR series: each week's last reading, the change since
+    # the week before (the first week's since year-end). DFDV publishes a daily SOL
+    # balance, so a week's change includes staking rewards and loans, not only buys.
+    weeks = {}                                     # Monday -> the week's last reading
+    for day, v in held:
+        if day > f"{year - 1}-12-31":
+            dt = datetime.date.fromisoformat(day)
+            weeks[dt - datetime.timedelta(days=dt.weekday())] = (day, v)
+    jan1 = datetime.date(year, 1, 1)
+    wk = {"dates": [], "ranges": [], "acquired": [], "holdings": []}
+    prev = ye or 0
+    for mon in sorted(weeks):
+        day, v = weeks[mon]
+        wk["dates"].append(_iso_lbl(day, "%b %-d"))
+        wk["ranges"].append(f"{_iso_lbl(max(mon, jan1).isoformat(), '%b %-d')} – {_iso_lbl(day, '%b %-d')}")
+        wk["acquired"].append(v - prev)
+        wk["holdings"].append(v)
+        prev = v
+    if wk["dates"]:
+        data.setdefault("weekly", {})["DFDV"] = wk
+    return sol_hist
+
+
+def _dfdv_per_share(co):
+    """SOL per share (DFDV's headline, basic shares) and its growth since Jan 1, the
+    realized staking yield, and the share count per date for short interest."""
+    year = datetime.date.today().year
+    sps = _dfdv("nav/sps-daily", timeout=40)
+    pts = sorted((r["date"], float(r["headline_sps"])) for r in sps or []
+                 if _iso(r.get("date")) and r.get("headline_sps"))
+    if pts:
+        idx = sorted(set(range(0, len(pts), 7)) | {len(pts) - 1})
+        co["bpsHistory"] = {"dates": [_iso_lbl(pts[i][0], "%b '%y") for i in idx],
+                            "sol": [round(pts[i][1], 5) for i in idx], "basis": "basic"}
+        base = _step(pts, f"{year - 1}-12-31")
+        if base:
+            co["assetYieldYtd"] = round((pts[-1][1] / base - 1) * 100, 1)
+    # realized staking yield: dfdvSOL's exchange rate to SOL over the trailing ~90 days
+    rt = _dfdv("dfdvsol/rate")
+    rates = sorted((r["epoch_date"], float(r["dfdvsol_sol_rate"])) for r in rt or []
+                   if _iso(r.get("epoch_date")) and r.get("dfdvsol_sol_rate"))
+    if rates:
+        end_d, end_r = rates[-1]
+        frm = (datetime.date.fromisoformat(end_d) - datetime.timedelta(days=90)).isoformat()
+        past = [x for x in rates if x[0] <= frm]
+        if past:
+            days = (datetime.date.fromisoformat(end_d) - datetime.date.fromisoformat(past[-1][0])).days
+            co["organicYield"] = round(((end_r / past[-1][1]) ** (365 / days) - 1) * 100, 2)
+    shs = _dfdv("shares")
+    if shs:
+        _SHARES_HIST["DFDV"] = sorted((r["date"], float(r["shares_outstanding"]) / 1e6)
+                                      for r in shs if _iso(r.get("date")) and r.get("shares_outstanding"))
+
+
+def _dfdv_cost(co):
+    """Average cost per SOL from the purchase log DFDV publishes on its dashboard, which
+    the page takes as the record. The log lists purchases only and doesn't reconcile with
+    the SOL DFDV holds (2,148,968 logged vs 2,590,266 held on 2026-10-25), so
+    costBasisSol carries the SOL the cost covers, and the page's P/L counts only that."""
+    rows = [(r["date"], float(r["sol_amount"]), float(r["usd_amount"]))
+            for r in _dfdv("purchases") or []
+            if _iso(r.get("date")) and (r.get("sol_amount") or 0) > 0 and (r.get("usd_amount") or 0) > 0]
+    if rows:
+        sol, usd = sum(r[1] for r in rows), sum(r[2] for r in rows)
+        co["avgCost"] = round(usd / sol, 2)
+        co["costBasisSol"] = round(sol)
+        co["costBasisAsOf"] = max(r[0] for r in rows)
+
+
+def _dfdv_closes(co, data, steps, sol_hist):
+    """Nasdaq daily closes: stockHistory's calendar axis, beta to SOL, relative volume,
+    and the price beside DFDV's own EV series. That series leaves CHAD out of EV; it
+    goes back in here, as preferred does for MSTR and ASST."""
+    closes = _nasdaq_closes("DFDV")
+    if not closes:
+        return
+    snap_et = datetime.datetime.now(ET)
+    # DFDV's quote is its latest trade, after-hours included, with the change on the
+    # previous close: on Sunday 2026-10-25 it read 3.78, +2.02% for Friday, whose close
+    # was 3.705, -1.33%. Stamp it against the settled sessions, as MSTR's and ASST's
+    # are, and outside a session take the last settled close and its own change.
+    settled = _settled_sessions([(d, c) for d, c, _v in closes], snap_et)
+    if co.get("stockPrice") and len(settled) >= 2:
+        quote = _quote_session(settled, co["stockPrice"], snap_et)
+        if not quote:                         # an after-hours print: the close is the quote
+            co["stockPrice"] = settled[-1][1]   # unrounded: Friday's 3.705 on 3.755 is -1.33%
+            quote = (settled[-1][0], settled[-2][1])
+        _stamp_price(co, co["stockPrice"], (co["stockPrice"] / quote[1] - 1) * 100, quote[0])
+    sh = data.get("stockHistory") or {}
+    if sh.get("iso"):
+        out, last, j = [], None, 0
+        for iso in sh["iso"]:
+            while j < len(closes) and closes[j][0] <= iso:
+                last = closes[j][1]
+                j += 1
+            out.append(round(last, 2) if last is not None else None)
+        sh["DFDV"] = out
+    beta = _beta(settled[-253:], sol_hist)
+    if beta is not None:
+        co["betaAsset"] = round(beta, 2)
+    rv = _rvol([(d, c * v) for d, c, v in closes], snap_et)
+    if rv:
+        co["rvol"] = rv
+    mn = _dfdv("nav/mnav-enterprise", timeout=40)
+    cl = [(d, c) for d, c, _v in closes]
+    dts, px, ev = [], [], []
+    for r in mn or []:
+        day = _iso(r.get("date"))
+        last = _step(cl, day) if day else None
+        if not day or day < MNAV_START["DFDV"] or last is None or not r.get("solNav"):
+            continue
+        dts.append(_iso_lbl(day, "%b %-d"))
+        px.append(round(last, 2))
+        ev.append(round((float(r["enterpriseValue"]) / 1e6 + (_step(steps, day) or 0))
+                        / (float(r["solNav"]) / 1e6), 3))
+    if ev:
+        co["mnavHistory"] = {"dates": dts, "px": px, "mnav": ev}
+
+
+def fetch_dfdv(data):
+    """DFDV + CHAD from DFDV's dashboard API, in the shape the page reads for MSTR and
+    ASST. Each part is guarded on its own, so one failing route keeps only its figures."""
+    co = data["companies"].setdefault("DFDV", {})
+    co.update({"name": "DeFi Development", "ticker": "DFDV", "prefName": "DFDV Preferred",
+               "prefTicker": "CHAD", "asset": "SOL", "accent": "#a970ff",
+               "prefStated": CHAD["stated"], "opexYr": DFDV_OPEX_M})
+    co.setdefault("trail3m", {"prefMo": 0, "commonMo": 0})
+    _guard("DFDV balance sheet", _dfdv_balance_sheet, co, data)
+    steps = _guard("CHAD", _dfdv_chad, co) or list(CHAD["notional"])
+    sol_hist = _guard("DFDV holdings", _dfdv_holdings, co, data) or []
+    _guard("DFDV per share", _dfdv_per_share, co)
+    _guard("DFDV cost basis", _dfdv_cost, co)
+    _guard("DFDV closes", _dfdv_closes, co, data, steps, sol_hist)
+    if co.get("holdings") and co.get("stockPrice") and co.get("prefBreakdown"):
+        log(f"DFDV via its dashboard: {co['holdings']:,} SOL, ${co['stockPrice']} "
+            f"({co.get('dayChangePct', 0):+.2f}%), debt ${co.get('seniorDebt', 0):,.1f}M, "
+            f"cash ${co.get('cash', 0):,.1f}M, CHAD ${co['prefNotional']:,.2f}M at "
+            f"{co['prefBreakdown'][0][3]:g}%")
 
 
 def apply_sats_proceeds(data):
@@ -2769,13 +3294,31 @@ def record_filing_watermark(data):
             continue
         newest = None
         try:
-            r = get_json(f"https://data.sec.gov/submissions/CIK{cik}.json")["filings"]["recent"]
+            r = _edgar_json(f"https://data.sec.gov/submissions/CIK{cik}.json")["filings"]["recent"]
             newest = max((r["filingDate"][i] for i in range(len(r["form"]))
                           if r["form"][i] == "8-K"), default=None)
+            # Nothing here reads an amendment: they're rare (Strategy's one, 2026-07-31,
+            # replaced an earnings exhibit), and parsing them would mean deciding, reader by
+            # reader, which filing stands. Name a recent one so a restatement gets checked.
+            since = (datetime.date.today() - datetime.timedelta(days=14)).isoformat()
+            for i in range(len(r["form"])):
+                if r["form"][i] == "8-K/A" and r["filingDate"][i] >= since:
+                    log(f"[drift] {tk} filed an 8-K/A on {r['filingDate'][i]}, amending its "
+                        f"{r['reportDate'][i]} report — amendments aren't read; check whether "
+                        f"it restates a figure")
         except Exception as e:
             log(f"[skip] filing watermark {tk}: {e}")
-        ingested = max((a["filed"] for a in (data.get("actions") or [])
-                        if a["co"] == tk and a.get("filed")), default=None)
+        acted = max((a["filed"] for a in (data.get("actions") or [])
+                     if a["co"] == tk and a.get("filed")), default=None)
+        # An 8-K counts once this run has read it, whether or not it carried any
+        # figures. Counting only those that yielded an action kept ASST "behind" from
+        # a 2026-10-21 SATS dividend notice until its next weekly 8-K, and fired the
+        # page's notice, the workflow gate and filing-watch on every check meanwhile.
+        read = _READ_8K.get(tk)
+        ingested = max(filter(None, (acted, read)), default=None)
+        if read and acted and read > acted:
+            log(f"[watermark] {tk}: newest 8-K read ({read}) gave no action; "
+                f"the newest that did is {acted}")
         co["filingWatch"] = {"latestOnEdgar": newest, "ingested": ingested}
         if newest and ingested and newest > ingested:
             log(f"[stale] {tk}: EDGAR has an 8-K filed {newest} but the newest "
@@ -2794,12 +3337,14 @@ def main():
     before = json.dumps(data, sort_keys=True)
 
     print("Refreshing treasury data…")
-    fetch_btc_market(data)            # CoinGecko: BTC price + supply
+    fetch_crypto_market(data)         # CoinGecko: BTC + SOL price and supply
     fetch_strategy_kpi(data)          # strategy.com API: shares, debt, USD reserve (MSTR)
     fetch_sata_notional(data)         # SEC EDGAR: filed SATA count (the tracker's stalls)
+    fetch_strc_notional(data)         # SEC EDGAR: STRC's filed weekly sales and buybacks (the tracker's log lags)
     fetch_strategytracker(data)       # PRIMARY: current metrics + real history (both names)
     fetch_holdings(data)             # SEC EDGAR: weekly accumulation (8-K period ranges)
     fetch_strategy_kpi(data)          # re-apply: holdings sets cash from the 8-K balances; live wins
+    fetch_dfdv(data)                  # DFDV dashboard API: the SOL treasury and CHAD
     fetch_short_interest(data)        # Nasdaq: days to cover (semi-monthly)
     fetch_borrow_fees(data)           # ChartExchange/IBKR: annualized cost to short
     fetch_atm(data)                   # preferred ATM issuance estimate + filing calibration

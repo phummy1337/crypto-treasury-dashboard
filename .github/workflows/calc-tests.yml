@@ -1,0 +1,22 @@
+# Runs the calculator engine's tests when the engine or its tests change. The refresh
+# bot only commits data.json and data.js, so its runs never trigger this one.
+name: Calculator tests
+
+on:
+  push:
+    paths: ["calc-engine.js", "tests/**", ".github/workflows/calc-tests.yml"]
+  pull_request:
+    paths: ["calc-engine.js", "tests/**", ".github/workflows/calc-tests.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: node --test 'tests/*.test.js'
