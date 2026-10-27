@@ -33,6 +33,13 @@ on:
     - cron: "39 21 * * 1-5"         # 5:39pm EDT / 4:39pm EST (winter)
     - cron: "7 22 * * 5"            # Fri 6:07pm EDT / 5:07pm EST — safety net if the close run drops
     - cron: "17 14 * * 6"           # Sat 10:17am EDT / 9:17am EST — catch anything filed late Friday
+  # A merge that changes the refresh script rebuilds the data straight away, so the
+  # site never pairs new code with data the old script wrote (PR #2's DFDV and CHAD
+  # fields would otherwise wait for the next cron slot). The bot's own commits touch
+  # only the data files, and a push made with GITHUB_TOKEN never starts a workflow.
+  push:
+    branches: [main]
+    paths: [refresh_data.py]
   workflow_dispatch:               # manual button, and Cloud Scheduler's entry point
     inputs:
       force:
