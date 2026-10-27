@@ -439,6 +439,7 @@
   .charts.two { grid-template-columns: 1fr 1fr; }   /* the ATM cards: MSTR and ASST only */
   @media (max-width: 1100px) { .charts { grid-template-columns: 1fr 1fr; } }
   .charts.full { grid-template-columns: 1fr; }
+  .charts ~ .grid { margin-top: 14px; }   /* charts above a table (Company Stats, Valuation): same gap as a table above charts */
   .chartcard {
     background: var(--panel); border:1px solid var(--border); border-radius: var(--radius);
     padding: 14px 16px 12px;
