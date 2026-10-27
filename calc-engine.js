@@ -78,12 +78,17 @@ function simulate(s, cfg){
     let gap = Math.max(0, cfg.runway*divMo - buf);                     // cash still to park
     const pc = Math.min(cfg.prefMo, gap); gap -= pc;                   // preferred ATM:
     buf += pc; hold += (cfg.prefMo - pc)*1e6/b;                        // runway first, rest -> the asset
-    premCap += (cfg.prefMo - pc)*(mn-1);
-    p = priceAt(hold,b,pref,buf,sharesM,mn);
-    const commonMo = atmOpen ? cfg.commonMo : 0;                       // ATM shut below the floor
-    if(commonMo>0){                                                    // common ATM: same split
-      const cc = Math.min(commonMo, gap);
-      buf += cc; sharesM += commonMo/p; hold += (commonMo - cc)*1e6/b;
+    premCap += (cfg.basis==="net" ? 0 : cfg.prefMo - pc)*(mn-1);       // net: its claim offsets its cash
+    // Common ATM, the same split. Its proceeds land first and the sale is priced on the
+    // result: C raised on M, the market value with the buyers' money in, issues
+    // C*S/(M - C) shares, so existing holders keep M - C. Only a floor below 1x can leave
+    // M short of C, and then nothing sells.
+    let commonMo = atmOpen ? cfg.commonMo : 0;                         // ATM shut below the floor
+    const cc = Math.min(commonMo, gap);
+    const mcap = commonMo>0 ? priceAt(hold + (commonMo - cc)*1e6/b, b, pref, buf + cc, sharesM, mn)*sharesM : 0;
+    if(!(mcap > commonMo)) commonMo = 0;
+    if(commonMo>0){
+      buf += cc; hold += (commonMo - cc)*1e6/b; sharesM += commonMo*sharesM/(mcap - commonMo);
       parked += cc; premCap += (cfg.basis==="net" ? commonMo : commonMo - cc)*(mn-1);   // net: parked cash earns it too
     }
     parked += pc;
@@ -100,9 +105,10 @@ function simulate(s, cfg){
       if(!atmOpen && viaEq>0){ forcedDiv += viaEq; viaAsset += viaEq; viaEq = 0; }
       if(viaAsset>0){ hold -= viaAsset*1e6/b; assetSold += viaAsset; }
       if(viaEq>0){
-        // Stock sold to pay a bill is priced after its own dilution, so existing holders
-        // bear exactly the bill: raising X on a market cap M issues X*S/(M - X) shares. A
-        // bill the whole company isn't worth can't be paid in stock, so the treasury pays.
+        // Stock sold to pay a bill is priced after its own dilution, as the ATM's raise is
+        // above. The money goes out, so the market cap M doesn't move and existing holders
+        // bear exactly the bill: X issues X*S/(M - X) shares. A bill the whole company
+        // isn't worth can't be paid in stock, so the treasury pays.
         const mcap = priceAt(hold,b,pref,buf,sharesM,mn)*sharesM;
         if(viaEq < mcap) sharesM += viaEq*sharesM/(mcap - viaEq);
         else { forcedDiv += viaEq; hold -= viaEq*1e6/b; assetSold += viaEq; }

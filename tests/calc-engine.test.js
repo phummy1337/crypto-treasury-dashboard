@@ -13,13 +13,13 @@ const FIXTURES = {
     s: {px:146.01, sharesM:422.35, pref:13557, spot:80472, hold:848517, cash:5281, owed:0, debtUsd:6714, intUsd:34.5953, intUnits:0,
         otherNotional:4987, otherDivs:470.66},
     cfg: {target:150000, months:12, prefMo:0, commonMo:1579, rate:12, fundMix:0, endMnav:1.15, runway:0, basis:"net", atmFloor:1, stake:0, opex:0},
-    golden: {implied:307.47947057187207, endHold:1013760.6016336514, endSharesM:506.9330316489228, assetSold:0, pausedMo:0, broke:null},
+    golden: {implied:307.6200142131077, endHold:1013760.6016336514, endSharesM:506.70142703661304, assetSold:0, pausedMo:0, broke:null},
   },
   ASST: {
     s: {px:28.97, sharesM:124.06, pref:2103, spot:80472, hold:36818, cash:976, owed:0, debtUsd:0, intUsd:0, intUnits:0,
         otherNotional:700, otherDivs:105},
     cfg: {target:150000, months:12, prefMo:207, commonMo:334, rate:13, fundMix:0, endMnav:1.95, runway:0, basis:"net", atmFloor:1, stake:0, opex:0},
-    golden: {implied:100.12230107011628, endHold:93434.07883711549, endSharesM:193.6284234646163, assetSold:0, pausedMo:0, broke:null},
+    golden: {implied:102.02003267757561, endHold:93434.07883711549, endSharesM:190.026633015552, assetSold:0, pausedMo:0, broke:null},
   },
   DFDV: {
     s: {px:3.78, sharesM:32.62, pref:15.81, spot:101.4, hold:2590266, cash:9.98, owed:562000, debtUsd:149.0532, intUsd:7.5087, intUnits:33725,
@@ -219,6 +219,17 @@ test("stock sold to pay a bill costs existing holders exactly the bill", () => {
   near(r.endSharesM, 10 + 12*10/108, "shares");
   near(r.implied*10, 120 - 12, "the old holders' stake");
   near(r.assetSold, 0, "nothing sold");
+});
+
+test("premium captured is what existing holders gain from issuance", () => {
+  // $30M of common and $30M of preferred in one month. Net basis at 1.5x: the common's
+  // $30M adds 1.5 x 30 to a company worth $120M, and the preferred's claim offsets its
+  // cash, so holders gain $15M. EV basis at 1.3x: each $30M adds $9M of premium.
+  for(const [basis, endMnav, before, gain] of [["net", 1.5, 1.5*80, 15], ["ev", 1.3, 1.3*100 - 20, 18]]){
+    const r = simulate(tinyCo(), flatCo({basis, endMnav, commonMo:30, prefMo:30}));
+    near(r.implied*10 - before, gain, `${basis}: the old 10M shares' gain`);
+    near(r.premCap, gain, `${basis}: premium captured`);
+  }
 });
 
 test("a bill bigger than the company's market value is paid by selling the treasury", () => {
