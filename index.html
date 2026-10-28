@@ -347,6 +347,8 @@
   .livedot { width:7px; height:7px; border-radius:50%; background:var(--pos);
     box-shadow:0 0 0 3px rgba(52,211,153,0.16); }
   .fresh-ago::before { content:"·"; margin:0 5px; }
+  .ratenote { display:block; color:var(--faint); font-size:11px; font-weight:500;
+    letter-spacing:.2px; margin-top:2px; text-transform:none; }
   .rangechips { display: flex; gap: 4px; flex: 0 0 auto; }
   .rangechips button { background: none; border: 1px solid var(--border); border-radius: 4px;
     color: var(--faint); font: inherit; font-size: 12px; font-weight: 600; padding: 3px 9px; cursor: pointer; }
@@ -532,11 +534,6 @@
           <div class="lbl">Bitcoin</div>
           <div class="val" id="btcVal">—</div>
           <div class="sub" id="btcSub">loading…</div>
-        </div>
-        <div class="statbox" style="--bx:var(--sol)">
-          <div class="lbl">Solana</div>
-          <div class="val" id="solVal">—</div>
-          <div class="sub" id="solSub">loading…</div>
         </div>
       </div>
       <div class="statgroup" style="--bx:var(--mstr)">
@@ -796,7 +793,7 @@
         <label data-view="common"><span class="lblrow">ATM Pauses Below<span class="evhint" data-title="Common ATM discipline" data-rows="Rule~no common issuance below this net mNAV|Strategy's stated threshold~1.00×|Set 0~issue regardless (unrealistic)|Effect~below the floor, dividends must come from sales of the treasury">?</span></span>
           <input type="number" id="ci-floor" value="1.00" step="0.05" min="0" max="5">
           <span class="mixlbl" id="ci-floor-lbl">× net mNAV — ATM open above this</span></label>
-        <label><span><span id="ci-rate-name">Preferred</span> Dividend Rate (% / yr)</span><input type="number" id="ci-rate" value="12" step="0.5" min="0"></label>
+        <label><span><span id="ci-rate-name">Preferred</span> Dividend Rate (% / yr)<small id="ci-rate-note" class="ratenote" hidden></small></span><input type="number" id="ci-rate" value="12" step="0.5" min="0"></label>
         <label data-view="credit" hidden>Required Yield (%)<input type="number" id="ci-ry" value="12" step="0.25" min="0.1" max="100">
           <span class="mixlbl">the yield the market prices it at</span></label>
         <label data-view="common">Dividend Funding Mix
@@ -1440,7 +1437,7 @@ function renderCapital(){
 // ---------- price + orchestration ----------
 function renderPriceHeader(){
   document.getElementById("btcVal").textContent = usd(btcPrice);
-  document.getElementById("solVal").textContent = usd(solPrice,2);
+  const sv=document.getElementById("solVal"); if(sv) sv.textContent = usd(solPrice,2);
   const pa=document.getElementById("priceAsOf"); if(pa) pa.textContent = DATA.priceAsOf || "—";
   const da=document.getElementById("dataAsOf"); if(da) da.textContent = DATA.asOf || "—";
   const D=DATA.companies, A=D.ASST;
@@ -2127,11 +2124,11 @@ async function fetchCryptoPrices(){
     const j = await r.json();
     btcPrice = j.bitcoin.usd; liveBtc = true;
     live(sub, j.bitcoin.usd_24h_change);
-    if(j.solana && j.solana.usd > 0){ solPrice = j.solana.usd; liveSol = true; live(ssub, j.solana.usd_24h_change); }
+    if(j.solana && j.solana.usd > 0){ solPrice = j.solana.usd; liveSol = true; if(ssub) live(ssub, j.solana.usd_24h_change); }
     markSolLoans(); renderAll(); markFresh();
   }catch(e){
     sub.textContent = `latest · ${usd(DATA.btcPriceUsd)} · as of ${DATA.priceAsOf}`;
-    ssub.textContent = `latest · ${usd(DATA.solPriceUsd,2)} · as of ${DATA.priceAsOf}`;
+    if(ssub) ssub.textContent = `latest · ${usd(DATA.solPriceUsd,2)} · as of ${DATA.priceAsOf}`;
   }
 }
 
@@ -2896,8 +2893,20 @@ function initCalc(){
       group = g;
     }
     const series = (o.prefBreakdown || []).find(r => r[0] === (credit ? calcCo : o.prefTicker));
-    const rate = series && series[3] != null ? series[3] : (calcCo==="MSTR" ? 12 : 13);
+    // Prefer a rate that has been declared for a period still ahead of us: the model
+    // runs forward months, so CHAD's 14% from 1 Nov is the rate those months pay,
+    // even while the page's obligations correctly still show today's 13%.
+    const nx = o.prefRateNext;
+    const rate = (nx && nx.rate != null) ? nx.rate
+               : (series && series[3] != null ? series[3] : (calcCo==="MSTR" ? 12 : 13));
     val("ci-rate", rate);
+    const rl = document.getElementById("ci-rate-note");
+    if(rl){
+      const on = !!(nx && nx.rate != null);
+      rl.hidden = !on;
+      if(on) rl.textContent = `declared ${fmt(nx.rate,2)}% from `
+        + new Date(nx.from+"T12:00:00Z").toLocaleDateString("en-US",{month:"short",day:"numeric"});
+    }
     val("ci-opex", o.opexYr || 0);
     val("ci-stake", o.asset === "SOL" ? (o.organicYield ?? 0) : 0);
     const co = calcCo;            // the getters below look it up as they run: a repoll replaces DATA

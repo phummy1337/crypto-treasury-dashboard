@@ -3003,6 +3003,16 @@ def _dfdv_chad(co):
     notional = steps[-1][1]
     co["prefNotional"] = round(notional, 2)
     co["prefBreakdown"] = [["CHAD", PREF_LABEL["CHAD"].format(r="%g" % rate), round(notional, 2), rate]]
+    # A declared-but-not-yet-effective rate. Everything above is deliberately on
+    # today's rate — obligations, hurdle and duration all describe the stack as it
+    # stands — but the calculator runs forward months, so seeding it from today
+    # understates the cost from the day the new rate starts. CHAD was raised
+    # 13.00% -> 14.00% for periods from 2026-11-01 (8-K filed 2026-10-15).
+    nxt = next(((d, r) for d, r in CHAD["rates"] if d > today), None)
+    if nxt:
+        co["prefRateNext"] = {"rate": nxt[1], "from": nxt[0]}
+    else:
+        co.pop("prefRateNext", None)
     interest = sum(t["principal"] * t["coupon"] / 100 for t in co.get("debtSchedule") or [])
     co["annualObligations"] = round(notional * rate / 100 + interest, 2)
     q = _dfdv("chad/quote", timeout=20)
