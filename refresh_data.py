@@ -278,6 +278,66 @@ PREF_LABEL = {"STRC": "Stretch · {r}% var", "STRK": "Strike · {r}%", "STRF": "
 # SATS is JUNIOR to SATA and senior to both common classes (closing 8-K, Item 3.03).
 SATS = {"ticker": "SATS", "shares": 7_000_000, "stated": 100.0, "rate": 15.0,
         "netProceedsM": 608.15, "closed": "2026-10-20"}
+# SATS's row in Strive's weekly table, written like SATA's ("SATA Stock (6) 14,030,176 ...")
+_SATS_ROW = r"SATS Stock(?:\s*\(\d+\))?"
+
+
+def _asst_pref2(co, row, today):
+    """co["pref2"] for Strive's second preferred, SATS, from its preferred-list row:
+    the feed's once it carries SATS, until then the filed terms above.
+
+    Nasdaq lists SATS as Strive's 15% preferred (checked 2026-10-29; ChartExchange's
+    "SATS" is still EchoStar). Its daily closes give the chart, the volume behind days
+    to cover, and the previous close the tile's day change needs. Without them the
+    chart grows by one snapshot point a session."""
+    nM = round(row.get("notionalMillions") or (row.get("notionalUSD") or 0) / 1e6
+               or SATS["shares"] * SATS["stated"] / 1e6)
+    px = row.get("price")
+    p2 = {"ticker": "SATS", "price": px, "rate": row.get("dividendRate") or SATS["rate"],
+          "stated": SATS["stated"], "notional": nM}
+    try:
+        rows = [r for r in _nasdaq_closes("SATS") if r[0] >= SATS["closed"]]
+    except Exception as e:
+        rows = []
+        log(f"[skip] Nasdaq SATS closes: {e} — adding a snapshot point instead")
+    if rows:
+        co["pref2History"] = {"dates": [_iso_lbl(d, "%b %-d") for d, _c, _v in rows],
+                              "iso": [d for d, _c, _v in rows],
+                              "px": [round(c, 2) for _d, c, _v in rows],
+                              "notional": [nM] * len(rows)}
+        _VOL_HIST["SATS"] = [(d, v) for d, _c, v in rows]
+        snap_et = datetime.datetime.now(ET)
+        settled = _settled_sessions([(d, c) for d, c, _v in rows], snap_et)
+        if px and len(settled) >= 2:
+            quote = _quote_session(settled, px, snap_et)
+            if not quote:                     # an after-hours print: the close is the quote
+                p2["price"] = px = settled[-1][1]
+                quote = (settled[-1][0], settled[-2][1])
+            p2["prevClose"] = round(quote[1], 4)
+            p2["changePct"] = round((px / quote[1] - 1) * 100, 2)
+    elif px:
+        # re-running within a session updates that day's point rather than adding one
+        h2 = co.get("pref2History") or {"dates": [], "iso": [], "px": [], "notional": []}
+        if h2["iso"] and h2["iso"][-1] == today:
+            h2["px"][-1], h2["notional"][-1] = px, nM
+        else:
+            h2["iso"].append(today)
+            h2["dates"].append(_iso_lbl(today, "%b %-d"))
+            h2["px"].append(px)
+            h2["notional"].append(nM)
+        co["pref2History"] = h2
+    co["pref2"] = p2
+
+
+def _check_sats_count(text):
+    """Flag the SATS constant once Strive's weekly table counts SATS shares sold.
+
+    Its ATM opened 2026-10-26 and no filing has a SATS row yet, so there is no
+    count to read the notional from; this names the filing that first has one."""
+    m = re.search(_SATS_ROW + r" ([\d,]+) ([\d,]+)", text or "")
+    if m and int(m.group(2).replace(",", "")) != SATS["shares"]:
+        log(f"[stale] Strive's weekly table counts {m.group(2)} SATS shares but SATS['shares'] "
+            f"is {SATS['shares']:,} — update it in refresh_data.py, or read the row")
 
 def _iso_lbl(iso, fmt):
     y, m, d = iso.split("-")
@@ -510,32 +570,19 @@ def fetch_strategytracker(data):
             co["cash"] = round(pm["latestCashBalance"] / 1e6)
         # preferred: live per-series notionals, prices, and the implied annual dividend
         ps = list(pm.get("preferredStocks") or [])
-        if tk == "ASST" and not any(p.get("ticker") == "SATS" for p in ps) \
-                and str(tracker_date) >= SATS["closed"]:
-            px = _cboe_last("SATS")
-            ps.append({"ticker": "SATS", "dividendRate": SATS["rate"],
-                       "notionalMillions": SATS["shares"] * SATS["stated"] / 1e6,
-                       "price": px, "priceChangePercent": 0})
-            co["pref2"] = {"ticker": "SATS", "price": px, "rate": SATS["rate"],
-                           "stated": SATS["stated"],
-                           "notional": round(SATS["shares"] * SATS["stated"] / 1e6)}
-            # No feed carries a SATS price series yet, so build one a session at a
-            # time and keep it in data.json. Re-running within a session updates
-            # that day's point rather than adding another.
-            if px:
-                h2 = co.get("pref2History") or {"dates": [], "iso": [], "px": [], "notional": []}
-                nM = round(SATS["shares"] * SATS["stated"] / 1e6)
-                if h2["iso"] and h2["iso"][-1] == tracker_date:
-                    h2["px"][-1], h2["notional"][-1] = px, nM
-                else:
-                    h2["iso"].append(tracker_date)
-                    h2["dates"].append(_iso_lbl(tracker_date, "%b %-d"))
-                    h2["px"].append(px)
-                    h2["notional"].append(nM)
-                co["pref2History"] = h2
+        sats = next((p for p in ps if p.get("ticker") == "SATS"), None)
+        if tk == "ASST" and not sats and str(tracker_date) >= SATS["closed"]:
+            sats = {"ticker": "SATS", "dividendRate": SATS["rate"],
+                    "notionalMillions": SATS["shares"] * SATS["stated"] / 1e6,
+                    "price": _cboe_last("SATS"), "priceChangePercent": 0}
+            ps.append(sats)
             log(f"[SATS] not in the feed yet — carrying {SATS['shares']:,} sh "
                 f"x ${SATS['stated']:,.0f} = ${SATS['shares']*SATS['stated']/1e6:,.0f}M at "
-                f"{SATS['rate']}%" + (f", last ${px:,.2f}" if px else ", no quote"))
+                f"{SATS['rate']}%" + (f", last ${sats['price']:,.2f}" if sats["price"] else ", no quote"))
+        # whether injected or the feed's own, so the tile and chart keep updating
+        # once the feed lists SATS
+        if tk == "ASST" and sats:
+            _asst_pref2(co, sats, tracker_date)
         if ps:
             bd = []
             kpi = _strategy_pref_notional() if tk == "MSTR" else {}
@@ -1621,7 +1668,9 @@ def fetch_sata_notional(data):
             txt = _edgar_text(url)
             got = _asst_sata_counts(txt)
         except Exception:
-            got = []
+            txt, got = "", []
+        if not scanned:                      # the newest filing
+            _check_sats_count(txt)
         scanned += 1
         if got and all(d in known for d, _ in got):
             break                            # newest-first: everything older is held
@@ -2278,29 +2327,40 @@ def fetch_short_interest(data):
                     f"{pct[-1]}% of float")
         except Exception as e:
             log(f"[skip] short interest {sym}: {e} — keeping existing values")
-        pref = co.get("prefTicker")
-        if pref:
+        p2 = co.get("pref2") or {}
+        for key, sym, hist, stated in (
+                ("prefShortInterest", co.get("prefTicker"), co.get("prefHistory"), co.get("prefStated")),
+                ("pref2ShortInterest", p2.get("ticker"), co.get("pref2History"), p2.get("stated"))):
+            if not sym:
+                continue
             try:
-                sih = _nasdaq_si(pref)
+                sih = _pref_short_interest(sym, hist or {}, stated or 100)
                 if sih:
-                    # % of float: preferred float = notional outstanding / stated amount
-                    # ($100 for STRC and SATA, $10 for CHAD)
-                    ph = co.get("prefHistory") or {}
-                    stated = co.get("prefStated") or 100
-                    steps = [(d, n) for d, n in zip(ph.get("iso") or [], ph.get("notional") or []) if n]
-                    pct = []
-                    for iso, s in zip(sih["iso"], sih["si"]):
-                        ns = [n for d2, n in steps if d2 <= iso]
-                        pct.append(round(s / (ns[-1] * 1e6 / stated) * 100, 2) if ns else None)
-                    sih["pctFloat"] = pct
-                    if pref in _VOL_HIST:
-                        sih["dtc10"] = _dtc10(sih, _VOL_HIST[pref])
-                        sih["dtcLive"] = _dtc_live(sih, _VOL_HIST[pref])
-                    co["prefShortInterest"] = sih
-                    log(f"[short interest] {pref}: {len(sih['dtc'])} pts, latest {sih['si'][-1]:,} sh "
-                        f"({pct[-1]}% of float)")
+                    co[key] = sih
             except Exception as e:
-                log(f"[skip] short interest {pref}: {e} — keeping existing values")
+                log(f"[skip] short interest {sym}: {e} — keeping existing values")
+
+
+def _pref_short_interest(sym, hist, stated):
+    """Nasdaq short interest for one preferred series, or None before its first figure.
+
+    % of float: the float is notional outstanding ÷ stated amount ($100; CHAD $10) on
+    each settlement date, from the series' own notional history."""
+    sih = _nasdaq_si(sym)
+    if not sih:
+        return None
+    steps = [(d, n) for d, n in zip(hist.get("iso") or [], hist.get("notional") or []) if n]
+    pct = []
+    for iso, s in zip(sih["iso"], sih["si"]):
+        ns = [n for d2, n in steps if d2 <= iso]
+        pct.append(round(s / (ns[-1] * 1e6 / stated) * 100, 2) if ns else None)
+    sih["pctFloat"] = pct
+    if sym in _VOL_HIST:
+        sih["dtc10"] = _dtc10(sih, _VOL_HIST[sym])
+        sih["dtcLive"] = _dtc_live(sih, _VOL_HIST[sym])
+    log(f"[short interest] {sym}: {len(sih['dtc'])} pts, latest {sih['si'][-1]:,} sh "
+        f"({pct[-1]}% of float)")
+    return sih
 
 
 # live KPI snapshot from strategy.com, shared with the history builder
