@@ -102,29 +102,30 @@
   .dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:6px; vertical-align: middle; }
 
   /* header stat bar */
-  /* a price column (BTC over SOL) and three issuer cards; Strive's is widest, since it
-     carries two preferred series */
-  .statbar { display:grid; grid-template-columns: 0.72fr 1.3fr 1.62fr 1.3fr; gap: 12px; align-items: stretch; }
-  .pricecol { display:flex; flex-direction:column; gap:12px; }
-  .pricecol .statbox { flex:1; padding: 9px 13px; }
-  .pricecol .statbox .val { font-size: 21px; margin-top: 2px; }
-  .pricecol .statbox .sub { font-size: 11.5px; margin-top: 1px; }
+  /* a Bitcoin card and three issuer cards, all built alike so every value sits on one
+     line at one size. Strive's is widest (two preferred series); Strategy's next, since
+     "$145.16" and "$99.92" are the widest figures and crowded a card DFDV's size. */
+  .statbar { display:grid; grid-template-columns: 0.62fr 1.42fr 1.68fr 1.24fr; gap: 12px; align-items: stretch; }
   .statgroup { position:relative; overflow:hidden; border:1px solid var(--border); border-radius:6px;
     background:rgba(255,255,255,0.02); padding:10px 16px 12px; }
   .statgroup::before { content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--bx); }
   .sg-head { font-size:11.5px; text-transform:uppercase; letter-spacing:1.4px; font-weight:700; margin-bottom:6px; }
-  .sg-items { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
+  .sg-items { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+  .sg-items.one { grid-template-columns:1fr; }
   /* Strive carries two preferred series since SATS listed 2026-10-20. Four tiles in
-     the same single row keeps both cards the same height; the value size steps down
-     just enough that a $100-par price still fits the narrower column. */
-  .sg-items.four { grid-template-columns:repeat(4,1fr); gap:10px; }
-  .sg-items.four .sg-item .val { font-size:18px; }
+     the same single row keep the cards the same height; its card is wide enough that
+     the values keep the others' size. */
+  .sg-items.four { grid-template-columns:repeat(4,1fr); }
   .sg-items.four .sg-item .lbl { letter-spacing:.6px; }
   .sg-item .lbl { font-size:11px; text-transform:uppercase; letter-spacing:.8px; color:var(--muted); white-space:nowrap; }
   .sg-item .val { font-size:20px; font-weight:700; font-style:italic; margin-top:2px;
     color:var(--bx); font-variant-numeric:tabular-nums; }
   .sg-item .sub { font-size:12px; color:var(--faint); margin-top:2px; }
+  .sg-item .sub.live { color: var(--pos); }
   .sg-item .defhint { margin-left:4px; }
+  /* the glyph is a size up from the label; without this it deepens Net mNAV's label
+     line and drops its value below its neighbours' */
+  .sg-item .lbl .defhint { line-height:0; }
   /* relative volume is its own hint — the figure carries the tooltip rather than a
      separate glyph, so it must not pick up the glyph's spacing or size. nowrap: on
      phones a wrapped "Mon · last trade" reads as Monday's last trade */
@@ -137,25 +138,10 @@
      "$99.36" at full size push the third tile out of the card ("$99.3"). */
   @media (min-width: 1101px) and (max-width: 1200px) {
     .sg-items { gap: 10px; }
-    .sg-item .val, .sg-items.four .sg-item .val { font-size: 17px; }
+    .sg-item .val { font-size: 17px; }
     .sg-item .lbl { letter-spacing: .5px; }
   }
-  .statbox {
-    background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
-    padding: 13px 15px; position: relative; overflow: hidden;
-    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-  }
-  .statbox::before { content:""; position:absolute; left:0; top:0; bottom:0; width:3px;
-    background: var(--bx, var(--red)); }
-  .statbox .lbl { font-size: 12.5px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted); white-space: nowrap; }
-  /* italic bold stat callouts, like the deck's "3.3x" / "-50%" figures */
-  .statbox .val { font-size: 23px; font-weight: 700; font-style: italic; margin-top: 4px;
-    color: var(--bx, var(--text)); font-variant-numeric: tabular-nums; }
-  .statbox .sub { font-size: 12.5px; color: var(--faint); margin-top: 3px; }
-  .statbox .sub.live { color: var(--pos); }
-  .statbox .refresh { margin-top: 8px; display:inline-block; }
-  @media (max-width: 1100px) { .statbar { grid-template-columns: 1fr; } .btchero { max-width: none; }
-    .pricecol { flex-direction:row; } }
+  @media (max-width: 1100px) { .statbar { grid-template-columns: 1fr; } }
 
   /* apxUSD lending banner: Apyx's "Slim lending banner", dark variant, at the design's
      geometry (104px tall on desktop, 194px stacked on phones; the 1px border is part of
@@ -329,7 +315,7 @@
   .howto summary:hover { color: var(--text); }
   .howto .calc-how { margin-top: 10px; }
   /* mobile shrink-safety: grid items must be allowed to contract */
-  .chartcard, .chartwrap, .statbox, .calc-inputs label, .calc-cell { min-width: 0; }
+  .chartcard, .chartwrap, .calc-inputs label, .calc-cell { min-width: 0; }
   .chartwrap canvas { max-width: 100%; }
   .calc-inputs input, .calc-inputs select { width: 100%; box-sizing: border-box; min-width: 0; }
   .calc-inputs .basissel { width: auto; }
@@ -386,6 +372,7 @@
   .atm-grid > div { cursor:help; border-bottom:none; }
   .atm-grid .k { font-size:11px; text-transform:uppercase; letter-spacing:.9px; color:var(--muted);
     white-space:nowrap; }
+  .atm-grid .k .defhint { line-height:0; margin-left:5px; }   /* keeps its value level with the rest */
   .atm-grid .v { font-size:22px; font-weight:700; font-style:italic; margin-top:4px;
     font-variant-numeric:tabular-nums; color:var(--text); line-height:1.15; }
   .atm-grid .s { font-size:11.5px; color:var(--faint); margin-top:3px; }
@@ -476,8 +463,6 @@
     .title .legend { flex-direction: column; gap: 6px; }
     .title .legend > span { white-space: normal; }
     .statbar { gap: 8px; }
-    .statbox .val { font-size: 21px; }
-    .statbox { padding: 10px 12px; }
     .statgroup { padding: 9px 12px 11px; }
     .sg-items { gap: 8px; }
     /* four tiles across a phone would leave ~75px a column, so Strive's second
@@ -532,11 +517,11 @@
       </a>
     </div>
     <div class="statbar">
-      <div class="pricecol">
-        <div class="statbox btchero" style="--bx:var(--btc)">
-          <div class="lbl">Bitcoin</div>
-          <div class="val" id="btcVal">—</div>
-          <div class="sub" id="btcSub">loading…</div>
+      <div class="statgroup" style="--bx:var(--btc)">
+        <div class="sg-head" style="color:var(--btc)">Bitcoin</div>
+        <div class="sg-items one">
+          <div class="sg-item"><div class="lbl">BTC</div><div class="val" id="btcVal">—</div>
+            <div class="sub" id="btcSub">loading…</div></div>
         </div>
       </div>
       <div class="statgroup" style="--bx:var(--mstr)">
@@ -615,8 +600,7 @@
   <!-- 0. Preferred ATM Tracker (lead section) -->
   <section id="atm">
     <div class="sec-head"><h2>Preferred ATM Tracker</h2><span class="tag stub" id="tag-atm">seed data</span></div>
-    <p class="sec-note">An estimate of how much bitcoin each company is buying through its preferred ATM today, inferred from live trading and calibrated to the filings.
-      STRC and SATA only for now: CHAD's ATM (open since Sep 11) sells $10 shares for SOL, no feed carries its intraday trades and DFDV's weekly 8-Ks don't report its sales, so any CHAD it issues shows as shares outstanding on CHAD's chart in Company Stats. SATS's ATM opened Oct 26 and joins once Strive's weekly 8-K reports SATS sales.
+    <p class="sec-note">An estimate of how much bitcoin each company is buying through its preferred ATM today, inferred from live trading and calibrated to the filings. CHAD and SATS will be reflected once their ATMs can be tracked.
       <span class="evhint hint-icon" aria-label="Methodology" data-title="How this estimate is built" data-rows="At-par volume~15-min bars printed at/above $99.95, prorated when a bar straddles it|Capture rate~the share of that volume that was really ATM issuance|Calibration~capture solved from the newest filed week, else a default rate|To bitcoin~estimated proceeds ÷ live BTC price|Why $99.95, not $100~SATA hugs par to the cent; a strict cutoff undercounted a confirmed $44.1M week roughly 4x|Assumption~issuance tracks at-par volume evenly through the session|Confirmed vs estimate~the 8-K figure is fact; the intraday number is an estimate between filings">&#9432;</span></p>
     <div class="charts two" id="atm-cards"></div>
   </section>
@@ -1078,6 +1062,8 @@ const METRIC_DEFS = {
     m:"The referee between the gross and net per-share figures. If the treasury asset compounds above this rate, the leverage pays for itself, the senior claims shrink relative to NAV, and your outcome converges on the gross Holdings per Share. Below it, the claims eat the equity from underneath and Net Holdings per Share was the number telling the truth. Compare it to your own return expectation for BTC or SOL before paying any mNAV premium."},
   "Breakeven Crypto Rate": {c:"Annual obligations ÷ crypto reserve, expressed as a percentage per year. Cash isn't counted, since it doesn't appreciate; strategy.com publishes the same figure for MSTR.",
     m:"The rate the treasury asset has to appreciate for capital gains alone to cover every dividend and interest payment. Above this rate the structure funds itself indefinitely without selling the asset or issuing stock; below it, the obligations have to come from somewhere else. DFDV's staking earns part of this in SOL; the calculator models it."},
+  // the ATM tracker's Absorption tile; no m, so its tooltip is this one line
+  "Absorption": {c:"The share of all dollar trading in the preferred that was the company's own ATM selling, per its weekly 8-Ks over the past six months."},
   "Stock Price": {c:"Latest common-share price — the strategy.com / treasury.strive.com data feed for MSTR and ASST, DeFi Development's dashboard for DFDV — refreshed throughout market hours.",
     m:"What the market charges for one share of common stock — the starting point for market cap and every valuation ratio below."},
   "Day Change": {c:"Today's price versus the prior close, in percent.",
@@ -1535,7 +1521,7 @@ function renderPriceHeader(){
 // One ATM stat tile; its tooltip rides in data-rows, which tipHTML splits on | then ~.
 function atmCell(k, v, sub, tip, color){
   return `<div class="evhint" data-title="${k}" data-rows="${tip}">
-         <div class="k">${k}</div>
+         <div class="k">${defLabel(k)}</div>
          <div class="v"${color?` style="color:${color}"`:""}>${v}</div>
          <div class="s">${sub}</div></div>`;
 }
@@ -2059,6 +2045,8 @@ function tipHTML(el){
   if(el.classList.contains("defhint")){
     const d = METRIC_DEFS[el.dataset.def]; if(!d) return null;
     const own = (d.co || {})[el.dataset.co];     // an issuer's own note, on its own tile only
+    // a definition with no "what it means" is a one-liner, shown without headings
+    if(!d.m) return `<div class="et-title">${el.dataset.def}</div><p class="et-p">${d.c}</p>`;
     return `<div class="et-title">${el.dataset.def}</div>
       <div class="et-sec">How It's Calculated</div><p class="et-p">${d.c}${own ? " "+own : ""}</p>
       <div class="et-sec">What It Means</div><p class="et-p">${d.m}</p>`;
