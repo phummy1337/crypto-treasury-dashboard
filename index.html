@@ -226,7 +226,10 @@
   .grow.headrow > div { background: rgba(255,255,255,0.04); padding: 12px 18px; }
   .grow.headrow .co { font-weight: 700; font-size: 15px; letter-spacing:.5px;
     text-align:right; display:flex; align-items:center; justify-content:flex-end; gap:7px; }
-  .grow.headrow .co small { color: var(--faint); font-weight: 400; }
+  .grow.headrow .co small { color: var(--faint); font-weight: 400;
+    /* one line: the name gives way first (below), then the preferreds truncate */
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  @media (max-width: 1100px) { .grow.headrow .co .coname { display: none; } }
   .grow:hover:not(.headrow) > div { background: rgba(255,255,255,0.06); }
 
   .evhint, .debthint { cursor: help; border-bottom: 1px dotted var(--faint); }
@@ -613,6 +616,7 @@
   <section id="atm">
     <div class="sec-head"><h2>Preferred ATM Tracker</h2><span class="tag stub" id="tag-atm">seed data</span></div>
     <p class="sec-note">An estimate of how much bitcoin each company is buying through its preferred ATM today, inferred from live trading and calibrated to the filings.
+      STRC and SATA only for now: CHAD's ATM (open since Sep 11) sells $10 shares for SOL, no feed carries its intraday trades and DFDV's weekly 8-Ks don't report its sales, so any CHAD it issues shows as shares outstanding on CHAD's chart in Company Stats. SATS's ATM opened Oct 26 and joins once Strive's weekly 8-K reports SATS sales.
       <span class="evhint hint-icon" aria-label="Methodology" data-title="How this estimate is built" data-rows="At-par volume~15-min bars printed at/above $99.95, prorated when a bar straddles it|Capture rate~the share of that volume that was really ATM issuance|Calibration~capture solved from the newest filed week, else a default rate|To bitcoin~estimated proceeds ÷ live BTC price|Why $99.95, not $100~SATA hugs par to the cent; a strict cutoff undercounted a confirmed $44.1M week roughly 4x|Assumption~issuance tracks at-par volume evenly through the session|Confirmed vs estimate~the 8-K figure is fact; the intraday number is an estimate between filings">&#9432;</span></p>
     <div class="charts two" id="atm-cards"></div>
   </section>
@@ -870,7 +874,7 @@
   <!-- 9. Company Actions -->
   <section id="actions">
     <div class="sec-head"><h2>Company Actions &amp; Filings</h2></div>
-    <p class="sec-note">A running log of what each company actually did, week by week, parsed straight from their SEC filings — raises, buys, sales, buybacks, and dividend changes. Every entry links to the 8-K it came from. Newest first; scroll for history.</p>
+    <p class="sec-note">A running log of what each company actually did, week by week, parsed straight from their SEC filings — raises, buys, sales, buybacks, offerings and dividend-rate changes; for DFDV, the SOL and SOL equivalents it reports each week. Every entry links to the 8-K it came from. Newest first; scroll for history.</p>
     <div id="filing-stale"></div>
     <div class="grid actionsbox" id="grid-actions"></div>
   </section>
@@ -878,8 +882,8 @@
   <div class="sources">
     <b>Sources &amp; methodology</b> — Prices as of <span id="priceAsOf">—</span>; data as of <span id="dataAsOf">—</span>. Data refreshes automatically throughout market hours.
     <ul>
-      <li>Holdings, prices, shares, yields, preferred series: strategy.com / treasury.strive.com data feed</li>
-      <li>DFDV &amp; CHAD — SOL held, shares, debt, cash, CHAD notional and quotes, SOL per share: DeFi Development's dashboard (defidevcorp.com/dashboard); daily DFDV closes: Nasdaq</li>
+      <li>Holdings, prices, shares, yields, preferred series: strategy.com / treasury.strive.com data feed; SATS's terms: its 8-K and prospectus, its daily closes: Nasdaq</li>
+      <li>DFDV &amp; CHAD — SOL held: DFDV's weekly 8-Ks, with its dashboard for the days between; CHAD's rate and offerings: its 8-Ks; shares, debt, cash, CHAD notional and quotes, SOL per share: DeFi Development's dashboard (defidevcorp.com/dashboard); daily DFDV closes: Nasdaq</li>
       <li>Weekly accumulation, debt schedule, historical preferred &amp; cash: SEC EDGAR filings (8-K, 10-Q, XBRL)</li>
       <li>Days to cover / short interest: Nasdaq (semi-monthly settlement data)</li>
       <li>Live BTC and SOL prices: CoinGecko API</li>
@@ -1114,7 +1118,7 @@ const METRIC_DEFS = {
     m:"How much the treasury has actually added this year, net of any sales."},
   "YTD Growth (Relative)": {c:"Net YTD change ÷ holdings at the start of the year.",
     m:"Growth relative to size — a small treasury adding quickly can out-compound a giant one."},
-  "Avg. Acquired / Week": {c:"Average added per week this year: across 8-K weeks for BTC; for DFDV, the weekly change in the SOL balance it publishes daily, so staking rewards and loans count too.",
+  "Avg. Acquired / Week": {c:"Average added per week this year: across 8-K weeks for BTC; for DFDV, the weekly change in its SOL and SOL equivalents, from its weekly 8-K where one was filed and the balance it publishes daily before that, so staking rewards and loans count too.",
     m:"The current pace of accumulation."},
   "Avg. Acquired / Day": {c:"The weekly pace ÷ 7.",
     m:"The same accumulation pace, expressed per day."},
@@ -1176,8 +1180,13 @@ function row({label, cell, cls, cmp, dir, sameAsset}){
   </div>`;
 }
 
+// Each column's issuer: ticker, name and every preferred it lists (ASST's SATS too), on
+// one line; the CSS drops the name before anything would wrap (.coname)
+const SHORT_NAME = { DFDV: "DeFi Dev" };
 function headRow(){
-  const c = (k)=>{const o=DATA.companies[k];return `<div class="co" style="color:${o.accent}">${o.ticker} <small>· ${o.name} · ${o.prefTicker} pref</small></div>`;};
+  const c = k => { const o = DATA.companies[k];
+    const prefs = [o.prefTicker, o.pref2 && o.pref2.ticker].filter(Boolean).join(" + ");
+    return `<div class="co" style="color:${o.accent}">${o.ticker} <small><span class="coname">· ${SHORT_NAME[k] || o.name} </span>· ${prefs} pref</small></div>`; };
   return `<div class="grow headrow"><div class="glabel"></div>${COS.map(c).join("")}</div>`;
 }
 // a section sub-heading inside a metric grid, with an empty cell per issuer
@@ -1482,10 +1491,7 @@ function renderPriceHeader(){
     const on = !!(p2 && p2.price > 0);
     sats.hidden = !on;
     grid.classList.toggle("four", on);
-    if(on){
-      set("hdr-sats", usd(p2.price,2));
-      set("hdr-sats-sub", `${fmt(p2.rate,0)}% · $${fmt(p2.stated,0)} par`);
-    }
+    if(on) set("hdr-sats", usd(p2.price,2));
   }
   const chg = v => (v==null||isNaN(v)) ? "" : `<span class="${v>=0?'pos':'neg'}">${sig(v)}${fmt(v,2)}%</span>`;
   // Relative volume is the last SETTLED session's (refresh_data.py leaves the running
@@ -1522,6 +1528,9 @@ function renderPriceHeader(){
     set("hdr-px-"+co+"-sub",   sub(o, o.dayChangePct,  o.rvol,     "_preClose",     "common"));
     set("hdr-pref-"+co+"-sub", sub(o, o.prefChangePct, o.prefRvol, "_prefPreClose", "preferred"));
   });
+  // SATS: its day's move like the others, then its terms where the others say "preferred"
+  if(p2 && p2.price > 0)
+    set("hdr-sats-sub", sub(p2, p2.changePct, null, "_preClose", `${fmt(p2.rate,0)}% · $${fmt(p2.stated,0)} par`));
 }
 // One ATM stat tile; its tooltip rides in data-rows, which tipHTML splits on | then ~.
 function atmCell(k, v, sub, tip, color){
@@ -1620,12 +1629,12 @@ function renderATM(){
    reader a filing has landed that these numbers don't include yet. The filing
    BODIES are not CORS-open (200 to a server, no allow-origin header), so this can
    flag the gap but cannot close it — the cron still has to do the parsing. */
-const SEC_CIK = { MSTR: '0001050446', ASST: '0001920406' };
+const SEC_CIK = { MSTR: '0001050446', ASST: '0001920406', DFDV: '0001805526' };
 async function checkFilingFreshness(){
   const box = document.getElementById('filing-stale'); if(!box) return;
   const behind = [];
   await Promise.all(Object.entries(SEC_CIK).map(async ([tk, cik]) => {
-    // the refresh writes filingWatch for both on every run; without it (seed data) say nothing
+    // the refresh writes filingWatch for each on every run; without it (seed data) say nothing
     const seen = (DATA.companies[tk] || {}).filingWatch?.ingested;
     try{
       const r = await fetch(`https://data.sec.gov/submissions/CIK${cik}.json`, {cache:'no-store'});
@@ -3165,10 +3174,7 @@ async function fetchCboe(){
   }
   // SATS lives on its own object rather than a prefPrice field, since ASST's
   // flagship preferred is still SATA
-  if(A.pref2 && q.SATS){
-    const s = q.SATS, px = (closed && s.close > 0) ? s.close : s.last;
-    if(px > 0 && Math.abs(px - (A.pref2.price ?? 0)) > 0.005){ A.pref2.price = Math.round(px*100)/100; changed = true; }
-  }
+  if(A.pref2) apply(A.pref2, "price", "changePct", "_preClose", "SATS");
   if(changed){ renderAll(); markFresh(); }
 }
 async function fetchStrategyLive(){
