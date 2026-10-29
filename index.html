@@ -541,7 +541,7 @@
         <div class="sg-items">
           <div class="sg-item"><div class="lbl">MSTR</div><div class="val" id="hdr-px-MSTR">—</div>
             <div class="sub" id="hdr-px-MSTR-sub">common</div></div>
-          <div class="sg-item"><div class="lbl">Net mNAV<span class="defhint" data-def="Net mNAV" aria-label="About this metric">&#9432;</span></div>
+          <div class="sg-item"><div class="lbl">Net mNAV<span class="defhint" data-def="Net mNAV" data-co="MSTR" aria-label="About this metric">&#9432;</span></div>
             <div class="val" id="hdr-mnav-MSTR">—</div><div class="sub">mcap ÷ net reserve</div></div>
           <div class="sg-item"><div class="lbl">STRC</div><div class="val" id="hdr-pref-MSTR">—</div>
             <div class="sub" id="hdr-pref-MSTR-sub">preferred</div></div>
@@ -552,7 +552,7 @@
         <div class="sg-items" id="sg-items-ASST">
           <div class="sg-item"><div class="lbl">ASST</div><div class="val" id="hdr-px-ASST">—</div>
             <div class="sub" id="hdr-px-ASST-sub">common</div></div>
-          <div class="sg-item"><div class="lbl">Net mNAV<span class="defhint" data-def="Net mNAV" aria-label="About this metric">&#9432;</span></div>
+          <div class="sg-item"><div class="lbl">Net mNAV<span class="defhint" data-def="Net mNAV" data-co="ASST" aria-label="About this metric">&#9432;</span></div>
             <div class="val" id="hdr-mnav-ASST">—</div><div class="sub">mcap ÷ net reserve</div></div>
           <div class="sg-item"><div class="lbl">SATA</div><div class="val" id="hdr-pref-ASST">—</div>
             <div class="sub" id="hdr-pref-ASST-sub">preferred</div></div>
@@ -566,7 +566,7 @@
         <div class="sg-items">
           <div class="sg-item"><div class="lbl">DFDV</div><div class="val" id="hdr-px-DFDV">—</div>
             <div class="sub" id="hdr-px-DFDV-sub">common</div></div>
-          <div class="sg-item"><div class="lbl">Net mNAV<span class="defhint" data-def="Net mNAV" aria-label="About this metric">&#9432;</span></div>
+          <div class="sg-item"><div class="lbl">Net mNAV<span class="defhint" data-def="Net mNAV" data-co="DFDV" aria-label="About this metric">&#9432;</span></div>
             <div class="val" id="hdr-mnav-DFDV">—</div><div class="sub">mcap ÷ net reserve</div></div>
           <div class="sg-item"><div class="lbl">CHAD</div><div class="val" id="hdr-pref-DFDV">—</div>
             <div class="sub" id="hdr-pref-DFDV-sub">preferred</div></div>
@@ -598,7 +598,7 @@
 
   <nav class="secnav" id="secnav">
     <div class="secnav-links">
-      <a href="#atm">ATM</a><a href="#company">Company</a><a href="#holdings">Holdings</a><a href="#cost">Cost</a>
+      <a href="#atm">ATM</a><a href="#company">Company</a><a href="#coverage">Coverage</a><a href="#holdings">Holdings</a><a href="#cost">Cost</a>
       <a href="#pershare">Per-Share</a><a href="#valuation">Valuation</a><a href="#capital">Capital</a>
       <a href="#shorts">Shorts</a><a href="#actions">Actions</a>
     </div>
@@ -654,6 +654,14 @@
     </div>
     <div class="illus" id="illus-company"></div>
     <div class="grid" id="grid-company"></div>
+  </section>
+
+  <!-- 1b. Coverage & Duration -->
+  <section id="coverage">
+    <div class="sec-head"><h2>Coverage &amp; Duration</h2></div>
+    <p class="sec-note">How long each treasury could keep paying its dividends and coupons if no new money came in — from the crypto, from the dollars, and after setting aside what the debt is owed — and how many times over the assets cover the preferred.</p>
+    <div class="grid" id="grid-coverage"></div>
+    <p class="footnote">Durations divide by annual obligations: every preferred series' dividends plus debt coupons, at today's rates. Net figures set aside all senior debt at face value, converts included, and keep its coupons, since the debt is owed until it's repaid. Operating costs aren't counted; the calculator models them.</p>
   </section>
 
   <!-- 1. Accumulation & Holdings -->
@@ -730,7 +738,7 @@
       </div>
       <div class="chartcard">
         <h3><span class="dot" style="background:var(--dfdv)"></span>DFDV — Price vs. mNAV</h3>
-        <div class="ch-sub">Line: daily close (left) · Right: EV mNAV dashed (whole structure, from DFDV's own series with CHAD added)</div>
+        <div class="ch-sub">Line: daily close (left) · Right: Net mNAV solid (after debt &amp; preferred; gaps where nothing was left for common) · EV mNAV dashed (whole structure)</div>
         <div class="chartwrap"><canvas id="ch-mnav-DFDV"></canvas></div>
       </div>
     </div>
@@ -741,9 +749,9 @@
   <!-- 6. Capital Structure (FULLY WORKING, from Excel) -->
   <section id="capital">
     <div class="sec-head"><h2>Capital Structure</h2></div>
-    <p class="sec-note">How much cushion sits between each treasury and its obligations — leverage, coverage, and staying power.</p>
+    <p class="sec-note">How much of each treasury is financed rather than owned — the hard assets, and the senior claims against them. Coverage and staying power are in Coverage &amp; Duration.</p>
     <div class="grid" id="grid-capital"></div>
-    <p class="footnote">Leverage and coverage use face/notional values. Lower leverage and higher coverage = a safer structure for common holders; higher leverage can enable faster accumulation.</p>
+    <p class="footnote">Leverage uses face/notional values. Lower leverage = a safer structure for common holders; higher leverage can enable faster accumulation.</p>
   </section>
 
   <!-- Implied Price Calculator -->
@@ -1030,10 +1038,12 @@ function netParts(o){
   return { nav, reserve, netReserve, shares, mcap: px*shares, otm, itmSh };
 }
 function netMnav(o){
-  // Strategy publishes its own mNAV every minute; take it verbatim so the headline
-  // can never drift from strategy.com/btc. The computed path below is the fallback
-  // (and the only path for ASST and DFDV, which publish no net figure).
-  if(o._netMnavLive != null) return o._netMnavLive;
+  // Strategy publishes its own mNAV every minute of the session; take it verbatim then,
+  // so the headline matches strategy.com/btc. That figure stops at the 4pm close while
+  // BTC keeps moving, so after the close and at weekends compute it: the definition is
+  // the same (netParts gave its 1.1424 exactly at 4pm BTC on 2026-10-28). The computed
+  // path is also the only one for ASST and DFDV, which publish no net figure.
+  if(o._netMnavLive != null && marketOpenET()) return o._netMnavLive;
   if(!(o.stockPrice && o.sharesOutstanding)) return null;
   const p = netParts(o);
   return p.netReserve > 0 ? p.mcap/p.netReserve : null;
@@ -1044,11 +1054,15 @@ function unit(v, u){ return `${v}<span class="unit">${u}</span>`; }
 
 // ---------- per-metric definitions (label hover: how it's calculated / what it means) ----------
 const METRIC_DEFS = {
-  "Duration": {c:"(Crypto reserve + USD reserve) ÷ annual obligations, where obligations are preferred dividends plus cash interest on debt. Answers: if no new money ever came in, how many years could the existing reserves keep paying?",
+  "Total Duration (gross)": {c:"(Crypto reserve + cash reserve) ÷ annual obligations, where obligations are preferred dividends plus cash interest on debt. Answers: if no new money ever came in, how many years could the existing reserves keep paying? Crypto Duration plus USD Duration, except that ASST's cash here includes the STRC it holds.",
     m:"Staying power. A high number means the company could service its dividends and interest for decades out of what it already holds, so a long bear market is survivable without touching the equity story. A low number means it depends on continued issuance or a rising treasury asset to keep the obligations funded — the same treasury is far more fragile. Operating costs are not counted; DFDV's run larger than its dividends and interest combined, and the calculator models them. Strategy splits this into BTC duration and USD duration; this is the combined figure."},
-  "EV mNAV": {c:"(Market cap + senior debt + preferred notional − USD reserve) ÷ crypto reserve (holdings × live BTC or SOL price). DFDV's own dashboard leaves CHAD out of EV; it is counted here, as STRC and SATA are.",
-    m:"What the market pays for the whole structure — common, debt and preferred together — per dollar of treasury asset behind it. This is the solvency and coverage lens, and it's the one a STRC, SATA or CHAD holder should care about, since their claim sits on the entire enterprise rather than the residual."},
-  "Net mNAV": {c:"Fully-diluted market cap ÷ net reserve, where net reserve is crypto + USD reserve − out-of-the-money convertible and straight debt − preferred notional. In-the-money converts are counted as shares instead of debt. DFDV's own adjusted mNAV leaves CHAD out; it is a claim here.",
+  "Total Duration (net)": {c:"(Crypto reserve + cash reserve − senior debt at face value) ÷ annual obligations, in years: the net crypto leg plus USD Duration. All debt is set aside, converts included whether in the money or not, and its coupons still count, since it is owed until it's repaid.",
+    m:"The whole reserve's staying power once the lenders' principal is held back. Where dollars on hand match much of the debt, as at Strategy, it stays near the gross figure; where the debt is most of the treasury, it falls toward the USD leg alone."},
+  "EV mNAV": {c:"(Market cap + senior debt + preferred notional − USD reserve) ÷ crypto reserve (holdings × live BTC or SOL price).",
+    m:"What the market pays for the whole structure — common, debt and preferred together — per dollar of treasury asset behind it. This is the solvency and coverage lens, and it's the one a STRC, SATA, SATS or CHAD holder should care about, since their claim sits on the entire enterprise rather than the residual."},
+  // co: a sentence only that issuer's own tile shows (tipHTML reads the hint's data-co)
+  "Net mNAV": {c:"Fully-diluted market cap ÷ net reserve, where net reserve is crypto + USD reserve − out-of-the-money convertible and straight debt − preferred notional. In-the-money converts are counted as shares instead of debt.",
+    co:{DFDV:"DFDV's own adjusted mNAV leaves CHAD out; it is a claim here."},
     m:"What common shareholders pay per dollar of treasury asset that's actually left for them after the senior claims are satisfied. Strategy adopted this as its headline mNAV in July 2026, and it fixes the accretion threshold at exactly 1.0× — above it, issuing stock to buy the asset raises holdings per share; below it, issuing destroys them."},
   "Net Reserve": {c:"Crypto reserve + USD reserve − out-of-the-money convertible and straight debt − preferred notional.",
     m:"The treasury value genuinely attributable to common equity once everyone senior has been paid. This is the denominator common shareholders are actually buying, and it's what makes leverage cut both ways: it grows faster than the asset on the way up and shrinks faster on the way down."},
@@ -1058,7 +1072,7 @@ const METRIC_DEFS = {
     m:"How much the residual moves for a given move in the treasury asset. At 1.5×, a 20% rise in the asset lifts net holdings per share roughly 30% — that's the leverage common holders are paying a premium to access. It rises as the asset falls (the fixed claims eat a bigger share) and decays as it rises unless the company keeps issuing preferred."},
   "Crypto Hurdle Rate": {c:"The effective annual cost of the credit stack. MSTR: taken from strategy.com's published figure, which uses the option-adjusted financing cost of the converts, not just cash coupons. ASST and DFDV: annual obligations ÷ (debt + preferred notional).",
     m:"The referee between the gross and net per-share figures. If the treasury asset compounds above this rate, the leverage pays for itself, the senior claims shrink relative to NAV, and your outcome converges on the gross Holdings per Share. Below it, the claims eat the equity from underneath and Net Holdings per Share was the number telling the truth. Compare it to your own return expectation for BTC or SOL before paying any mNAV premium."},
-  "Breakeven Crypto Rate": {c:"Annual obligations ÷ total reserves, expressed as a percentage per year.",
+  "Breakeven Crypto Rate": {c:"Annual obligations ÷ crypto reserve, expressed as a percentage per year. Cash isn't counted, since it doesn't appreciate; strategy.com publishes the same figure for MSTR.",
     m:"The rate the treasury asset has to appreciate for capital gains alone to cover every dividend and interest payment. Above this rate the structure funds itself indefinitely without selling the asset or issuing stock; below it, the obligations have to come from somewhere else. DFDV's staking earns part of this in SOL; the calculator models it."},
   "Stock Price": {c:"Latest common-share price — the strategy.com / treasury.strive.com data feed for MSTR and ASST, DeFi Development's dashboard for DFDV — refreshed throughout market hours.",
     m:"What the market charges for one share of common stock — the starting point for market cap and every valuation ratio below."},
@@ -1084,9 +1098,11 @@ const METRIC_DEFS = {
     m:"The claims that rank ahead of both preferred and common if things go wrong."},
   "Preferred Equity Notional": {c:"Stated value of every preferred series — $100 per share (EUR-denominated STRE at its USD stated amount), $10 per CHAD share.",
     m:"The full preferred claim sitting senior to common — the 'digital credit' layer each company funds itself with."},
-  "Crypto Duration": {c:"Crypto reserve (holdings × live BTC or SOL price) ÷ annual obligations, in years — how long the treasury alone could fund every dividend and coupon at today's marks.",
-    m:"The crypto leg of staying power. It moves with the asset price: a drawdown shortens it exactly when the obligations feel heaviest. Add USD Duration for the total figure shown in the Valuation section."},
-  "USD Duration": {c:"True dollar reserve ÷ annual obligations, in years. For ASST this deliberately EXCLUDES the ~$45M of STRC preferred Strive holds — that position is counted in total-reserve metrics (matching Strive's own math) but it is BTC-linked paper, not dollars; hover the ASST value for the blended figure.",
+  "Crypto Duration (gross)": {c:"Crypto reserve (holdings × live BTC or SOL price) ÷ annual obligations, in years — how long the treasury alone could fund every dividend and coupon at today's marks.",
+    m:"The crypto leg of staying power. It moves with the asset price: a drawdown shortens it exactly when the obligations feel heaviest. Add USD Duration for the Total Duration below."},
+  "Crypto Duration (net)": {c:"(Crypto reserve − senior debt at face value) ÷ annual obligations, in years. Every convert and loan is set aside in full, in the money or not, and the coupons still count, since the debt is owed until it's repaid.",
+    m:"The crypto's staying power with enough held back to repay the lenders. Where debt is a large share of the treasury this is far shorter than the gross figure, and it reaches zero once the crypto only just covers the debt; below that it turns negative."},
+  "USD Duration": {c:"True dollar reserve ÷ annual obligations, in years. For ASST this deliberately EXCLUDES the STRC preferred Strive holds — that position is counted in total-reserve metrics (matching Strive's own math) but it is BTC-linked paper, not dollars; hover the ASST value for the blended figure.",
     m:"The cushion that decides whether a bear market forces treasury sales — so it should only count assets that hold value in that exact scenario. A reserve parked in another BTC treasury company's preferred is weakest at precisely the moment it's needed, which is why the headline here is stricter than the issuer's blended number."},
   "Annual Obligations": {c:"Each preferred series' notional × its dividend rate, plus debt coupons.",
     m:"The fixed yearly cash cost of the capital structure — what must be paid out before common shareholders see anything."},
@@ -1130,12 +1146,6 @@ const METRIC_DEFS = {
     m:"Debt leverage: the slice of the asset base lenders could claim. Lower is safer for everyone below them."},
   "(Debt + Preferred) / Hard Assets": {c:"(Senior debt + preferred notional) ÷ total hard assets.",
     m:"Total leverage from all senior claims — the fuller stress-test view of the structure."},
-  "Hard Assets / Annual Obligation": {c:"Total hard assets ÷ annual dividend and coupon cost.",
-    m:"Years of obligations covered by everything on hand — the big-picture safety margin."},
-  "Crypto NAV / Annual Obligation": {c:"Crypto NAV ÷ annual obligations.",
-    m:"Coverage from the treasury alone, ignoring cash."},
-  "Cash / Annual Obligations": {c:"Cash reserve ÷ annual obligations.",
-    m:"Years of dividends payable without selling any of the treasury or raising a dollar."},
   "(Crypto NAV − Debt) / Preferred": {c:"(Crypto NAV − senior debt) ÷ preferred notional.",
     m:"Asset coverage on the preferred layer after the debt that ranks ahead of it: how many times over the treasury covers that claim once lenders are paid. Below 1× the preferred is not fully covered at today's prices."},
 };
@@ -1253,13 +1263,23 @@ function renderCompany(){
   h += row({label:"Senior Debt", cell:debtCell});
   h += row({label:"Preferred Equity Notional", cell:prefCell});
   h += row({label:"Annual Obligations", cell:o => capFmt(o.annualObligations)});
-  // duration split, per strategy.com: how many years each reserve alone covers the obligations
-  const cryptoDur = o => o.annualObligations>0 ? o.holdings*assetPx(o)/1e6/o.annualObligations : null;
-  h += row({label:"Crypto Duration", cell:o => fmt(cryptoDur(o),1)+" yrs", cmp:cryptoDur});
+  document.getElementById("grid-company").innerHTML = h;
+}
+
+// Years of obligations each reserve covers, and the assets' cover on the preferred.
+// Net sets aside all senior debt at face, converts included, and keeps its coupons:
+// the debt is owed until it's repaid. Crypto + USD = Total, gross and net alike (ASST's
+// Total also counts the STRC it holds, which USD Duration leaves out).
+function renderCoverage(){
+  const D = DATA.companies, strcPx = (D.MSTR && D.MSTR.prefPrice) || 0;
+  const nav = o => o.holdings*assetPx(o)/1e6;                    // crypto reserve, $mm
+  const years = f => o => o.annualObligations>0 ? f(o)/o.annualObligations : null;
+  const cryptoDur = years(nav), cryptoNet = years(o => nav(o) - o.seniorDebt);
+  const totalDur = years(o => nav(o) + o.cash), totalNet = years(o => nav(o) + o.cash - o.seniorDebt);
   // "USD" means dollars. ASST parks part of its reserve in STRC (BTC-linked paper,
   // marked live at STRC's price) — headline only true dollars, blend in the hover.
   const usdOnly = o => o.cashUsd != null ? o.cashUsd : o.cash;
-  const usdDur = o => o.annualObligations>0 ? usdOnly(o)/o.annualObligations : null;
+  const usdDur = years(usdOnly);
   const usdDurCell = o => {
     const strcVal = (o.strcShares && strcPx) ? o.strcShares*strcPx/1e6 : 0;
     if(strcVal <= 0.5) return fmt(usdDur(o),1)+" yrs";
@@ -1270,8 +1290,23 @@ function renderCompany(){
         ["Caveat", "STRC is BTC-linked paper — weakest exactly when the reserve is needed"]
       ].map(r=>r.join("~")).join("|")}">${fmt(usdDur(o),1)} yrs</span>`;
   };
+  // the rate the asset must rise for its gains alone to pay the year's obligations;
+  // cash doesn't appreciate, so it divides by the crypto only, as strategy.com's does
+  const brkE = o => nav(o)>0 ? o.annualObligations/nav(o)*100 : null;
+  const navPref = o => o.prefNotional>0 ? (nav(o) - o.seniorDebt)/o.prefNotional : null;
+  const yrs = f => o => f(o)==null ? null : fmt(f(o),1)+" yrs";
+  const neg = f => o => f(o) < 0 ? "neg" : "";        // the debt outweighs that reserve
+  let h = headRow();
+  h += subHead("Years of obligations covered <small style='color:var(--faint)'>higher = safer</small>");
+  h += row({label:"Crypto Duration (gross)", cell:yrs(cryptoDur), cmp:cryptoDur});
+  h += row({label:"Crypto Duration (net)", cell:yrs(cryptoNet), cls:neg(cryptoNet), cmp:cryptoNet});
   h += row({label:"USD Duration", cell:usdDurCell, cmp:usdDur});
-  document.getElementById("grid-company").innerHTML = h;
+  h += row({label:"Total Duration (gross)", cell:yrs(totalDur), cmp:totalDur});
+  h += row({label:"Total Duration (net)", cell:yrs(totalNet), cls:neg(totalNet), cmp:totalNet});
+  h += row({label:"Breakeven Crypto Rate", cell:o => brkE(o)==null ? null : fmt(brkE(o),2)+"%/yr", cmp:brkE, dir:"min"});
+  h += subHead("Asset coverage <small style='color:var(--faint)'>higher = safer</small>");
+  h += row({label:"(Crypto NAV − Debt) / Preferred", cell:o => navPref(o)==null ? null : fmt(navPref(o),2)+"x", cmp:navPref});
+  document.getElementById("grid-coverage").innerHTML = h;
 }
 
 function renderHoldings(){
@@ -1365,23 +1400,25 @@ function renderValuation(){
     ["= Enterprise Value", bil(evv(o))], [`÷ ${assetUnit(o)} Reserve`, bil(nav(o))],
     ["= EV mNAV", fmt(evMnav(o),2)+"x"]
   ].map(r=>r.join("~")).join("|");
-  const netRows = o => { const p = netParts(o); return [
+  const netRows = o => { const p = netParts(o), ours = p.netReserve>0 ? p.mcap/p.netReserve : null;
+    // the arithmetic shown is always our own, so the rows reconcile; in session the
+    // cell shows strategy.com's published figure, so name it when the two round apart
+    const shown = netMnav(o);
+    const pub = shown != null && ours != null && fmt(shown,2) !== fmt(ours,2)
+      ? [["strategy.com publishes", fmt(shown,2)+"x"]] : [];
+    return [
     [`${assetUnit(o)} Reserve`, bil(p.nav)], ["+ Cash", bil(o.cash)],
     ["− OTM Convertible & Straight Debt", bil(p.otm)], ["− Preferred", bil(o.prefNotional)],
     ["= Net Reserve", bil(p.netReserve)],
     [`Mkt Cap (${fmt(p.shares,2)}M fully-diluted sh)`, bil(p.mcap)],
-    // the arithmetic shown is always our own, even when the headline takes
-    // strategy.com's published mNAV — otherwise the rows wouldn't reconcile
-    ["= Net mNAV  (mcap ÷ net reserve)",
-      fmt(p.netReserve>0 ? p.mcap/p.netReserve : null,2)+"x"]
+    ...pub,
+    ["= Net mNAV  (mcap ÷ net reserve)", fmt(ours,2)+"x"]
   ].map(r=>r.join("~")).join("|"); };
   const cell = (v,rows,title) => v==null ? null : `<span class="evhint" data-title="${title}" data-rows="${rows}"><span class="${cls(v)}">${fmt(v,2)}x</span></span>`;
 
   // Strategy's Jul-2026 net-framework stats (computed live for every name)
   const netRes = o => netParts(o).netReserve;
   const amp = o => { const p=netParts(o); return p.netReserve>0 ? p.nav/p.netReserve : null; };  // crypto reserve ÷ net reserve (Strategy's definition)
-  const durY = o => o.annualObligations>0 ? (nav(o)+o.cash)/o.annualObligations : null;
-  const brkE = o => (nav(o)+o.cash)>0 ? o.annualObligations/(nav(o)+o.cash)*100 : null;
 
   let h = headRow();
   h += row({label:"EV mNAV", cell:o => cell(evMnav(o),mnavRows(o),"EV mNAV")});
@@ -1396,8 +1433,6 @@ function renderValuation(){
     return o.netLeveragePub != null ? o.netLeveragePub
          : n > 0 ? Math.max(0, (o.seniorDebt || 0) - (o.cash || 0)) / n * 100 : null; };
   h += row({label:"Net Leverage", cell:o => fmt(netLev(o),1)+"%", cmp:netLev, dir:"min"});
-  h += row({label:"Duration", cell:o => fmt(durY(o),1)+" yrs", cmp:durY});
-  h += row({label:"Breakeven Crypto Rate", cell:o => fmt(brkE(o),2)+"%/yr", cmp:brkE, dir:"min"});
   const hurdle = o => o.hurdleArrPub != null ? o.hurdleArrPub
     : ((o.seniorDebt+o.prefNotional)>0 ? o.annualObligations/(o.seniorDebt+o.prefNotional)*100 : null);
   h += row({label:"Crypto Hurdle Rate", cell:o => fmt(hurdle(o),2)+"%/yr", cmp:hurdle, dir:"min"});
@@ -1412,14 +1447,10 @@ function renderValuation(){
 function renderCapital(){
   const nav  = o => o.holdings*assetPx(o)/1e6;
   const hard = o => nav(o) + o.cash;
-  const ratio = (f, d) => o => f(o)==null ? null : fmt(f(o), d)+"x";
   const pctOf = f => o => fmt(f(o)*100,1)+"%";
   const sd = o => o.seniorDebt/hard(o), tl = o => (o.seniorDebt+o.prefNotional)/hard(o);
-  const per = (num, den) => o => den(o)>0 ? num(o)/den(o) : null;
-  const hardOb = per(hard, o=>o.annualObligations), navOb = per(nav, o=>o.annualObligations);
-  const cashOb = per(o=>o.cash, o=>o.annualObligations);
-  const navPref = per(o => nav(o) - o.seniorDebt, o => o.prefNotional);   // after the debt ranked ahead of it
 
+  // coverage and staying power live in Coverage & Duration
   let h = headRow();
   h += subHead("Crypto NAV &amp; Hard Assets");
   h += row({label:"Crypto NAV", cell:o => capFmt(nav(o))});
@@ -1427,11 +1458,6 @@ function renderCapital(){
   h += subHead("Leverage <small style='color:var(--faint)'>lower = safer</small>");
   h += row({label:"Senior Debt / Hard Assets", cell:pctOf(sd), cmp:sd, dir:"min"});
   h += row({label:"(Debt + Preferred) / Hard Assets", cell:pctOf(tl), cmp:tl, dir:"min"});
-  h += subHead("Coverage <small style='color:var(--faint)'>higher = safer</small>");
-  h += row({label:"Hard Assets / Annual Obligation", cell:ratio(hardOb,1), cmp:hardOb});
-  h += row({label:"Crypto NAV / Annual Obligation", cell:ratio(navOb,1), cmp:navOb});
-  h += row({label:"Cash / Annual Obligations", cell:ratio(cashOb,2), cmp:cashOb});
-  h += row({label:"(Crypto NAV − Debt) / Preferred", cell:ratio(navPref,2), cmp:navPref});
   document.getElementById("grid-capital").innerHTML = h;
 }
 
@@ -1646,7 +1672,35 @@ function renderLendingBanner(){
   if(opts.length) document.getElementById("lb-count").textContent = opts.length;
 }
 
-function renderAll(){ renderPriceHeader(); renderLendingBanner(); renderCompany(); renderHoldings(); renderCost(); renderPerShare(); renderValuation(); renderCapital(); renderATM(); renderActions(); if(typeof runCalc==="function") runCalc();
+// Trailing mNAV averages beside each Company Stats chart, so today's multiple has
+// historical context. Rendered with the rest of the page, because "now" is live; the
+// averages always run over the FULL series, not the chart's visible range.
+function renderMnavChips(){
+  COS.forEach(co => {
+    const o = DATA.companies[co], mhs = o.mnavHistory, ctx = document.getElementById("mnav-ctx-"+co);
+    if(!ctx || !mhs) return;
+    const mLbl = mhs.net ? "Net mNAV" : "EV mNAV", full = mhs.net || mhs.mnav;
+    const live = mhs.net ? netMnav(o) : evMnav(o);
+    // only report a window the history actually covers — it starts Oct 2025 (MSTR) and
+    // Jan 2026 (ASST, DFDV), so a shorter average would wear the wrong label. A window is
+    // its last rows blanks included, so DFDV's gaps don't stretch it further back.
+    const avg = n => { const need = Math.round(n*PPM_CAL);
+      if(full.length < need) return null;
+      const w = full.slice(-need).filter(v=>v!=null);
+      return w.length ? w.reduce((a,b)=>a+b,0)/w.length : null; };
+    const cell = (lbl, v) => v==null
+      ? `<span class="si-chip" title="Not enough history — this chart's data starts less than ${lbl} ago">${lbl} <b style="color:var(--faint)">—</b></span>`
+      : `<span class="si-chip" title="Average ${mLbl} over the trailing ${lbl}${
+          live!=null ? ` — today is ${Math.abs((live/v-1)*100).toFixed(0)}% ${live>=v?"above":"below"} it` : ""}">`+
+        `${lbl} <b class="${live!=null && live<v ? "" : "warn"}">${fmt(v,2)}x</b></span>`;
+    ctx.innerHTML = (live!=null
+        ? `<span class="si-chip" title="${mLbl} right now, live with the ${assetUnit(o)} price">now <b>${fmt(live,2)}x</b></span>`
+        : "")
+      + cell("1M",avg(1)) + cell("3M",avg(3)) + cell("6M",avg(6)) + cell("1Y",avg(12));
+  });
+}
+
+function renderAll(){ renderPriceHeader(); renderLendingBanner(); renderCompany(); renderCoverage(); renderHoldings(); renderCost(); renderPerShare(); renderValuation(); renderCapital(); renderMnavChips(); renderATM(); renderActions(); if(typeof runCalc==="function") runCalc();
   // keep every hint reachable by keyboard (re-rendered markup loses the attribute)
   document.querySelectorAll(".evhint, .defhint").forEach(el => {
     if(!el.hasAttribute("tabindex")){ el.setAttribute("tabindex","0"); el.setAttribute("role","button"); } });
@@ -1787,8 +1841,9 @@ function renderCharts(){
         borderWidth:2, tension:.25, pointRadius:0, fill:true} ]},
       options: bpsOpts });
 
-    // 3. Company Stats price chart — daily close (left) + net mNAV (right). DFDV's
-    // history is its own EV series (no net), so its card plots and averages EV mNAV.
+    // 3. Company Stats price chart — daily close (left) + net mNAV (right). DFDV's net
+    // series is rebuilt from its EV series, blank where nothing was left for common; a
+    // data.json from before that carries EV only, and the card plots EV mNAV instead.
     const mhs = o.mnavHistory;
     const mLbl = mhs && mhs.net ? "Net mNAV" : "EV mNAV";
     if(mhs){
@@ -1812,27 +1867,6 @@ function renderCharts(){
           backgroundColor:"transparent", borderWidth:2, tension:.2, pointRadius:0, fill:false, order:2} ]},
         options: siOpts });
 
-      // trailing mNAV averages, so today's multiple has historical context.
-      // Always computed on the FULL series, not the visible range.
-      const ctx = document.getElementById("mnav-ctx-"+co);
-      if(ctx){
-        const full = (mhs.net || mhs.mnav).filter(v=>v!=null);
-        const live = mhs.net ? netMnav(o) : evMnav(o);
-        // only report a window the history actually covers — it starts Oct 2025 (MSTR)
-        // and Jan 2026 (ASST), so a shorter average would wear the wrong label
-        const avg = n => { const need = Math.round(n*PPM_CAL);
-          if(full.length < need) return null;
-          const w = full.slice(-need); return w.reduce((a,b)=>a+b,0)/w.length; };
-        const cell = (lbl, v) => v==null
-          ? `<span class="si-chip" title="Not enough history — this chart's data starts less than ${lbl} ago">${lbl} <b style="color:var(--faint)">—</b></span>`
-          : `<span class="si-chip" title="Average ${mLbl} over the trailing ${lbl}${
-              live!=null ? ` — today is ${Math.abs((live/v-1)*100).toFixed(0)}% ${live>=v?"above":"below"} it` : ""}">`+
-            `${lbl} <b class="${live!=null && live<v ? "" : "warn"}">${fmt(v,2)}x</b></span>`;
-        ctx.innerHTML = (live!=null
-            ? `<span class="si-chip" title="${mLbl} right now, live with the ${u} price">now <b>${fmt(live,2)}x</b></span>`
-            : "")
-          + cell("1M",avg(1)) + cell("3M",avg(3)) + cell("6M",avg(6)) + cell("1Y",avg(12));
-      }
     }
 
     // 4. Preferred price + shares outstanding (STRC / SATA / SATS / CHAD); shares =
@@ -2015,8 +2049,9 @@ let tipPinned = null;                       // element whose tip is held open by
 function tipHTML(el){
   if(el.classList.contains("defhint")){
     const d = METRIC_DEFS[el.dataset.def]; if(!d) return null;
+    const own = (d.co || {})[el.dataset.co];     // an issuer's own note, on its own tile only
     return `<div class="et-title">${el.dataset.def}</div>
-      <div class="et-sec">How It's Calculated</div><p class="et-p">${d.c}</p>
+      <div class="et-sec">How It's Calculated</div><p class="et-p">${d.c}${own ? " "+own : ""}</p>
       <div class="et-sec">What It Means</div><p class="et-p">${d.m}</p>`;
   }
   const rows = (el.dataset.rows||"").split("|").map(r=>r.split("~"));
@@ -2141,14 +2176,17 @@ function seedMissingIssuers(){
 }
 
 // DFDV's SOL loans are SOL owed, and data.json values them at the refresh's SOL price.
-// Re-mark them, and the senior debt that holds them, at the live price whenever it
-// moves, so the debt moves with the SOL held instead of staying at the refresh's price.
+// Re-mark them, the senior debt that holds them, and their coupons in the annual
+// obligations at the live price whenever it moves, so the debt and every duration
+// move with the SOL held instead of staying at the refresh's price.
 function markSolLoans(){
   if(!(solPrice > 0)) return;
   Object.values(DATA.companies).forEach(o => (o.debtSchedule || []).forEach(t => {
     if(!t.solAmount) return;
     const v = t.solAmount*solPrice/1e6;
-    o.seniorDebt += v - t.principal; t.principal = v;
+    o.seniorDebt += v - t.principal;
+    o.annualObligations += (v - t.principal)*(t.coupon || 0)/100;
+    t.principal = v;
   }));
 }
 
@@ -3039,7 +3077,8 @@ async function fetchLiveEquity(){
 //
 // Runs after fetchLiveEquity so MSTR's official consolidated quote wins over the
 // tracker's light feed, and runs after the close too: mstrKpiData carries the
-// settled 4:00pm print, and mNAV keeps moving with BTC overnight.
+// settled 4:00pm print. strategy.com's own mNAV stops at that print, so after the
+// close netMnav computes it from these balances and keeps it moving with BTC.
 const num = s => parseFloat(String(s).replace(/,/g,""));
 
 /* Minutes-since-midnight ET, for both the wall clock and a quote's own stamp.
