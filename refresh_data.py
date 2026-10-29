@@ -138,6 +138,7 @@ TRACKER_BASE = "https://data.strategytracker.com/"
 # fetch_holdings reads the 8-Ks — so the series cannot see a purchase the filings
 # already know about. rebase_mnav_holdings() closes that gap afterwards.
 _MNAV_INPUTS, _FILED_HOLD = {}, {}
+_FILED_DATES = {}       # every filed observation date, oldest first (ASST)
 # STRC notional ($mm) before the tracker's change log begins (2026-03-09), built from
 # SEC 8-Ks: IPO 28,011,111 sh × $100 stated (closed 2025-07-29), then the weekly ATM
 # "available for issuance" column (program $4,200mm). Validated: last step + the week
@@ -755,7 +756,11 @@ def fetch_strategytracker(data):
                     if i < len(cb) and cb[i]:
                         lastc = cb[i] / 1e6
                     _ff[i] = lastc
-                pref_at = lambda d: _step(sata_st, d) or 0
+                # SATS is a claim from its closing date, at the filed constant the live
+                # stack uses. Not apply_sats_proceeds' job: that stops once filings
+                # cover the close, and the rows after it lost the $700M claim.
+                sats_m = SATS["shares"] * SATS["stated"] / 1e6
+                pref_at = lambda d: (_step(sata_st, d) or 0) + (sats_m if d >= SATS["closed"] else 0)
                 cash_at = lambda d, i: _ff[i]
                 debt_at = lambda d, i: (db[i] or 0) / 1e6 if i < len(db) else 0
             # Net framework (Strategy, Jul-2026): net mNAV = fully-diluted mcap /
@@ -2086,6 +2091,7 @@ def fetch_holdings(data, max_points=60):
                 "holdings": holds,
             }
             _FILED_HOLD[tk] = (items[-1][0].isoformat(), holds[-1])
+            _FILED_DATES[tk] = [d.isoformat() for d, _ in items]
             cur = holds[-1]
 
         data["companies"][tk]["holdings"] = cur
@@ -3230,18 +3236,20 @@ def apply_sats_proceeds(data):
     co = data["companies"].get("ASST")
     if not co or not any(r[0] == "SATS" for r in (co.get("prefBreakdown") or [])):
         return
-    filed_through = (_FILED_HOLD.get("ASST") or ("", 0))[0]
-    if filed_through >= SATS["closed"]:
-        log(f"[SATS] filings now cover {filed_through} — using the reported cash")
-        return
-    co["cash"] = round((co.get("cash") or 0) + SATS["netProceedsM"])
+    # the first filed balance from the close on reports the proceeds itself
+    reported = min((d for d in _FILED_DATES.get("ASST", []) if d >= SATS["closed"]), default=None)
+    if reported:
+        log(f"[SATS] filings report the cash from {reported}")
+    else:
+        co["cash"] = round((co.get("cash") or 0) + SATS["netProceedsM"])
+        log(f"[SATS] +${SATS['netProceedsM']:,.0f}M net proceeds to cash (no filing since the close)")
+    # The history rows carry the claim from the close (fetch_strategytracker's pref_at),
+    # so the cash goes in beside it until that filing: without it Oct 20-22 2026 read
+    # 2.9x, the claim in and the $608M that came in against it out.
     for m in _MNAV_INPUTS.get("ASST") or []:
-        if m["d"] >= SATS["closed"]:
-            m["pref"] += SATS["shares"] * SATS["stated"] / 1e6
+        if m["d"] >= SATS["closed"] and (reported is None or m["d"] < reported):
             m["cash"] += SATS["netProceedsM"]
             m["dirty"] = True
-    log(f"[SATS] +${SATS['netProceedsM']:,.0f}M net proceeds to cash "
-        f"(filings only run to {filed_through or 'n/a'})")
 
 
 def rebase_mnav_holdings(data):
