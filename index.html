@@ -732,8 +732,9 @@
         <div class="chartwrap"><canvas id="ch-mnav-ASST"></canvas></div>
       </div>
       <div class="chartcard">
-        <h3><span class="dot" style="background:var(--dfdv)"></span>DFDV — Price vs. mNAV</h3>
-        <div class="ch-sub">Line: daily close (left) · Right: Net mNAV solid (after debt &amp; preferred; gaps where nothing was left for common) · EV mNAV dashed (whole structure)</div>
+        <h3><span class="dot" style="background:var(--dfdv)"></span>DFDV — Price vs. mNAV<span class="evhint hint-icon" aria-label="About this chart" data-title="DFDV's mNAV lines"
+          data-rows="Gaps~nothing was left for common, or the multiple was above 5x|Starts~Feb 23 2026, the first day DFDV's daily EV series counts all its debt">&#9432;</span></h3>
+        <div class="ch-sub">Line: daily close (left) · Right: Net mNAV solid (after debt &amp; preferred) · EV mNAV dashed (whole structure)</div>
         <div class="chartwrap"><canvas id="ch-mnav-DFDV"></canvas></div>
       </div>
     </div>
@@ -1683,9 +1684,9 @@ function renderMnavChips(){
     if(!ctx || !mhs) return;
     const mLbl = mhs.net ? "Net mNAV" : "EV mNAV", full = mhs.net || mhs.mnav;
     const live = mhs.net ? netMnav(o) : evMnav(o);
-    // only report a window the history actually covers — it starts Oct 2025 (MSTR) and
-    // Jan 2026 (ASST, DFDV), so a shorter average would wear the wrong label. A window is
-    // its last rows blanks included, so DFDV's gaps don't stretch it further back.
+    // only report a window the history actually covers — it starts Oct 2025 (MSTR), Jan
+    // 2026 (ASST) and Feb 23 2026 (DFDV), so a shorter average would wear the wrong label.
+    // A window is its last rows blanks included, so DFDV's gaps don't stretch it back.
     const avg = n => { const need = Math.round(n*PPM_CAL);
       if(full.length < need) return null;
       const w = full.slice(-need).filter(v=>v!=null);

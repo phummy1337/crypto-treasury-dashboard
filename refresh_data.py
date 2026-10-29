@@ -194,7 +194,11 @@ MSTR_CASH_STEPS = [("2025-06-30", 50.1), ("2025-09-30", 54.3),
 # were repurchased and cancelled 2026-05-19 (Q2 10-Q). Live steps take strategy.com's
 # figure after that.
 MSTR_DEBT_STEPS = [("2025-02-21", 8213.75), ("2026-05-19", 6713.75)]
-MNAV_START = {"MSTR": "2025-10-01", "ASST": "2026-01-01", "DFDV": "2026-01-01"}   # chart windows
+# chart windows. DFDV's starts 2026-02-23, the first day its own daily EV series counts
+# all of its debt: before that the series left out $125M-180M of it (on Feb 23 the
+# $114.6M July 2025 convert came in, with no new borrowing), so both mNAV lines read
+# too low (net 0.7x in January against roughly 2x).
+MNAV_START = {"MSTR": "2025-10-01", "ASST": "2026-01-01", "DFDV": "2026-02-23"}
 
 
 def _step(steps, iso):
