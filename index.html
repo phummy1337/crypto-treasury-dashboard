@@ -139,6 +139,10 @@
   @media (min-width: 1101px) and (max-width: 1200px) {
     .sg-items { gap: 10px; }
     .sg-item .val { font-size: 17px; }
+    /* a chart card is ~345px here: "SATA | SATS — Short Interest" and its PNG button
+       overran one line by a few px; tighter gaps keep it level with its neighbours */
+    .chartcard h3 { column-gap: 5px; }
+    .chartcard h3 .serieschips button { padding: 2px 5px; }
     .sg-item .lbl { letter-spacing: .5px; }
   }
   @media (max-width: 1100px) { .statbar { grid-template-columns: 1fr; } }
@@ -344,8 +348,11 @@
   .rangechips button:hover { color: var(--text); }
   .rangechips button.active { color: #fff; border-color: rgba(255,255,255,0.45); background: rgba(255,255,255,0.06); }
   /* Strive runs two preferred series, so its two preferred cards switch between
-     them. Same vocabulary as the range chips, sized to sit inside a card heading. */
+     them. Same vocabulary as the range chips, sized to sit inside a card heading.
+     The switch stands in for the ticker there ("SATA | SATS — Short Interest"), so the
+     heading and its PNG button stay on one line, level with the cards beside it. */
   .serieschips { display:inline-flex; gap:4px; margin-left:10px; vertical-align:middle; }
+  .chartcard h3 .serieschips { margin-left:0; }
   .serieschips button { background:none; border:1px solid var(--border); border-radius:4px;
     color:var(--faint); font:inherit; font-size:11px; font-weight:700; letter-spacing:.4px;
     padding:2px 7px; cursor:pointer; }
@@ -631,8 +638,8 @@
         <div class="chartwrap"><canvas id="ch-pref-MSTR"></canvas></div>
       </div>
       <div class="chartcard">
-        <h3><span class="dot" style="background:var(--asst)"></span><span class="h3t"><span id="pref-title">SATA</span> — Daily Close</span><span class="serieschips" data-switch="pref">
-          <button data-series="SATA" class="active">SATA</button><button data-series="SATS">SATS</button></span></h3>
+        <h3><span class="dot" style="background:var(--asst)"></span><span class="serieschips" data-switch="pref">
+          <button data-series="SATA" class="active">SATA</button><button data-series="SATS">SATS</button></span><span class="h3t">— Daily Close</span></h3>
         <div class="chartwrap"><canvas id="ch-pref-ASST"></canvas></div>
       </div>
       <div class="chartcard">
@@ -842,8 +849,8 @@
         <div class="chartwrap"><canvas id="ch-short-STRC"></canvas></div>
       </div>
       <div class="chartcard">
-        <h3><span class="dot" style="background:var(--asst)"></span><span class="h3t"><span id="si-title">SATA</span> — Short Interest</span><span class="serieschips" data-switch="si">
-          <button data-series="SATA" class="active">SATA</button><button data-series="SATS">SATS</button></span></h3>
+        <h3><span class="dot" style="background:var(--asst)"></span><span class="serieschips" data-switch="si">
+          <button data-series="SATA" class="active">SATA</button><button data-series="SATS">SATS</button></span><span class="h3t">— Short Interest</span></h3>
         <div class="si-chips" id="si-chips-SATA"></div>
         <div class="chartwrap"><canvas id="ch-short-SATA"></canvas></div>
       </div>
@@ -1869,7 +1876,6 @@ function renderCharts(){
     const useSats = (co === "ASST" && prefSeries === "SATS");
     const ph = useSats ? o.pref2History : o.prefHistory;
     if(co === "ASST"){
-      const t = document.getElementById("pref-title"); if(t) t.textContent = prefSeries;
       if(useSats && (!ph || (ph.px || []).filter(v=>v!=null).length < 2)){
         showNoData("ch-pref-ASST",
           `SATS listed 20 Oct 2026. Its daily close builds here one session at a time — `
@@ -1963,7 +1969,6 @@ function renderCharts(){
   // publishes about a week later, so a listing from 20 Oct has nothing to show
   // until mid-November — an empty card would just look broken.
   {
-    const t = document.getElementById("si-title"); if(t) t.textContent = siSeries;
     const s2 = D.ASST.pref2ShortInterest;
     if(siSeries === "SATS" && !(s2 && s2.pctFloat)){
       const chips = document.getElementById("si-chips-SATA"); if(chips) chips.innerHTML = "";
@@ -2567,9 +2572,13 @@ function exportCanvas(cv, filename, btn){
 function chartExportMeta(id, card){
   const cfg = CHART_CFG[id] || {};
   const h3 = card.querySelector("h3");
+  // a series switch counts as the series it shows, not the text of every button on it;
+  // a hint icon isn't part of the title
   const title = [...h3.childNodes]
-    .filter(n => !(n.nodeType === 1 && n.classList.contains("pngbtn")))
-    .map(n => n.textContent).join("").trim();
+    .filter(n => !(n.nodeType === 1 && (n.classList.contains("pngbtn") || n.classList.contains("evhint"))))
+    .map(n => n.nodeType === 1 && n.classList.contains("serieschips")
+      ? (n.querySelector("button.active") || {}).textContent || "" : n.textContent)
+    .join(" ").replace(/\s+/g, " ").trim();
   const dash = title.indexOf("—");
   const scales = (cfg.options && cfg.options.scales) || {};
   const sets = ((cfg.data && cfg.data.datasets) || []).filter(d => d.label);
