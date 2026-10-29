@@ -1760,6 +1760,14 @@ function clip(ppm, ...arrs){
 }
 const PPM_CAL = 30.44, PPM_DAY = 21, PPM_WEEK = 4.33, PPM_SEMI = 2;   // calendar days / trading days / weeks / settlements per month
 if(typeof Chart !== "undefined") Chart.defaults.font.family = "'Google Sans Flex','Google Sans',-apple-system,'Segoe UI',Roboto,sans-serif";
+// Chart.js packs a legend straight onto the top tick label and has no option for the
+// gap, so every chart's legend gets 12px more room below it when it lays itself out
+const LEGEND_GAP = 12;
+if(typeof Chart !== "undefined") Chart.register({ id:"legendGap", beforeInit(chart){
+  const lg = chart.legend; if(!lg) return;
+  const fit = lg.fit;
+  lg.fit = function(){ fit.call(this); if(this.options.display !== false && this.height > 0) this.height += LEGEND_GAP; };
+}});
 const baseOpts = (extra={}) => Object.assign({
   responsive:true, maintainAspectRatio:false, interaction:{mode:"index",intersect:false},
   plugins:{ legend:{ labels:{ boxWidth:14, boxHeight:14, color:AX, font:{size:13} } },
