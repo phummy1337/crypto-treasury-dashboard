@@ -72,7 +72,7 @@ jobs:
         run: |
           UA="crypto-treasury-dashboard pete@defidevcorp.com"
           skip=true
-          for pair in "MSTR:0001050446" "ASST:0001920406"; do
+          for pair in "MSTR:0001050446" "ASST:0001920406" "DFDV:0001805526"; do
             tk="${pair%%:*}"; cik="${pair##*:}"
             edgar=$(curl -sS -A "$UA" "https://data.sec.gov/submissions/CIK$cik.json" \
               | python3 -c "import json,sys;r=json.load(sys.stdin)['filings']['recent'];print(max((r['filingDate'][i] for i in range(len(r['form'])) if r['form'][i]=='8-K'), default=''))")
