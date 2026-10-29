@@ -39,15 +39,19 @@ function simulate(s, cfg){
   // ending-multiple basis: EV prices the whole structure (mcap = mn×NAV − claims);
   // net prices the common's residual (mcap = mn×(NAV − claims)). Converts are held
   // at notional throughout — the model doesn't flip ITM tranches into share count.
+  // Net mNAV divides a fully-diluted market cap, as the page's header does, so on that
+  // basis every share count carries `dil`: options, RSUs and the like beyond basic
+  // (s.dilM, held constant). EV mNAV is on basic shares, as the page's is.
+  const dil = cfg.basis==="net" ? (s.dilM || 0) : 0;
   const priceAt = (hold,b,pref,buf,sh,mn)=> Math.max(
     (cfg.basis==="net" ? mn*(nav(hold,b) - claims(pref,buf,b))
-                       : mn*nav(hold,b) - claims(pref,buf,b)) / sh, 0.01);
+                       : mn*nav(hold,b) - claims(pref,buf,b)) / (sh + dil), 0.01);
   const cebeShare = (hold,b,pref,buf,sh)=> (nav(hold,b) - claims(pref,buf,b)) / sh;
   const nav0 = nav(s.hold, s.spot);
   if(nav0<=0) return null;
   const mnav0 = (s.px*s.sharesM + claims(s.pref,0,s.spot)) / nav0;    // current EV mNAV
   const netNav0 = nav0 - claims(s.pref,0,s.spot);
-  const net0 = netNav0>0 ? (s.px*s.sharesM)/netNav0 : null;            // current net mNAV
+  const net0 = netNav0>0 ? (s.px*(s.sharesM + dil))/netNav0 : null;    // current net mNAV
   const mn0 = (cfg.basis==="net" && net0) ? net0 : mnav0;              // interpolation start
   const cebe0 = cebeShare(s.hold, s.spot, s.pref, 0, s.sharesM);
   let hold=s.hold, sharesM=s.sharesM, pref=s.pref, buf=0, p=s.px;
@@ -81,14 +85,15 @@ function simulate(s, cfg){
     premCap += (cfg.basis==="net" ? 0 : cfg.prefMo - pc)*(mn-1);       // net: its claim offsets its cash
     // Common ATM, the same split. Its proceeds land first and the sale is priced on the
     // result: C raised on M, the market value with the buyers' money in, issues
-    // C*S/(M - C) shares, so existing holders keep M - C. Only a floor below 1x can leave
+    // C*S/(M - C) shares, so existing holders keep M - C. S and M count the diluted
+    // shares too (dil), which own their slice of M. Only a floor below 1x can leave
     // M short of C, and then nothing sells.
     let commonMo = atmOpen ? cfg.commonMo : 0;                         // ATM shut below the floor
     const cc = Math.min(commonMo, gap);
-    const mcap = commonMo>0 ? priceAt(hold + (commonMo - cc)*1e6/b, b, pref, buf + cc, sharesM, mn)*sharesM : 0;
+    const mcap = commonMo>0 ? priceAt(hold + (commonMo - cc)*1e6/b, b, pref, buf + cc, sharesM, mn)*(sharesM + dil) : 0;
     if(!(mcap > commonMo)) commonMo = 0;
     if(commonMo>0){
-      buf += cc; hold += (commonMo - cc)*1e6/b; sharesM += commonMo*sharesM/(mcap - commonMo);
+      buf += cc; hold += (commonMo - cc)*1e6/b; sharesM += commonMo*(sharesM + dil)/(mcap - commonMo);
       parked += cc; premCap += (cfg.basis==="net" ? commonMo : commonMo - cc)*(mn-1);   // net: parked cash earns it too
     }
     parked += pc;
@@ -109,8 +114,8 @@ function simulate(s, cfg){
         // above. The money goes out, so the market cap M doesn't move and existing holders
         // bear exactly the bill: X issues X*S/(M - X) shares. A bill the whole company
         // isn't worth can't be paid in stock, so the treasury pays.
-        const mcap = priceAt(hold,b,pref,buf,sharesM,mn)*sharesM;
-        if(viaEq < mcap) sharesM += viaEq*sharesM/(mcap - viaEq);
+        const mcap = priceAt(hold,b,pref,buf,sharesM,mn)*(sharesM + dil);
+        if(viaEq < mcap) sharesM += viaEq*(sharesM + dil)/(mcap - viaEq);
         else { forcedDiv += viaEq; hold -= viaEq*1e6/b; assetSold += viaEq; }
       }
     }

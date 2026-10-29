@@ -3,23 +3,24 @@
 // Each fixture is one calculator button's opening snapshot and default inputs, frozen
 // from data.json on 2026-10-25 so a data refresh can't move them. The goldens are what
 // the engine returns for them: an edit that shifts one has changed what the page shows,
-// and its commit should say so.
+// and its commit should say so. dilM is that day's fully-diluted count less basic
+// (MSTR 426.32 - 422.35, ASST 126.79 - 124.06); DFDV published no adjusted count then.
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { crashMonth, pathPrice, simulate, simulateCredit, breakEven } = require("../calc-engine.js");
 
 const FIXTURES = {
   MSTR: {
-    s: {px:146.01, sharesM:422.35, pref:13557, spot:80472, hold:848517, cash:5281, owed:0, debtUsd:6714, intUsd:34.5953, intUnits:0,
+    s: {px:146.01, sharesM:422.35, dilM:3.97, pref:13557, spot:80472, hold:848517, cash:5281, owed:0, debtUsd:6714, intUsd:34.5953, intUnits:0,
         otherNotional:4987, otherDivs:470.66},
     cfg: {target:150000, months:12, prefMo:0, commonMo:1579, rate:12, fundMix:0, endMnav:1.15, runway:0, basis:"net", atmFloor:1, stake:0, opex:0},
-    golden: {implied:307.6200142131077, endHold:1013760.6016336514, endSharesM:506.70142703661304, assetSold:0, pausedMo:0, broke:null},
+    golden: {implied:305.03437585840555, endHold:1013760.6016336514, endSharesM:507.02650571566767, assetSold:0, pausedMo:0, broke:null},
   },
   ASST: {
-    s: {px:28.97, sharesM:124.06, pref:2103, spot:80472, hold:36818, cash:976, owed:0, debtUsd:0, intUsd:0, intUnits:0,
+    s: {px:28.97, sharesM:124.06, dilM:2.73, pref:2103, spot:80472, hold:36818, cash:976, owed:0, debtUsd:0, intUsd:0, intUnits:0,
         otherNotional:700, otherDivs:105},
     cfg: {target:150000, months:12, prefMo:207, commonMo:334, rate:13, fundMix:0, endMnav:1.95, runway:0, basis:"net", atmFloor:1, stake:0, opex:0},
-    golden: {implied:102.02003267757561, endHold:93434.07883711549, endSharesM:190.026633015552, assetSold:0, pausedMo:0, broke:null},
+    golden: {implied:100.38244313531246, endHold:93434.07883711549, endSharesM:190.3966335461057, assetSold:0, pausedMo:0, broke:null},
   },
   DFDV: {
     s: {px:3.78, sharesM:32.62, pref:15.81, spot:101.4, hold:2590266, cash:9.98, owed:562000, debtUsd:149.0532, intUsd:7.5087, intUnits:33725,
@@ -44,6 +45,13 @@ const FIXTURES = {
     s: {spot:80472, hold:36818, cash:976, owed:0, debtUsd:0, intUsd:0, intUnits:0, stated:100, quote:98.02,
         series:1403, rate:13, otherNotional:700, otherDivs:105, tranches:[]},
     cfg: {target:80472, months:60, prefMo:0, rate:13, issuePx:98.02, reqYield:13.2626, stake:0, opex:0},
+    golden: {unpaid:0, firstGap:null, cashOut:41, firstSale:41, sold:5728.07933194154, repaid:0, coverEnd:1.1896662368045656, breakEven:4683.269706652449},
+  },
+  // SATS from the same day's stack: its $700M at 15%, SATA's $1,403M at 13% the other series
+  SATS: {
+    s: {spot:80472, hold:36818, cash:976, owed:0, debtUsd:0, intUsd:0, intUnits:0, stated:100, quote:92.6,
+        series:700, rate:15, otherNotional:1403, otherDivs:182.39, tranches:[]},
+    cfg: {target:80472, months:60, prefMo:0, rate:15, issuePx:92.6, reqYield:16.1987, stake:0, opex:0},
     golden: {unpaid:0, firstGap:null, cashOut:41, firstSale:41, sold:5728.07933194154, repaid:0, coverEnd:1.1896662368045656, breakEven:4683.269706652449},
   },
   CHAD: {
@@ -73,7 +81,7 @@ for(const co of ["MSTR", "ASST", "DFDV"]){
     for(const k in golden) near(r[k], golden[k], k);
   });
 }
-for(const tk of ["STRC", "SATA", "CHAD"]){
+for(const tk of ["STRC", "SATA", "SATS", "CHAD"]){
   test(`${tk} credit defaults give the golden results`, () => {
     const {s, cfg, golden} = FIXTURES[tk];
     const r = {...simulateCredit(s, cfg), breakEven:breakEven(s, cfg)};
@@ -198,6 +206,27 @@ const flatCo = (over = {}) => ({target:100, months:1, prefMo:0, commonMo:0, rate
 test("the net basis prices the common's residual, the EV basis the whole structure", () => {
   near(simulate(tinyCo(), flatCo()).implied, 1.5*(100 - 20)/10, "net: 1.5 x (NAV - claims) / shares");
   near(simulate(tinyCo(), flatCo({basis:"ev"})).implied, (1.5*100 - 20)/10, "EV: (1.5 x NAV - claims) / shares");
+});
+
+test("net mNAV divides a fully-diluted market cap; EV mNAV a basic one", () => {
+  // 2M options on top of 10M basic shares: net mNAV today is $10 x 12M / $80M = 1.5x,
+  // so an ending 1.5x re-rates nothing and the price stays $10. EV ignores them.
+  const s = tinyCo({dilM:2});
+  near(simulate(s, flatCo()).net0, 10*12/80, "net mNAV today");
+  near(simulate(s, flatCo()).implied, 10, "no re-rate at today's multiple");
+  near(simulate(s, flatCo({basis:"ev"})).implied, (1.5*100 - 20)/10, "EV: basic shares");
+  // a $12M bill sold as stock: the 12M diluted shares are worth $120M, so it issues
+  // 12 x 12 / 108 new shares and leaves the old 12M worth $108M
+  const r = simulate(s, flatCo({opex:144}));
+  near(r.endSharesM, 10 + 12*12/108, "shares issued");
+  near(r.implied*12, 120 - 12, "the old holders' stake");
+});
+
+test("SATS and SATA share one pool, so their coverage reads the same", () => {
+  const sata = simulateCredit(FIXTURES.SATA.s, FIXTURES.SATA.cfg);
+  const sats = simulateCredit(FIXTURES.SATS.s, FIXTURES.SATS.cfg);
+  near(sats.coverEnd, sata.coverEnd, "coverage");
+  near(sats.sold, sata.sold, "coin sold");
 });
 
 test("with the ATM shut below its floor, costs are paid by selling the treasury", () => {
