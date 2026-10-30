@@ -623,7 +623,7 @@
     <div class="sec-head"><h2>Coverage &amp; Duration</h2></div>
     <p class="sec-note">How long each treasury could keep paying its dividends and coupons if no new money came in — from the crypto, from the dollars, and after setting aside what the debt is owed — and how many times over the assets cover the preferred.</p>
     <div class="grid" id="grid-coverage"></div>
-    <p class="footnote">Durations divide by annual obligations: every preferred series' dividends plus debt coupons, at today's rates. Net figures set aside all senior debt at face value, converts included, and keep its coupons, since the debt is owed until it's repaid. Operating costs aren't counted; the calculator models them.</p>
+    <p class="footnote">Durations divide by annual obligations: every preferred series' dividends plus debt coupons, at the latest declared rates. Net figures set aside all senior debt at face value, converts included, and keep its coupons, since the debt is owed until it's repaid. Operating costs aren't counted; the calculator models them.</p>
   </section>
 
   <!-- 1. Accumulation & Holdings -->
@@ -861,8 +861,8 @@ const SEED = {
     DFDV: { name:"DeFi Development", ticker:"DFDV", prefTicker:"CHAD", asset:"SOL", accent:"#a970ff", prefStated:10,
       stockPrice:3.78, dayChangePct:2.02, sharesOutstanding:32.62, prefPrice:9.90,
       holdings:2590266, pctSupply:0.4392, netChangeYtd:394340,
-      cash:9.98, seniorDebt:205.9, prefNotional:15.81, annualObligations:12.97, opexYr:17, organicYield:5.07,
-      prefBreakdown:[["CHAD","CHAD · 13% var",15.81,13]] }
+      cash:9.98, seniorDebt:205.9, prefNotional:15.81, annualObligations:13.13, opexYr:17, organicYield:5.07,
+      prefBreakdown:[["CHAD","CHAD · 14% var",15.81,14]] }
   },
   stockHistory: {
     illustrative: false,
@@ -1034,7 +1034,7 @@ const METRIC_DEFS = {
     m:"The crypto's staying power with enough held back to repay the lenders. Where debt is a large share of the treasury this is far shorter than the gross figure, and it reaches zero once the crypto only just covers the debt; below that it turns negative."},
   "USD Duration": {c:"True dollar reserve ÷ annual obligations, in years. For ASST this deliberately EXCLUDES the STRC preferred Strive holds — that position is counted in total-reserve metrics (matching Strive's own math) but it is BTC-linked paper, not dollars; hover the ASST value for the blended figure.",
     m:"The cushion that decides whether a bear market forces treasury sales — so it should only count assets that hold value in that exact scenario. A reserve parked in another BTC treasury company's preferred is weakest at precisely the moment it's needed, which is why the headline here is stricter than the issuer's blended number."},
-  "Annual Obligations": {c:"Each preferred series' notional × its dividend rate, plus debt coupons.",
+  "Annual Obligations": {c:"Each preferred series' notional × its latest declared dividend rate, plus debt coupons.",
     m:"The fixed yearly cash cost of the capital structure — what must be paid out before common shareholders see anything."},
   "Total Holdings": {c:"Total treasury per the latest weekly 8-K (BTC) or DeFi Development's dashboard (SOL); hover the value for the year-by-year path.",
     m:"Raw treasury size — scale before adjusting for who holds claims against it. BTC and SOL counts don't compare with each other; compare dollars or ratios."},
@@ -2831,9 +2831,9 @@ function initCalc(){
       group = g;
     }
     const series = (o.prefBreakdown || []).find(r => r[0] === (credit ? calcCo : o.prefTicker));
-    // Prefer a rate that has been declared for a period still ahead of us: the model
-    // runs forward months, so CHAD's 14% from 1 Nov is the rate those months pay,
-    // even while the page's obligations correctly still show today's 13%.
+    // A rate declared for a period still ahead of us is the rate the model's forward
+    // months pay. The refresh puts CHAD's latest declared rate in prefBreakdown as
+    // well, so for CHAD the two agree.
     const nx = o.prefRateNext;
     const rate = (nx && nx.rate != null) ? nx.rate
                : (series && series[3] != null ? series[3] : (calcCo==="MSTR" ? 12 : 13));

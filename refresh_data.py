@@ -3089,7 +3089,7 @@ def _dfdv_chad(co):
     Returns the notional steps, which the mNAV history needs."""
     today = datetime.date.today().isoformat()
     rates = _chad_rates()
-    rate = _step(rates, today)
+    rate = rates[-1][1]          # the latest declared, whether or not it has started
     if rates[-1][0][:7] < today[:7]:
         log(f"[stale] CHAD rate steps end {rates[-1][0]} — no 8-K has declared this month's "
             f"rate; add it to CHAD['rates'] if DFDV announced it elsewhere")
@@ -3102,11 +3102,11 @@ def _dfdv_chad(co):
     notional = steps[-1][1]
     co["prefNotional"] = round(notional, 2)
     co["prefBreakdown"] = [["CHAD", PREF_LABEL["CHAD"].format(r="%g" % rate), round(notional, 2), rate]]
-    # A declared-but-not-yet-effective rate. Everything above is deliberately on
-    # today's rate — obligations, hurdle and duration all describe the stack as it
-    # stands — but the calculator runs forward months, so seeding it from today
-    # understates the cost from the day the new rate starts. CHAD was raised
-    # 13.00% -> 14.00% for periods from 2026-11-01 (8-K filed 2026-10-15).
+    # Everything here is on the latest declared rate, so obligations, hurdle and
+    # duration carry a new rate from the refresh after its 8-K, not from the day it
+    # starts. prefRateNext names a declared rate that hasn't started yet, so the
+    # calculator can say when it does. CHAD was raised 13.00% -> 14.00% for periods
+    # from 2026-11-01 (8-K filed 2026-10-15).
     nxt = next(((d, r) for d, r in rates if d > today), None)
     if nxt:
         co["prefRateNext"] = {"rate": nxt[1], "from": nxt[0]}
