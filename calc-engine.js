@@ -30,6 +30,12 @@ function prefDivsMo(s, issued, rate){
 // up the mNAV spread and locks in today's price), and DFDV's cash was 4.5× the reserve in
 // October 2026.
 function reserveFor(issued, cfg){ return (cfg.reserveMo || 0)*issued*cfg.rate/1200; }
+// The months of the selected series' dividends the reserve holds at the start: all
+// cfg.reserveMo of them, or the whole months today's cash covers when it can't fill it.
+function reserveMonths(s, cfg){
+  const full = reserveFor(s.series, cfg);
+  return full > s.cash ? Math.floor(cfg.reserveMo*s.cash/full) : (cfg.reserveMo || 0);
+}
 function simulate(s, cfg){
   // EV mNAV framing, on basic shares: mNAV = (mcap + debt + pref - cash) / crypto NAV, so
   // each month market cap backs out as mNAV x NAV - claims and price = mcap / shares.
@@ -238,4 +244,4 @@ function breakEven(s, cfg){
   return hi;
 }
 
-if(typeof module !== "undefined") module.exports = { crashMonth, pathPrice, prefDivsMo, reserveFor, simulate, simulateCredit, breakEven };
+if(typeof module !== "undefined") module.exports = { crashMonth, pathPrice, prefDivsMo, reserveFor, reserveMonths, simulate, simulateCredit, breakEven };

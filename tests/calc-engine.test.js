@@ -8,7 +8,7 @@
 // both buttons (reserveMo).
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { crashMonth, pathPrice, reserveFor, simulate, simulateCredit, breakEven } = require("../calc-engine.js");
+const { crashMonth, pathPrice, reserveFor, reserveMonths, simulate, simulateCredit, breakEven } = require("../calc-engine.js");
 
 const FIXTURES = {
   MSTR: {
@@ -283,6 +283,14 @@ test("the reserve is reserveMo months of the selected series' dividends at the r
   // $15.81M of CHAD at 14% pays $2.2134M a year: 12 months of it
   near(reserveFor(15.81, {reserveMo:12, rate:14}), 2.2134, "CHAD's reserve");
   assert.equal(reserveFor(15.81, {rate:14}), 0);                   // every other button
+});
+
+test("the reserve holds reserveMo months of dividends, or the whole months cash can fill", () => {
+  const chad = {reserveMo:12, rate:14};
+  assert.equal(reserveMonths({series:15.81, cash:9.98}, chad), 12);
+  // $1M of cash against $0.184M of dividends a month: 5 whole months
+  assert.equal(reserveMonths({series:15.81, cash:1}, chad), 5);
+  assert.equal(reserveMonths({series:15.81, cash:9.98}, {rate:14}), 0);   // every other button
 });
 
 test("the reserve is carved out of today's cash and held, and today's multiple doesn't move", () => {
