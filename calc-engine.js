@@ -1,5 +1,6 @@
 /* The calculator's engine: pure functions of a balance-sheet snapshot and the
-   calculator's inputs. index.html builds the snapshots from data.json and loads
+   calculator's inputs, plus the run-off behind the Coverage & Duration rows (the
+   last two functions). index.html builds the snapshots from data.json and loads
    this file as a plain script; tests/calc-engine.test.js requires it under Node.
    Keep it free of DATA, the DOM and other page globals so both can run it. */
 
@@ -23,75 +24,90 @@ function pathPrice(spot, cfg, m){
 function prefDivsMo(s, issued, rate){
   return (s.otherDivs + issued*rate/100)/12;
 }
+// The dividend reserve in $M: cfg.reserveMo months of the selected series' dividends at the
+// rate input, `issued` its notional in $M (anything raised included). Only DFDV holds one.
+// Both engines carve it out of today's cash. Cash short of it leaves it short, flagged as
+// reserveShort 0, rather than filled by selling the treasury: a sale isn't neutral (it gives
+// up the mNAV spread and locks in today's price), and DFDV's cash was 4.5× the reserve in
+// October 2026.
+function reserveFor(issued, cfg){ return (cfg.reserveMo || 0)*issued*cfg.rate/1200; }
+// The months of the selected series' dividends the reserve holds at the start: all
+// cfg.reserveMo of them, or the whole months today's cash covers when it can't fill it.
+function reserveMonths(s, cfg){
+  const full = reserveFor(s.series, cfg);
+  return full > s.cash ? Math.floor(cfg.reserveMo*s.cash/full) : (cfg.reserveMo || 0);
+}
 function simulate(s, cfg){
-  // EV mNAV framing: mNAV = (mcap + debt + pref - cash) / crypto NAV, so each month
-  // market cap backs out as mNAV x NAV - claims and price = mcap / shares.
+  // EV mNAV framing, on basic shares: mNAV = (mcap + debt + pref - cash) / crypto NAV, so
+  // each month market cap backs out as mNAV x NAV - claims and price = mcap / shares.
+  // Converts are held at notional throughout — the model doesn't flip ITM tranches
+  // into share count.
   // `buf` is the dividend cash runway: issuance proceeds parked as cash to
-  // pre-fund dividends. It offsets claims at face value. On the EV basis it never
-  // earns the mNAV multiple, so parked dollars are per-share neutral (vs asset-bought
-  // dollars, which capture the mNAV premium spread); on the net basis it sits in net
-  // NAV and earns the multiple like the asset.
+  // pre-fund dividends. It offsets claims at face value and never earns the mNAV
+  // multiple, so parked dollars are per-share neutral (vs asset-bought dollars,
+  // which capture the mNAV premium spread).
   // `cash` is today's cash: it pays dividends, interest and costs before anything
   // else, and offsets claims at its current balance, so spending it raises claims.
-  let cash = s.cash;
+  // `res` is the dividend reserve (reserveFor), carved out of today's cash once today's
+  // multiple is read and topped up first by a preferred raise as the series grows. It
+  // offsets claims like cash and is never spent: it would pay only once sales of the
+  // treasury can't, and a treasury sold out ends the run.
+  let cash = s.cash, res = 0;
   const nav = (hold,b)=> hold*b/1e6;                                   // $mm
-  const claims = (pref,buf,b) => s.debtUsd + s.owed*b/1e6 + pref - cash - buf;   // $mm
-  // ending-multiple basis: EV prices the whole structure (mcap = mn×NAV − claims);
-  // net prices the common's residual (mcap = mn×(NAV − claims)). Converts are held
-  // at notional throughout — the model doesn't flip ITM tranches into share count.
-  const priceAt = (hold,b,pref,buf,sh,mn)=> Math.max(
-    (cfg.basis==="net" ? mn*(nav(hold,b) - claims(pref,buf,b))
-                       : mn*nav(hold,b) - claims(pref,buf,b)) / sh, 0.01);
+  const claims = (pref,buf,b) => s.debtUsd + s.owed*b/1e6 + pref - cash - res - buf;   // $mm
+  const priceAt = (hold,b,pref,buf,sh,mn)=> Math.max((mn*nav(hold,b) - claims(pref,buf,b)) / sh, 0.01);
   const cebeShare = (hold,b,pref,buf,sh)=> (nav(hold,b) - claims(pref,buf,b)) / sh;
   const nav0 = nav(s.hold, s.spot);
   if(nav0<=0) return null;
   const mnav0 = (s.px*s.sharesM + claims(s.pref,0,s.spot)) / nav0;    // current EV mNAV
-  const netNav0 = nav0 - claims(s.pref,0,s.spot);
-  const net0 = netNav0>0 ? (s.px*s.sharesM)/netNav0 : null;            // current net mNAV
-  const mn0 = (cfg.basis==="net" && net0) ? net0 : mnav0;              // interpolation start
   const cebe0 = cebeShare(s.hold, s.spot, s.pref, 0, s.sharesM);
+  const resFor = pref => reserveFor(pref - s.otherNotional, cfg);     // pref: the whole stack
+  res = Math.max(0, Math.min(cash, resFor(s.pref))); cash -= res;
+  const reserveShort = res < resFor(s.pref) ? 0 : null;
   let hold=s.hold, sharesM=s.sharesM, pref=s.pref, buf=0, p=s.px;
   let raised=0, raisedMnWt=0, parked=0, premCap=0;
   let pausedMo=0, forcedDiv=0, assetSold=0, broke=null;
   const idxStock=[100], idxAsset=[100], labels=["0"];
   for(let m=1;m<=cfg.months;m++){
     const b  = pathPrice(s.spot, cfg, m);
-    const mn = mn0 + (cfg.endMnav - mn0)*m/cfg.months;
+    const mn = mnav0 + (cfg.endMnav - mnav0)*m/cfg.months;
     if(broke && broke.exhausted){                                      // the treasury is sold out:
       broke.months++;                                                  // nothing left to recover with
       idxStock.push(0); idxAsset.push(b/s.spot*100); labels.push(String(m)); continue;
     }
     hold *= 1 + cfg.stake/1200;                                        // staking accrues in units (SOL)
-    // Is the common ATM open this month? Management issues only when the stock
-    // trades above the accretion threshold (Strategy states a hard 1.0x on the
-    // net multiple; Strive behaves the same). Evaluated on the NET multiple
-    // regardless of which basis the user is modelling in, before this month's
-    // issuance — the same information a board would act on.
-    const nav_ = nav(hold,b), cl_ = claims(pref,buf,b), netNav_ = nav_ - cl_;
-    const netMn = netNav_>0 ? (cfg.basis==="net" ? mn : (mn*nav_ - cl_)/netNav_) : 0;
-    const atmOpen = netNav_>0 && netMn >= cfg.atmFloor;
+    // Is the common ATM open this month? Management issues only while EV mNAV is at or
+    // above the floor, judged before this month's issuance — the same information a
+    // board would act on. A 1.0x floor is the accretion threshold: there the market cap
+    // equals the treasury left after every claim, the line Strategy states as a hard
+    // 1.0x of its net multiple (Strive behaves the same). Whatever the floor, the ATM
+    // stays shut while claims exceed the treasury or the stock is worth nothing.
+    const nav_ = nav(hold,b), cl_ = claims(pref,buf,b);
+    const atmOpen = nav_ - cl_ > 0 && mn*nav_ > cl_ && mn >= cfg.atmFloor;
     if(!atmOpen) pausedMo++;
     pref += cfg.prefMo;
     const divMo = prefDivsMo(s, pref - s.otherNotional, cfg.rate);
     // debt interest and operating costs ride the dividends' waterfall below
     const costMo = (s.intUsd + s.intUnits*b/1e6 + cfg.opex)/12;
+    // preferred ATM: the reserve's growth first, then the runway, the rest -> the asset
+    const rp = Math.min(cfg.prefMo, Math.max(0, resFor(pref) - res)); res += rp;
     let gap = Math.max(0, cfg.runway*divMo - buf);                     // cash still to park
-    const pc = Math.min(cfg.prefMo, gap); gap -= pc;                   // preferred ATM:
-    buf += pc; hold += (cfg.prefMo - pc)*1e6/b;                        // runway first, rest -> the asset
-    premCap += (cfg.basis==="net" ? 0 : cfg.prefMo - pc)*(mn-1);       // net: its claim offsets its cash
+    const pc = Math.min(cfg.prefMo - rp, gap); gap -= pc;
+    buf += pc; hold += (cfg.prefMo - rp - pc)*1e6/b;
+    premCap += (cfg.prefMo - rp - pc)*(mn-1);
     // Common ATM, the same split. Its proceeds land first and the sale is priced on the
     // result: C raised on M, the market value with the buyers' money in, issues
-    // C*S/(M - C) shares, so existing holders keep M - C. Only a floor below 1x can leave
-    // M short of C, and then nothing sells.
+    // C*S/(M - C) shares, so existing holders keep M - C. Only a floor below 1x can
+    // leave M short of C, and then nothing sells.
     let commonMo = atmOpen ? cfg.commonMo : 0;                         // ATM shut below the floor
     const cc = Math.min(commonMo, gap);
     const mcap = commonMo>0 ? priceAt(hold + (commonMo - cc)*1e6/b, b, pref, buf + cc, sharesM, mn)*sharesM : 0;
     if(!(mcap > commonMo)) commonMo = 0;
     if(commonMo>0){
       buf += cc; hold += (commonMo - cc)*1e6/b; sharesM += commonMo*sharesM/(mcap - commonMo);
-      parked += cc; premCap += (cfg.basis==="net" ? commonMo : commonMo - cc)*(mn-1);   // net: parked cash earns it too
+      parked += cc; premCap += (commonMo - cc)*(mn-1);
     }
-    parked += pc;
+    parked += rp + pc;
     raised += cfg.prefMo + commonMo; raisedMnWt += (cfg.prefMo + commonMo)*mn;
     // payment waterfall: today's cash -> runway cash -> common issuance (only while
     // the ATM is open, and only for a bill smaller than the company's market value)
@@ -135,9 +151,9 @@ function simulate(s, cfg){
   // stock = asset move x CEBE accretion x residual mNAV re-rate
   const unitAcc = cebe0>0 && cebeEnd>0 ? (cebeEnd/cfg.target)/(cebe0/s.spot) : 1;
   return { implied:p, stockX, assetX,
-           cebe0, cebeEnd, cebeX:unitAcc, mnav0, net0, mn0, mnavX:stockX/(assetX*unitAcc),
+           cebe0, cebeEnd, cebeX:unitAcc, mnav0, mnavX:stockX/(assetX*unitAcc),
            endHold:hold, endSharesM:sharesM, endPref:pref, endCash:buf, endOpenCash:cash,
-           raised, avgIssMn: raised>0 ? raisedMnWt/raised : null, parked, premCap,
+           endReserve:res, reserveShort, raised, avgIssMn: raised>0 ? raisedMnWt/raised : null, parked, premCap,
            pausedMo, forcedDiv, assetSold, broke,
            endClaims:claims(pref,buf,cfg.target)/nav(hold,cfg.target)*100,
            idxStock, idxAsset, labels };
@@ -145,15 +161,19 @@ function simulate(s, cfg){
 
 // The issuer's cash flows from the selected preferred's seat, month by month: debt
 // interest and any principal due come first, then operating costs, then every
-// preferred series' dividends; opening cash pays first, then sales of the treasury.
+// preferred series' dividends; opening cash pays first, then sales of the treasury,
+// then the dividend reserve (reserveFor), held apart from the cash until both run out.
 // Whatever is left unpaid is a modeled funding gap. No new money comes in unless
 // cfg.prefMo raises more of the selected series.
 function simulateCredit(s, cfg){
   let hold = s.hold, cash = s.cash, series = s.series;
+  // reserveShort: 0 if opening cash can't fill the reserve, else the first month it pays, if any
+  let res = Math.max(0, Math.min(cash, reserveFor(series, cfg))), reserveShort = res < reserveFor(series, cfg) ? 0 : null;
+  cash -= res;
   const live = s.tranches.map(t => ({...t}));
   let unpaid = 0, unpaidDebt = 0, firstGap = null, gapPx = null, cashOut = null, firstSale = null, sold = 0, soldUsd = 0, repaid = 0;
-  // treasury + cash, and debt + preferred, in $M at price P
-  const mark = P => [hold*P/1e6 + cash,
+  // treasury + cash (the reserve's included), and debt + preferred, in $M at price P
+  const mark = P => [hold*P/1e6 + cash + res,
     live.reduce((d, t) => d + (t.units ? t.units*P/1e6 : t.principal), 0) + s.otherNotional + series];
   const labels = ["0"], assets = [mark(s.spot)[0]], claims = [mark(s.spot)[1]];
   for(let m = 1; m <= cfg.months; m++){
@@ -161,7 +181,9 @@ function simulateCredit(s, cfg){
     hold *= 1 + cfg.stake/1200;                                      // staking accrues in units
     if(cfg.prefMo > 0){                                              // raise more of the series:
       series += cfg.prefMo*s.stated/cfg.issuePx;                     // shares × stated amount
-      hold += cfg.prefMo*1e6/P;                                      // proceeds buy the treasury asset
+      const top = Math.min(cfg.prefMo, Math.max(0, reserveFor(series, cfg) - res));
+      res += top;                                                    // proceeds top up the reserve,
+      hold += (cfg.prefMo - top)*1e6/P;                              // then buy the treasury asset
     }
     let interest = 0, principal = 0;
     const due = [];
@@ -180,6 +202,10 @@ function simulateCredit(s, cfg){
       if(units > 0){
         if(firstSale == null) firstSale = m;
         hold -= units; sold += units; soldUsd += units*P/1e6; need -= units*P/1e6;
+      }
+      if(need > 1e-9 && res > 0){                                    // the reserve pays last
+        const fromRes = Math.min(res, need); res -= fromRes; need -= fromRes;
+        if(reserveShort == null) reserveShort = m;
       }
     }
     const short = need > 1e-6 ? need : 0;
@@ -200,13 +226,16 @@ function simulateCredit(s, cfg){
   }
   const [aEnd, cEnd] = mark(cfg.target), prefEnd = s.otherNotional + series;
   return { unpaid, unpaidDebt, firstGap, gapPx, cashOut, firstSale, sold, soldUsd, repaid, endSeries:series,
+           endReserve:res, reserveShort,
            coverEnd: prefEnd > 0 ? (aEnd - (cEnd - prefEnd))/prefEnd : null,
            assets, claims, labels };
 }
 // The lowest ending price of the treasury asset that still funds every payment through
-// the horizon, holding the other inputs (a crash keeps its depth and month): 0 when cash
-// and staking alone do, null when no price up to 20× today does. A higher ending price
-// raises every month's price, so it never makes a payment harder.
+// the horizon, holding the other inputs (a crash keeps its depth and month): 0 when one
+// 99.99% below today's still does — cash and staking alone, or with a dividend reserve,
+// the treasury sold on the way down and the reserve paying the final months — and null
+// when no price up to 20× today does. A higher ending price raises every month's price,
+// so it never makes a payment harder.
 function breakEven(s, cfg){
   const gap = target => simulateCredit(s, {...cfg, target}).unpaid > 1e-6;
   let lo = s.spot*1e-4, hi = s.spot*20;
@@ -216,4 +245,27 @@ function breakEven(s, cfg){
   return hi;
 }
 
-if(typeof module !== "undefined") module.exports = { crashMonth, pathPrice, prefDivsMo, simulate, simulateCredit, breakEven };
+// When a dated tranche leaves the debt: at its next put or maturity after `today` (ISO
+// dates). Out of the money at `stockPx` it is repaid in cash then (no refinancing); in
+// the money it converts into shares. A loan with no date ahead rolls over: null. The
+// credit view's tranches and the Coverage & Duration run-off both read it.
+function trancheExit(t, stockPx, today){
+  const date = [t.put, t.maturity].filter(d => d && d > today).sort()[0];
+  return date ? { date, converts: !!(t.convPrice && stockPx >= t.convPrice) } : null;
+}
+// Years a reserve ($M) lasts paying `obligations` ($M a year: every dividend and coupon)
+// with no new money, at today's prices. Each exit ({at: years from today, principal,
+// coupon: $M a year}) stops its coupon then and takes its principal from the reserve; a
+// tranche that converts takes none. A principal the reserve can't meet ends the run.
+function runoffYears(reserve, obligations, exits){
+  let at = 0, rate = obligations;
+  for(const e of [...exits].sort((a, b) => a.at - b.at)){
+    if(rate*(e.at - at) >= reserve) return at + reserve/rate;
+    reserve -= rate*(e.at - at); at = e.at;
+    if(e.principal > reserve) return at;
+    reserve -= e.principal; rate -= e.coupon;
+  }
+  return at + reserve/rate;
+}
+
+if(typeof module !== "undefined") module.exports = { crashMonth, pathPrice, prefDivsMo, reserveFor, reserveMonths, simulate, simulateCredit, breakEven, trancheExit, runoffYears };

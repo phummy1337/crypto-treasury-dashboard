@@ -138,6 +138,7 @@ TRACKER_BASE = "https://data.strategytracker.com/"
 # fetch_holdings reads the 8-Ks — so the series cannot see a purchase the filings
 # already know about. rebase_mnav_holdings() closes that gap afterwards.
 _MNAV_INPUTS, _FILED_HOLD = {}, {}
+_FILED_DATES = {}       # every filed observation date, oldest first (ASST)
 # STRC notional ($mm) before the tracker's change log begins (2026-03-09), built from
 # SEC 8-Ks: IPO 28,011,111 sh × $100 stated (closed 2025-07-29), then the weekly ATM
 # "available for issuance" column (program $4,200mm). Validated: last step + the week
@@ -193,7 +194,11 @@ MSTR_CASH_STEPS = [("2025-06-30", 50.1), ("2025-09-30", 54.3),
 # were repurchased and cancelled 2026-05-19 (Q2 10-Q). Live steps take strategy.com's
 # figure after that.
 MSTR_DEBT_STEPS = [("2025-02-21", 8213.75), ("2026-05-19", 6713.75)]
-MNAV_START = {"MSTR": "2025-10-01", "ASST": "2026-01-01", "DFDV": "2026-01-01"}   # chart windows
+# chart windows. DFDV's starts 2026-02-23, the first day its own daily EV series counts
+# all of its debt: before that the series left out $125M-180M of it (on Feb 23 the
+# $114.6M July 2025 convert came in, with no new borrowing), so both mNAV lines read
+# too low (net 0.7x in January against roughly 2x).
+MNAV_START = {"MSTR": "2025-10-01", "ASST": "2026-01-01", "DFDV": "2026-02-23"}
 
 
 def _step(steps, iso):
@@ -277,6 +282,66 @@ PREF_LABEL = {"STRC": "Stretch · {r}% var", "STRK": "Strike · {r}%", "STRF": "
 # SATS is JUNIOR to SATA and senior to both common classes (closing 8-K, Item 3.03).
 SATS = {"ticker": "SATS", "shares": 7_000_000, "stated": 100.0, "rate": 15.0,
         "netProceedsM": 608.15, "closed": "2026-10-20"}
+# SATS's row in Strive's weekly table, written like SATA's ("SATA Stock (6) 14,030,176 ...")
+_SATS_ROW = r"SATS Stock(?:\s*\(\d+\))?"
+
+
+def _asst_pref2(co, row, today):
+    """co["pref2"] for Strive's second preferred, SATS, from its preferred-list row:
+    the feed's once it carries SATS, until then the filed terms above.
+
+    Nasdaq lists SATS as Strive's 15% preferred (checked 2026-10-29; ChartExchange's
+    "SATS" is still EchoStar). Its daily closes give the chart, the volume behind days
+    to cover, and the previous close the tile's day change needs. Without them the
+    chart grows by one snapshot point a session."""
+    nM = round(row.get("notionalMillions") or (row.get("notionalUSD") or 0) / 1e6
+               or SATS["shares"] * SATS["stated"] / 1e6)
+    px = row.get("price")
+    p2 = {"ticker": "SATS", "price": px, "rate": row.get("dividendRate") or SATS["rate"],
+          "stated": SATS["stated"], "notional": nM}
+    try:
+        rows = [r for r in _nasdaq_closes("SATS") if r[0] >= SATS["closed"]]
+    except Exception as e:
+        rows = []
+        log(f"[skip] Nasdaq SATS closes: {e} — adding a snapshot point instead")
+    if rows:
+        co["pref2History"] = {"dates": [_iso_lbl(d, "%b %-d") for d, _c, _v in rows],
+                              "iso": [d for d, _c, _v in rows],
+                              "px": [round(c, 2) for _d, c, _v in rows],
+                              "notional": [nM] * len(rows)}
+        _VOL_HIST["SATS"] = [(d, v) for d, _c, v in rows]
+        snap_et = datetime.datetime.now(ET)
+        settled = _settled_sessions([(d, c) for d, c, _v in rows], snap_et)
+        if px and len(settled) >= 2:
+            quote = _quote_session(settled, px, snap_et)
+            if not quote:                     # an after-hours print: the close is the quote
+                p2["price"] = px = settled[-1][1]
+                quote = (settled[-1][0], settled[-2][1])
+            p2["prevClose"] = round(quote[1], 4)
+            p2["changePct"] = round((px / quote[1] - 1) * 100, 2)
+    elif px:
+        # re-running within a session updates that day's point rather than adding one
+        h2 = co.get("pref2History") or {"dates": [], "iso": [], "px": [], "notional": []}
+        if h2["iso"] and h2["iso"][-1] == today:
+            h2["px"][-1], h2["notional"][-1] = px, nM
+        else:
+            h2["iso"].append(today)
+            h2["dates"].append(_iso_lbl(today, "%b %-d"))
+            h2["px"].append(px)
+            h2["notional"].append(nM)
+        co["pref2History"] = h2
+    co["pref2"] = p2
+
+
+def _check_sats_count(text):
+    """Flag the SATS constant once Strive's weekly table counts SATS shares sold.
+
+    Its ATM opened 2026-10-26 and no filing has a SATS row yet, so there is no
+    count to read the notional from; this names the filing that first has one."""
+    m = re.search(_SATS_ROW + r" ([\d,]+) ([\d,]+)", text or "")
+    if m and int(m.group(2).replace(",", "")) != SATS["shares"]:
+        log(f"[stale] Strive's weekly table counts {m.group(2)} SATS shares but SATS['shares'] "
+            f"is {SATS['shares']:,} — update it in refresh_data.py, or read the row")
 
 def _iso_lbl(iso, fmt):
     y, m, d = iso.split("-")
@@ -509,32 +574,19 @@ def fetch_strategytracker(data):
             co["cash"] = round(pm["latestCashBalance"] / 1e6)
         # preferred: live per-series notionals, prices, and the implied annual dividend
         ps = list(pm.get("preferredStocks") or [])
-        if tk == "ASST" and not any(p.get("ticker") == "SATS" for p in ps) \
-                and str(tracker_date) >= SATS["closed"]:
-            px = _cboe_last("SATS")
-            ps.append({"ticker": "SATS", "dividendRate": SATS["rate"],
-                       "notionalMillions": SATS["shares"] * SATS["stated"] / 1e6,
-                       "price": px, "priceChangePercent": 0})
-            co["pref2"] = {"ticker": "SATS", "price": px, "rate": SATS["rate"],
-                           "stated": SATS["stated"],
-                           "notional": round(SATS["shares"] * SATS["stated"] / 1e6)}
-            # No feed carries a SATS price series yet, so build one a session at a
-            # time and keep it in data.json. Re-running within a session updates
-            # that day's point rather than adding another.
-            if px:
-                h2 = co.get("pref2History") or {"dates": [], "iso": [], "px": [], "notional": []}
-                nM = round(SATS["shares"] * SATS["stated"] / 1e6)
-                if h2["iso"] and h2["iso"][-1] == tracker_date:
-                    h2["px"][-1], h2["notional"][-1] = px, nM
-                else:
-                    h2["iso"].append(tracker_date)
-                    h2["dates"].append(_iso_lbl(tracker_date, "%b %-d"))
-                    h2["px"].append(px)
-                    h2["notional"].append(nM)
-                co["pref2History"] = h2
+        sats = next((p for p in ps if p.get("ticker") == "SATS"), None)
+        if tk == "ASST" and not sats and str(tracker_date) >= SATS["closed"]:
+            sats = {"ticker": "SATS", "dividendRate": SATS["rate"],
+                    "notionalMillions": SATS["shares"] * SATS["stated"] / 1e6,
+                    "price": _cboe_last("SATS"), "priceChangePercent": 0}
+            ps.append(sats)
             log(f"[SATS] not in the feed yet — carrying {SATS['shares']:,} sh "
                 f"x ${SATS['stated']:,.0f} = ${SATS['shares']*SATS['stated']/1e6:,.0f}M at "
-                f"{SATS['rate']}%" + (f", last ${px:,.2f}" if px else ", no quote"))
+                f"{SATS['rate']}%" + (f", last ${sats['price']:,.2f}" if sats["price"] else ", no quote"))
+        # whether injected or the feed's own, so the tile and chart keep updating
+        # once the feed lists SATS
+        if tk == "ASST" and sats:
+            _asst_pref2(co, sats, tracker_date)
         if ps:
             bd = []
             kpi = _strategy_pref_notional() if tk == "MSTR" else {}
@@ -755,7 +807,11 @@ def fetch_strategytracker(data):
                     if i < len(cb) and cb[i]:
                         lastc = cb[i] / 1e6
                     _ff[i] = lastc
-                pref_at = lambda d: _step(sata_st, d) or 0
+                # SATS is a claim from its closing date, at the filed constant the live
+                # stack uses. Not apply_sats_proceeds' job: that stops once filings
+                # cover the close, and the rows after it lost the $700M claim.
+                sats_m = SATS["shares"] * SATS["stated"] / 1e6
+                pref_at = lambda d: (_step(sata_st, d) or 0) + (sats_m if d >= SATS["closed"] else 0)
                 cash_at = lambda d, i: _ff[i]
                 debt_at = lambda d, i: (db[i] or 0) / 1e6 if i < len(db) else 0
             # Net framework (Strategy, Jul-2026): net mNAV = fully-diluted mcap /
@@ -1541,19 +1597,21 @@ _ASST_ATM_COMM = re.compile(r"commission of up to ([\d.]+)\s*%", re.I)
 
 
 def _asst_capital_events(text):
-    """Programme-level actions from a Strive 8-K that reports no week."""
+    """Programme-level actions from a Strive 8-K that reports no week: a preferred
+    offering it closed (SATS, 2026-10-20), or an ATM it set up."""
+    out = _offering_closed(text)
     if "Sales Agreement" not in text or "Item 1.01" not in text:
-        return []
+        return out
     m = _ASST_ATM_SIZE.search(text)
     if not m:
-        return []
+        return out
     amt = int(m.group(1).replace(",", "")) / 1e6
     pre = text[max(0, m.start() - 800):m.start()]      # which series it covers
     sec = ("SATS" if "SATS Stock" in pre else "SATA" if "SATA Stock" in pre else
            "Class A" if "Class A" in pre else "equity")
     c = _ASST_ATM_COMM.search(text)
-    return [f"Established ${amt:,.0f}M {sec} ATM"
-            + (f" ({c.group(1)}% commission)" if c else "")]
+    return out + [f"Established ${amt:,.0f}M {sec} ATM"
+                  + (f" ({c.group(1)}% commission)" if c else "")]
 # "273,493,909 traditional warrants to purchase 13,674,703 shares of Class A common
 # stock were exercised for expected gross proceeds of $369.2 million". The weekly
 # table cannot source this: in the week the programme closes it reports only the
@@ -1616,7 +1674,9 @@ def fetch_sata_notional(data):
             txt = _edgar_text(url)
             got = _asst_sata_counts(txt)
         except Exception:
-            got = []
+            txt, got = "", []
+        if not scanned:                      # the newest filing
+            _check_sats_count(txt)
         scanned += 1
         if got and all(d in known for d, _ in got):
             break                            # newest-first: everything older is held
@@ -2086,6 +2146,7 @@ def fetch_holdings(data, max_points=60):
                 "holdings": holds,
             }
             _FILED_HOLD[tk] = (items[-1][0].isoformat(), holds[-1])
+            _FILED_DATES[tk] = [d.isoformat() for d, _ in items]
             cur = holds[-1]
 
         data["companies"][tk]["holdings"] = cur
@@ -2104,7 +2165,7 @@ def fetch_holdings(data, max_points=60):
             log(f"[keep] weekly {k}: EDGAR rebuild failed — keeping the last series")
         weekly.update(kept)
         data["weekly"] = weekly
-    if acts:    # merge with previously stored actions so old weeks never drop off
+    if acts:
         # link each action to its source filing: the earliest 8-K filed on or after
         # the period it covers is the one that disclosed it. MSTR's already carry
         # theirs: a split week's first half ends mid-week, and another 8-K (a STRC
@@ -2113,15 +2174,24 @@ def fetch_holdings(data, max_points=60):
             cand = sorted(x for x in _FILINGS.get(a["co"], []) if x[0] >= a["d"])
             if cand and not a.get("url"):
                 a["filed"], a["url"] = cand[0]
-        old = {(a["d"], a["co"]): a for a in (data.get("actions") or [])}
-        for a in acts:
-            prev = old.get((a["d"], a["co"])) or {}
-            if not a.get("url") and prev.get("url"):     # keep a link we already had
-                a["filed"], a["url"] = prev.get("filed"), prev["url"]
-            old[(a["d"], a["co"])] = a
-        data["actions"] = sorted(old.values(), key=lambda a: a["d"], reverse=True)[:120]
+        _merge_actions(data, acts)
         linked = sum(1 for a in data["actions"] if a.get("url"))
         log(f"[actions] {len(data['actions'])} entries, {linked} linked to a filing")
+
+
+ACTIONS_KEPT = 160      # the log's newest entries, across all three issuers
+
+
+def _merge_actions(data, acts):
+    """Fold this run's actions into the stored log by (date, issuer), keeping a link a
+    stored entry already had, so weeks this run didn't re-read stay listed."""
+    old = {(a["d"], a["co"]): a for a in (data.get("actions") or [])}
+    for a in acts:
+        prev = old.get((a["d"], a["co"])) or {}
+        if not a.get("url") and prev.get("url"):
+            a["filed"], a["url"] = prev.get("filed"), prev["url"]
+        old[(a["d"], a["co"])] = a
+    data["actions"] = sorted(old.values(), key=lambda a: a["d"], reverse=True)[:ACTIONS_KEPT]
 
 
 # --------------------------------------------------------------------------- #
@@ -2272,29 +2342,40 @@ def fetch_short_interest(data):
                     f"{pct[-1]}% of float")
         except Exception as e:
             log(f"[skip] short interest {sym}: {e} — keeping existing values")
-        pref = co.get("prefTicker")
-        if pref:
+        p2 = co.get("pref2") or {}
+        for key, sym, hist, stated in (
+                ("prefShortInterest", co.get("prefTicker"), co.get("prefHistory"), co.get("prefStated")),
+                ("pref2ShortInterest", p2.get("ticker"), co.get("pref2History"), p2.get("stated"))):
+            if not sym:
+                continue
             try:
-                sih = _nasdaq_si(pref)
+                sih = _pref_short_interest(sym, hist or {}, stated or 100)
                 if sih:
-                    # % of float: preferred float = notional outstanding / stated amount
-                    # ($100 for STRC and SATA, $10 for CHAD)
-                    ph = co.get("prefHistory") or {}
-                    stated = co.get("prefStated") or 100
-                    steps = [(d, n) for d, n in zip(ph.get("iso") or [], ph.get("notional") or []) if n]
-                    pct = []
-                    for iso, s in zip(sih["iso"], sih["si"]):
-                        ns = [n for d2, n in steps if d2 <= iso]
-                        pct.append(round(s / (ns[-1] * 1e6 / stated) * 100, 2) if ns else None)
-                    sih["pctFloat"] = pct
-                    if pref in _VOL_HIST:
-                        sih["dtc10"] = _dtc10(sih, _VOL_HIST[pref])
-                        sih["dtcLive"] = _dtc_live(sih, _VOL_HIST[pref])
-                    co["prefShortInterest"] = sih
-                    log(f"[short interest] {pref}: {len(sih['dtc'])} pts, latest {sih['si'][-1]:,} sh "
-                        f"({pct[-1]}% of float)")
+                    co[key] = sih
             except Exception as e:
-                log(f"[skip] short interest {pref}: {e} — keeping existing values")
+                log(f"[skip] short interest {sym}: {e} — keeping existing values")
+
+
+def _pref_short_interest(sym, hist, stated):
+    """Nasdaq short interest for one preferred series, or None before its first figure.
+
+    % of float: the float is notional outstanding ÷ stated amount ($100; CHAD $10) on
+    each settlement date, from the series' own notional history."""
+    sih = _nasdaq_si(sym)
+    if not sih:
+        return None
+    steps = [(d, n) for d, n in zip(hist.get("iso") or [], hist.get("notional") or []) if n]
+    pct = []
+    for iso, s in zip(sih["iso"], sih["si"]):
+        ns = [n for d2, n in steps if d2 <= iso]
+        pct.append(round(s / (ns[-1] * 1e6 / stated) * 100, 2) if ns else None)
+    sih["pctFloat"] = pct
+    if sym in _VOL_HIST:
+        sih["dtc10"] = _dtc10(sih, _VOL_HIST[sym])
+        sih["dtcLive"] = _dtc_live(sih, _VOL_HIST[sym])
+    log(f"[short interest] {sym}: {len(sih['dtc'])} pts, latest {sih['si'][-1]:,} sh "
+        f"({pct[-1]}% of float)")
+    return sih
 
 
 # live KPI snapshot from strategy.com, shared with the history builder
@@ -2892,9 +2973,10 @@ def fetch_lending(data):
 DFDV_API = "https://defidevcorp.com/api/dashboard/"
 
 # CHAD terms the API doesn't serve (DFDV's own CHAD page hard-codes them). The rate
-# is variable and declared monthly by 8-K, so each new rate needs a row here; a month
-# without one is logged [stale]. $10 stated and 13.00% at the Sep 8 2026 IPO (424B5
-# dated 2026-09-03); 14.00% for periods from Nov 1 2026 (8-K filed 2026-10-15).
+# is variable and declared monthly by 8-K; fetch_dfdv_filings reads those, and this
+# table is the fallback when EDGAR can't be read. A month neither covers is logged
+# [stale]. $10 stated and 13.00% at the Sep 8 2026 IPO (424B5 dated 2026-09-03);
+# 14.00% for periods from Nov 1 2026 (8-K filed 2026-10-15).
 # The notional steps date the IPO close (1,375,000 sh) and the over-allotment
 # (206,250 sh, press release 2026-09-21); /chad/notional carries the latest.
 CHAD = {"stated": 10.0,
@@ -2904,6 +2986,11 @@ CHAD = {"stated": 10.0,
 # Not in the API either: the Q2 2026 shareholder letter puts operating costs at about
 # $17M a year, before roughly $10M of interest. The calculator's default for DFDV.
 DFDV_OPEX_M = 17.0
+
+# DFDV redefined its adjusted share count on 2026-04-06: nav/sps-daily puts it at about
+# 0.86x basic before that date and 1.04x after. Only the later definition is the
+# fully-diluted count Net mNAV uses, so earlier history scales basic by today's ratio.
+DFDV_ADJ_FROM = "2026-04-06"
 
 
 def _dfdv(route, timeout=30, tries=2):
@@ -2968,6 +3055,16 @@ def _dfdv_balance_sheet(co, data):
     nav = _dfdv("nav")
     if nav and nav.get("total_cash_including_eloc") is not None:
         co["cash"] = round(float(nav["total_cash_including_eloc"]) / 1e6, 2)
+    # DFDV's adjusted count (basic plus RSUs, vested options, and in-the-money warrants
+    # and converts) is the fully-diluted count Net mNAV divides by, as strategy.com's
+    # is for MSTR. Basic shares read DFDV's net mNAV about 5% low.
+    adj = float((nav or {}).get("adjusted_shares") or 0) / 1e6
+    if adj:
+        if co.get("sharesOutstanding") and 0.9 <= adj / co["sharesOutstanding"] <= 2:
+            co["netDilutedShares"] = round(adj, 2)
+        else:
+            log(f"[skip] DFDV adjusted shares {adj:,.2f}M against {co.get('sharesOutstanding')}M "
+                f"basic — keeping {co.get('netDilutedShares')}")
     debt, sol_px = _dfdv("debt"), data.get("solPriceUsd")
     if debt and sol_px:
         sched = []
@@ -2991,9 +3088,11 @@ def _dfdv_chad(co):
     """CHAD's notional, rate, quote and daily closes, plus annual obligations.
     Returns the notional steps, which the mNAV history needs."""
     today = datetime.date.today().isoformat()
-    rate = _step(CHAD["rates"], today)
-    if CHAD["rates"][-1][0][:7] < today[:7]:
-        log(f"[stale] CHAD rate table ends {CHAD['rates'][-1][0]} — add this month's declared rate")
+    rates = _chad_rates()
+    rate = rates[-1][1]          # the latest declared, whether or not it has started
+    if rates[-1][0][:7] < today[:7]:
+        log(f"[stale] CHAD rate steps end {rates[-1][0]} — no 8-K has declared this month's "
+            f"rate; add it to CHAD['rates'] if DFDV announced it elsewhere")
     steps = list(CHAD["notional"])
     cn = _dfdv("chad/notional")
     if cn and cn.get("notional_usd"):
@@ -3003,12 +3102,12 @@ def _dfdv_chad(co):
     notional = steps[-1][1]
     co["prefNotional"] = round(notional, 2)
     co["prefBreakdown"] = [["CHAD", PREF_LABEL["CHAD"].format(r="%g" % rate), round(notional, 2), rate]]
-    # A declared-but-not-yet-effective rate. Everything above is deliberately on
-    # today's rate — obligations, hurdle and duration all describe the stack as it
-    # stands — but the calculator runs forward months, so seeding it from today
-    # understates the cost from the day the new rate starts. CHAD was raised
-    # 13.00% -> 14.00% for periods from 2026-11-01 (8-K filed 2026-10-15).
-    nxt = next(((d, r) for d, r in CHAD["rates"] if d > today), None)
+    # Everything here is on the latest declared rate, so obligations, hurdle and
+    # duration carry a new rate from the refresh after its 8-K, not from the day it
+    # starts. prefRateNext names a declared rate that hasn't started yet, so the
+    # calculator can say when it does. CHAD was raised 13.00% -> 14.00% for periods
+    # from 2026-11-01 (8-K filed 2026-10-15).
+    nxt = next(((d, r) for d, r in rates if d > today), None)
     if nxt:
         co["prefRateNext"] = {"rate": nxt[1], "from": nxt[0]}
     else:
@@ -3066,6 +3165,19 @@ def _dfdv_holdings(co, data):
     day_before = lambda iso: (datetime.date.fromisoformat(iso) - datetime.timedelta(days=1)).isoformat()
     sol_hist = sorted((day_before(r["date"]), float(r["sol_price"])) for r in h
                       if _iso(r.get("date")) and r.get("sol_price"))
+    # A filed week wins on its own date; the dashboard supplies any later day. With
+    # the dashboard as new as the filing or older, holdings are the filed figure.
+    filed = sorted((_DFDV_FILED.get("sol") or {}).items())
+    if filed:
+        fd, fv = filed[-1]
+        api = dict(held)
+        if fd in api and api[fd] != fv:
+            log(f"[drift] DFDV SOL on {fd}: dashboard {api[fd]:,} vs 8-K {fv:,} — using the 8-K")
+        if not held or fd >= held[-1][0]:
+            co["holdings"] = fv
+            if data.get("solCirculating"):
+                co["pctSupply"] = round(fv / data["solCirculating"] * 100, 4)
+            held = [x for x in held if x[0] < fd] + [(fd, fv)]
     if not held:
         return sol_hist
     i = len(held) - 1
@@ -3079,11 +3191,19 @@ def _dfdv_holdings(co, data):
     # from Jan 1, like the EDGAR series: each week's last reading, the change since
     # the week before (the first week's since year-end). DFDV publishes a daily SOL
     # balance, so a week's change includes staking rewards and loans, not only buys.
+    # A week with a filed table ends on its filed Friday instead, as MSTR's and ASST's
+    # end on their 8-K weeks.
     weeks = {}                                     # Monday -> the week's last reading
+
+    def monday(day):
+        dt = datetime.date.fromisoformat(day)
+        return dt - datetime.timedelta(days=dt.weekday())
     for day, v in held:
         if day > f"{year - 1}-12-31":
-            dt = datetime.date.fromisoformat(day)
-            weeks[dt - datetime.timedelta(days=dt.weekday())] = (day, v)
+            weeks[monday(day)] = (day, v)
+    for day, v in filed:
+        if day > f"{year - 1}-12-31":
+            weeks[monday(day)] = (day, v)
     jan1 = datetime.date(year, 1, 1)
     wk = {"dates": [], "ranges": [], "acquired": [], "holdings": []}
     prev = ye or 0
@@ -3101,11 +3221,16 @@ def _dfdv_holdings(co, data):
 
 def _dfdv_per_share(co):
     """SOL per share (DFDV's headline, basic shares) and its growth since Jan 1, the
-    realized staking yield, and the share count per date for short interest."""
+    realized staking yield, and the share count per date for short interest.
+    Returns adjusted ÷ basic shares per date since DFDV_ADJ_FROM, for net mNAV."""
     year = datetime.date.today().year
     sps = _dfdv("nav/sps-daily", timeout=40)
     pts = sorted((r["date"], float(r["headline_sps"])) for r in sps or []
                  if _iso(r.get("date")) and r.get("headline_sps"))
+    # both are SOL ÷ shares, so their ratio is adjusted shares ÷ basic shares
+    adj_ratio = sorted((r["date"], float(r["headline_sps"]) / float(r["adjusted_sps"]))
+                       for r in sps or [] if _iso(r.get("date")) and r["date"] >= DFDV_ADJ_FROM
+                       and r.get("headline_sps") and r.get("adjusted_sps"))
     if pts:
         idx = sorted(set(range(0, len(pts), 7)) | {len(pts) - 1})
         co["bpsHistory"] = {"dates": [_iso_lbl(pts[i][0], "%b '%y") for i in idx],
@@ -3128,6 +3253,7 @@ def _dfdv_per_share(co):
     if shs:
         _SHARES_HIST["DFDV"] = sorted((r["date"], float(r["shares_outstanding"]) / 1e6)
                                       for r in shs if _iso(r.get("date")) and r.get("shares_outstanding"))
+    return adj_ratio
 
 
 def _dfdv_cost(co):
@@ -3145,10 +3271,11 @@ def _dfdv_cost(co):
         co["costBasisAsOf"] = max(r[0] for r in rows)
 
 
-def _dfdv_closes(co, data, steps, sol_hist):
+def _dfdv_closes(co, data, steps, sol_hist, adj_ratio):
     """Nasdaq daily closes: stockHistory's calendar axis, beta to SOL, relative volume,
     and the price beside DFDV's own EV series. That series leaves CHAD out of EV; it
-    goes back in here, as preferred does for MSTR and ASST."""
+    goes back in here, as preferred does for MSTR and ASST. Net mNAV is rebuilt from
+    the same series, since DFDV publishes no net history."""
     closes = _nasdaq_closes("DFDV")
     if not closes:
         return
@@ -3181,18 +3308,147 @@ def _dfdv_closes(co, data, steps, sol_hist):
         co["rvol"] = rv
     mn = _dfdv("nav/mnav-enterprise", timeout=40)
     cl = [(d, c) for d, c, _v in closes]
-    dts, px, ev = [], [], []
+    basic, ratio_now = _SHARES_HIST.get("DFDV") or [], (adj_ratio[-1][1] if adj_ratio else None)
+    dts, px, ev, net = [], [], [], []
     for r in mn or []:
         day = _iso(r.get("date"))
         last = _step(cl, day) if day else None
         if not day or day < MNAV_START["DFDV"] or last is None or not r.get("solNav"):
             continue
+        ev_m, sol_m, chad = float(r["enterpriseValue"]) / 1e6, float(r["solNav"]) / 1e6, _step(steps, day) or 0
         dts.append(_iso_lbl(day, "%b %-d"))
         px.append(round(last, 2))
-        ev.append(round((float(r["enterpriseValue"]) / 1e6 + (_step(steps, day) or 0))
-                        / (float(r["solNav"]) / 1e6), 3))
+        ev.append(round((ev_m + chad) / sol_m, 3))
+        # DFDV's EV is basic market cap plus net debt, so net debt is EV less the close
+        # times basic shares, and the net reserve is SOL less that and CHAD. Its EV
+        # prices the stock at its own time of day, so this is good to about ±5%. Blank
+        # where nothing is left for common (Jun 2 – Aug 18 2026) and above 5x, where
+        # the multiple only spikes toward a zero crossing.
+        sh = _step(basic, day)
+        ratio = (_step(adj_ratio, day) if day >= DFDV_ADJ_FROM else None) or ratio_now
+        n = None
+        if sh and ratio:
+            net_res = sol_m - (ev_m - last * sh) - chad
+            n = last * sh * ratio / net_res if net_res > 0 else None
+        net.append(round(n, 3) if n is not None and n <= 5 else None)
     if ev:
         co["mnavHistory"] = {"dates": dts, "px": px, "mnav": ev}
+        if any(v is not None for v in net):
+            co["mnavHistory"]["net"] = net
+        log(f"DFDV mNAV history: {len(ev)} pts, latest EV {ev[-1]}x / net {net[-1]}x, "
+            f"{sum(v is None for v in net)} blank")
+
+
+# DeFi Development's own 8-Ks. It files most Mondays, and since 2026-09-14 each weekly
+# one carries a "SOL and SOL equivalents" table for the last two Fridays. Others state
+# CHAD's rate, its offerings and its ATM. They anchor what they report; the dashboard
+# API covers the rest (shares, cash, debt, CHAD notional), and the days after a filing.
+DFDV_CIK = "0001805526"
+_D = r"([A-Z][a-z]+ \d{1,2}, \d{4})"
+_DFDV_SOL = re.compile(_D + r" " + _D + r" (?:% Change )?SOL and SOL equivalents ([\d,]+) ([\d,]+)")
+# "( CHAD Stock ) from 13.00% to 14.00%, effective for periods commencing on or after
+# November 1, 2026": _edgar_text turns the curly quotes into spaces
+_RATE_CHANGE = re.compile(r"\(\s*(?:the\s+)?([A-Z]{3,5})(?: Stock)?\s*\)[^.%]{0,60}?from ([\d.]+)% to ([\d.]+)%,?"
+                          r" effective (?:for (?:monthly )?periods commencing on or after )?" + _D)
+# a monthly declaration: "for the period from November 1, 2026 through November 30, 2026
+# ... which represents a per annum dividend rate of 14.00%"
+_RATE_DECLARED = re.compile(r"period from " + _D + r" (?:through|to) " + _D
+                            + r"[^%]{0,300}?per annum dividend rate of ([\d.]+)%")
+_SALES_AGREEMENT = re.compile(r"sales agreement .{0,400}?up to ([\d,]+) shares \(the Shares \) of the"
+                              r" Company.{0,200}?\(\s*(?:the\s+)?([A-Z]{3,5}) Stock\s*\)", re.I)
+_OVERALLOT = re.compile(r"closing of .{0,120}?exercise of its over-allotment option", re.I)
+# Readings from DFDV's 8-Ks this run: {"sol": {iso: SOL}, "rates": {iso: rate}}
+_DFDV_FILED = {}
+
+
+def _offering_closed(text):
+    """'Closed <series> offering: N shares at $P' from an 8-K reporting a closed
+    underwritten preferred offering (Strive's SATS, DFDV's CHAD), else []."""
+    m = re.search(r"underwritten offering \(the Offering \).{0,160}? of ([\d,]+) shares \(the Shares \)"
+                  r" of the Company.{0,200}?\(the ([A-Z]{3,5}) Stock \)"
+                  r"(?: at a public offering price of \$\s?([\d.]+))?", text)
+    # closed, not just priced: the pricing 8-K says when the Offering "is expected to close"
+    if not m or not re.search(r"At the closing of the Offering|net proceeds from the Offering were", text):
+        return []
+    n, ser, px = int(m.group(1).replace(",", "")), m.group(2), m.group(3)
+    return [f"Closed {ser} offering: {n:,} shares" + (f" at ${float(px):,.2f}" if px else "")]
+
+
+def _dfdv_filing(text, items_field):
+    """(actions, period end or None, SOL there, {(series, from, to): (effective, rate)},
+    {month start: rate}) from one DFDV 8-K."""
+    acts, end, sol, changes, declared = [], None, None, {}, {}
+    m = _DFDV_SOL.search(text)
+    if m:
+        a, b = (int(x.replace(",", "")) for x in m.group(3, 4))
+        end, sol = _pdate(m.group(2)).isoformat(), b
+        acts.append(f"SOL & equivalents {'+' if b >= a else '−'}{abs(b - a):,} → {b:,}")
+    for m in _RATE_CHANGE.finditer(text):
+        changes[(m.group(1), m.group(2), m.group(3))] = (_pdate(m.group(4)).isoformat(), float(m.group(3)))
+    for m in _RATE_DECLARED.finditer(text):
+        declared[_pdate(m.group(1)).isoformat()] = float(m.group(3))
+    acts += _offering_closed(text)
+    if "1.01" in items_field and (sa := _SALES_AGREEMENT.search(text)):
+        acts.append(f"Established {sa.group(2)} ATM: up to {int(sa.group(1).replace(',', '')):,} shares")
+    if _OVERALLOT.search(text) and "Series C" in text:
+        acts.append("Closed the CHAD offering's over-allotment option")
+    return acts, end, sol, changes, declared
+
+
+def fetch_dfdv_filings(data):
+    """DFDV's 8-Ks since Jan 1: the filed SOL weeks and CHAD rate steps that fetch_dfdv
+    anchors on, and their entries in the actions log, each linked to its 8-K."""
+    try:
+        r = _edgar_json(f"https://data.sec.gov/submissions/CIK{DFDV_CIK}.json")["filings"]["recent"]
+    except Exception as e:
+        log(f"[skip] EDGAR submissions DFDV: {e} — DFDV keeps its dashboard figures")
+        return
+    year0 = f"{datetime.date.today().year}-01-01"
+    acts, sol, rates, seen = {}, {}, {}, set()
+    for i in reversed(range(len(r["form"]))):      # oldest first, so a repeat names its first filing
+        filed = r["filingDate"][i]
+        if r["form"][i] != "8-K" or filed < year0:
+            continue
+        url = (f"https://www.sec.gov/Archives/edgar/data/{int(DFDV_CIK)}/"
+               f"{r['accessionNumber'][i].replace('-', '')}/{r['primaryDocument'][i]}")
+        try:
+            text = _edgar_text(url)
+        except Exception as e:
+            log(f"[skip] DFDV 8-K {filed}: {e}")
+            continue
+        _READ_8K["DFDV"] = max(_READ_8K.get("DFDV", ""), filed)
+        items, end, held, changes, declared = _dfdv_filing(text, r["items"][i] or "")
+        if end:
+            sol[end] = held
+        rates.update(declared)
+        for (ser, a, b), (eff, rate) in changes.items():
+            if ser == "CHAD" and (ser, a, b) not in seen:      # the press releases repeat it
+                seen.add((ser, a, b))
+                rates.setdefault(eff, rate)
+                items.append(f"{'Raised' if float(b) > float(a) else 'Cut'} CHAD dividend rate "
+                             f"{a}% → {b}% from {_iso_lbl(eff, '%b %-d')}")
+        # The log keys entries by date and issuer, and a filing can land on the day a
+        # filed week ends (the CHAD ATM, Fri 2026-09-11): one entry, led by the week.
+        d = end or filed
+        if items and d in acts:
+            prev = acts[d]
+            if end:
+                acts[d] = {"d": d, "co": "DFDV", "items": items + prev["items"], "filed": filed, "url": url}
+            else:
+                prev["items"] += items
+        elif items:
+            acts[d] = {"d": d, "co": "DFDV", "items": items, "filed": filed, "url": url}
+        time.sleep(0.12)
+    _DFDV_FILED.update({"sol": sol, "rates": rates})
+    if acts:
+        _merge_actions(data, list(acts.values()))
+    log(f"[DFDV 8-K] {len(acts)} entries; SOL weeks {min(sol, default='-')} → {max(sol, default='-')}; "
+        f"CHAD rate steps {sorted(rates.items())}")
+
+
+def _chad_rates():
+    """CHAD's rate steps: the hand table, with every step DFDV's 8-Ks state winning on its date."""
+    return sorted(dict(CHAD["rates"] + list((_DFDV_FILED.get("rates") or {}).items())).items())
 
 
 def fetch_dfdv(data):
@@ -3206,9 +3462,9 @@ def fetch_dfdv(data):
     _guard("DFDV balance sheet", _dfdv_balance_sheet, co, data)
     steps = _guard("CHAD", _dfdv_chad, co) or list(CHAD["notional"])
     sol_hist = _guard("DFDV holdings", _dfdv_holdings, co, data) or []
-    _guard("DFDV per share", _dfdv_per_share, co)
+    adj_ratio = _guard("DFDV per share", _dfdv_per_share, co) or []
     _guard("DFDV cost basis", _dfdv_cost, co)
-    _guard("DFDV closes", _dfdv_closes, co, data, steps, sol_hist)
+    _guard("DFDV closes", _dfdv_closes, co, data, steps, sol_hist, adj_ratio)
     if co.get("holdings") and co.get("stockPrice") and co.get("prefBreakdown"):
         log(f"DFDV via its dashboard: {co['holdings']:,} SOL, ${co['stockPrice']} "
             f"({co.get('dayChangePct', 0):+.2f}%), debt ${co.get('seniorDebt', 0):,.1f}M, "
@@ -3230,18 +3486,20 @@ def apply_sats_proceeds(data):
     co = data["companies"].get("ASST")
     if not co or not any(r[0] == "SATS" for r in (co.get("prefBreakdown") or [])):
         return
-    filed_through = (_FILED_HOLD.get("ASST") or ("", 0))[0]
-    if filed_through >= SATS["closed"]:
-        log(f"[SATS] filings now cover {filed_through} — using the reported cash")
-        return
-    co["cash"] = round((co.get("cash") or 0) + SATS["netProceedsM"])
+    # the first filed balance from the close on reports the proceeds itself
+    reported = min((d for d in _FILED_DATES.get("ASST", []) if d >= SATS["closed"]), default=None)
+    if reported:
+        log(f"[SATS] filings report the cash from {reported}")
+    else:
+        co["cash"] = round((co.get("cash") or 0) + SATS["netProceedsM"])
+        log(f"[SATS] +${SATS['netProceedsM']:,.0f}M net proceeds to cash (no filing since the close)")
+    # The history rows carry the claim from the close (fetch_strategytracker's pref_at),
+    # so the cash goes in beside it until that filing: without it Oct 20-22 2026 read
+    # 2.9x, the claim in and the $608M that came in against it out.
     for m in _MNAV_INPUTS.get("ASST") or []:
-        if m["d"] >= SATS["closed"]:
-            m["pref"] += SATS["shares"] * SATS["stated"] / 1e6
+        if m["d"] >= SATS["closed"] and (reported is None or m["d"] < reported):
             m["cash"] += SATS["netProceedsM"]
             m["dirty"] = True
-    log(f"[SATS] +${SATS['netProceedsM']:,.0f}M net proceeds to cash "
-        f"(filings only run to {filed_through or 'n/a'})")
 
 
 def rebase_mnav_holdings(data):
@@ -3298,7 +3556,7 @@ def record_filing_watermark(data):
     saying so. The frontend compares these two dates and shows a notice when
     EDGAR is ahead, instead of presenting last week's balance sheet as current.
     """
-    for tk, cik in CIK.items():
+    for tk, cik in {**CIK, "DFDV": DFDV_CIK}.items():
         co = data["companies"].get(tk)
         if not co:
             continue
@@ -3354,6 +3612,7 @@ def main():
     fetch_strategytracker(data)       # PRIMARY: current metrics + real history (both names)
     fetch_holdings(data)             # SEC EDGAR: weekly accumulation (8-K period ranges)
     fetch_strategy_kpi(data)          # re-apply: holdings sets cash from the 8-K balances; live wins
+    fetch_dfdv_filings(data)          # SEC EDGAR: DFDV's filed SOL weeks, CHAD rate, offerings
     fetch_dfdv(data)                  # DFDV dashboard API: the SOL treasury and CHAD
     fetch_short_interest(data)        # Nasdaq: days to cover (semi-monthly)
     fetch_borrow_fees(data)           # ChartExchange/IBKR: annualized cost to short
