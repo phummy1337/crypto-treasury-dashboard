@@ -2541,7 +2541,7 @@ function creditCardContent(){
             : funded ? `but not covered after debt by month ${cfg.months}` : ""].filter(Boolean),
     stats:[["PREFERRED COVERAGE", fmt(r.coverEnd,2)+"x", r.coverEnd!=null && r.coverEnd<1 ? "#ff7a7a" : "#34d399", "after debt · today "+fmt(cover0,2)+"x"],
            ["BREAK-EVEN "+u, bePx(be), "#f5f6f7",
-            cfg.prefMo>0 ? "with the raise · without: "+bePx(be0)
+            cfg.prefMo>0 ? (bePx(be0) === bePx(be) ? "with or without the raise" : "with raise · without: "+bePx(be0))
               : be ? pctFrom(be, s.spot)+" from today"
               : be===0 ? (cfg.reserveMo>0 ? "99.99% down still funds it" : "cash covers the horizon") : "up to 20× today"]],
     rows:[
@@ -2579,7 +2579,11 @@ async function shareCard(){
     x.fillRect(bx,70,215,96); x.strokeRect(bx,70,215,96);
     x.font=F("700 12px"); x.fillStyle="#9aa0a6"; x.fillText(label, bx+16, 96);
     x.font=F("italic 700 30px"); x.fillStyle=valColor; x.fillText(val, bx+16, 133);
-    x.font=F("400 14px"); x.fillStyle="#9aa0a6"; x.fillText(sub, bx+16, 155);
+    // the sub-line steps down from 14px until it clears the box's right edge, so a long
+    // one (a raise's "without:" figure, a BTC price) can't run past it
+    let px = 14; x.font=F("400 14px");
+    while(x.measureText(sub).width > 215 - 32 && px > 10){ px -= 0.5; x.font=F(`400 ${px}px`); }
+    x.fillStyle="#9aa0a6"; x.fillText(sub, bx+16, 155);
   };
   card.stats.forEach((st, i) => statBox(660 + i*235, ...st));
   // assumptions
