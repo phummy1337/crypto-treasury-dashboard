@@ -1097,7 +1097,7 @@ const METRIC_DEFS = {
     m:"The claims that rank ahead of both preferred and common if things go wrong."},
   "Preferred Equity Notional": {c:"Stated value of every preferred series — $100 per share (EUR-denominated STRE at its USD stated amount), $10 per CHAD share.",
     m:"The full preferred claim sitting senior to common — the 'digital credit' layer each company funds itself with."},
-  "Crypto Duration (gross)": {c:"Crypto reserve (holdings × live BTC or SOL price) ÷ annual obligations, in years — how long the treasury alone could fund every dividend and coupon at today's marks.",
+  "Crypto Duration (gross)": {c:"Crypto reserve (holdings × live BTC or SOL price) ÷ annual obligations, in years — how long the treasury alone could fund every dividend and coupon at today's marks. DFDV's SOL includes SOL it borrowed in kind (its SOL loans, carried in senior debt), which the net row sets aside with the rest of the debt.",
     m:"The crypto leg of staying power. It moves with the asset price: a drawdown shortens it exactly when the obligations feel heaviest. Add USD Duration for the Total Duration below."},
   "Crypto Duration (net)": {c:"(Crypto reserve − senior debt at face value) ÷ annual obligations, in years. Every convert and loan is set aside in full, in the money or not, and the coupons still count, since the debt is owed until it's repaid.",
     m:"The crypto's staying power with enough held back to repay the lenders. Where debt is a large share of the treasury this is far shorter than the gross figure, and it reaches zero once the crypto only just covers the debt; below that it turns negative."},
