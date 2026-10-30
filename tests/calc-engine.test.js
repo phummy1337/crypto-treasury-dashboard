@@ -4,10 +4,11 @@
 // from data.json on 2026-10-25 so a data refresh can't move them. The goldens are what
 // the engine returns for them: an edit that shifts one has changed what the page shows,
 // and its commit should say so. A common's endMnav is that day's EV mNAV to the input's
-// 0.05 step.
+// 0.05 step. DFDV and CHAD hold the 12 months of CHAD dividends the page reserves for
+// both buttons (reserveMo).
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { crashMonth, pathPrice, simulate, simulateCredit, breakEven } = require("../calc-engine.js");
+const { crashMonth, pathPrice, reserveFor, simulate, simulateCredit, breakEven } = require("../calc-engine.js");
 
 const FIXTURES = {
   MSTR: {
@@ -25,8 +26,9 @@ const FIXTURES = {
   DFDV: {
     s: {px:3.78, sharesM:32.62, pref:15.81, spot:101.4, hold:2590266, cash:9.98, owed:562000, debtUsd:149.0532, intUsd:7.5087, intUnits:33725,
         otherNotional:0, otherDivs:0},
-    cfg: {target:101.4, months:12, prefMo:0, commonMo:0, rate:13, fundMix:0, endMnav:1.3, runway:0, atmFloor:1, stake:5.07, opex:17},
-    golden: {implied:3.603919409501438, endHold:2724687.5748565323, endSharesM:38.10249356729776, assetSold:0, pausedMo:0, broke:null},
+    cfg: {target:101.4, months:12, prefMo:0, commonMo:0, rate:13, fundMix:0, endMnav:1.3, runway:0, atmFloor:1, stake:5.07, opex:17, reserveMo:12},
+    golden: {implied:3.6056353542145665, endHold:2724687.5748565323, endSharesM:38.65438471327296, assetSold:0, pausedMo:0, broke:null,
+             endReserve:2.0553, reserveShort:null},
   },
   STRC: {
     s: {spot:80472, hold:848517, cash:5281, owed:0, debtUsd:6714, intUsd:34.5953, intUnits:0, stated:100, quote:99.36,
@@ -63,8 +65,9 @@ const FIXTURES = {
       {note:"DeFi Loan", principal:23, coupon:4, units:0, repay:null, convert:null},
       {note:"SOL Loan - Evergreen", principal:49.382, coupon:5, units:487000, repay:null, convert:null},
     ]},
-    cfg: {target:101.4, months:60, prefMo:0, rate:13, issuePx:9.9, reqYield:13.1313, stake:5.07, opex:17},
-    golden: {unpaid:0, firstGap:null, cashOut:4, firstSale:4, sold:2530182.5238330057, repaid:126.052, coverEnd:-1.6300013586043436, breakEven:73.34536690751364},
+    cfg: {target:101.4, months:60, prefMo:0, rate:13, issuePx:9.9, reqYield:13.1313, stake:5.07, opex:17, reserveMo:12},
+    golden: {unpaid:0, firstGap:null, cashOut:4, firstSale:4, sold:2550451.7546022367, repaid:126.052, coverEnd:-1.6646207410803922, breakEven:73.26518995988579,
+             endReserve:2.0553, reserveShort:null},
   },
 };
 
@@ -285,4 +288,96 @@ test("a common underwater in a crash recovers with the asset; one still under at
   const down = simulate(s, {...cfg, target:30});
   assert.equal(down.broke.atEnd, true);
   near(down.implied, 0.01, "floor");
+});
+
+// CHAD's dividend reserve: months of the series' dividends that DFDV holds apart from its cash
+test("the reserve is reserveMo months of the selected series' dividends at the rate input", () => {
+  // $15.81M of CHAD at 14% pays $2.2134M a year: 12 months of it
+  near(reserveFor(15.81, {reserveMo:12, rate:14}), 2.2134, "CHAD's reserve");
+  assert.equal(reserveFor(15.81, {rate:14}), 0);                   // every other button
+});
+
+test("the reserve is carved out of today's cash and held, and today's multiple doesn't move", () => {
+  // $20M of preferred at 10% pays $2M a year, so the reserve is $2M of the $5M of cash. The
+  // other $3M pays 12 months of $1/6M and leaves $1M. Cash and the reserve offset claims
+  // alike, so claims end at $20M of debt + $20M of preferred − $1M − $2M = $37M with or
+  // without it, and at 1.5x the price is (150 − 37)/10 = $11.30 either way
+  const s = tinyCo({pref:20, cash:5}), cfg = flatCo({months:12, rate:10});
+  const held = simulate(s, {...cfg, reserveMo:12}), none = simulate(s, cfg);
+  assert.ok(Object.is(held.mnav0, none.mnav0), "today's multiple");
+  near(held.endReserve, 2, "reserve held");
+  assert.equal(held.reserveShort, null);
+  near(held.endOpenCash, 1, "cash left outside it");
+  near(held.implied, 11.3, "implied");
+  near(none.implied, 11.3, "implied without it");
+  // $1M of cash against a $2M reserve: the reserve holds all of it, flagged short from the
+  // start, and no coin is sold to fill the rest. The common pays the month's $1/6M
+  // dividend in stock; from CHAD's seat coin pays it, and only it.
+  const short = simulate(tinyCo({pref:20, cash:1}), flatCo({rate:10, reserveMo:12}));
+  assert.equal(short.reserveShort, 0);
+  near(short.endReserve, 1, "all of today's cash");
+  near(short.assetSold, 0, "coin sold");
+  const seat = simulateCredit(tiny({cash:1, series:20}), flat({months:1, rate:10, reserveMo:12}));
+  assert.equal(seat.reserveShort, 0);
+  near(seat.endReserve, 1, "all of today's cash, from CHAD's seat");
+  near(seat.soldUsd, 1/6, "coin sold for the dividend alone");
+});
+
+test("a preferred raise fills the reserve's growth first, then the runway, then buys the asset", () => {
+  // $3M raised on $20M at 10% grows the reserve from $2M to $2.3M, so $0.3M of it tops the
+  // reserve up, six months of the $23M's dividends ($1.15M) park as runway, and the last
+  // $1.55M buys 15,500 coin at $100. The $1M of cash outside the reserve pays the dividend.
+  const r = simulate(tinyCo({pref:20, cash:3}), flatCo({prefMo:3, runway:6, rate:10, reserveMo:12}));
+  near(r.endReserve, 2.3, "reserve");
+  near(r.endCash, 1.15, "runway");
+  near(r.endHold, 1015500, "coin");
+  near(r.parked, 0.3 + 1.15, "parked: the reserve's share and the runway");
+  near(r.premCap, 1.55*(1.5 - 1), "premium captured on the $1.55M of coin alone");
+  // From CHAD's seat: $1M raised at $9.99 adds $10/9.99M of stated notional, so a 12-month
+  // reserve at 14% takes 0.14 × 10/9.99 of the $1M and the rest buys coin
+  const c = simulateCredit(tiny({cash:3, series:15.81}), flat({months:1, prefMo:1, issuePx:9.99, rate:14, reserveMo:12}));
+  near(c.endReserve - 2.2134, 0.14*10/9.99, "reserve topped up");
+});
+
+test("the reserve pays only once the cash outside it and the treasury can't", () => {
+  // $20M of preferred at 10% holds $2M of the $12M of cash in reserve. $10M a year of costs
+  // and $2M of dividends are $1M a month: the other $10M pays months 1-10 and the 20,000
+  // coin ($2M at a flat $100) months 11-12, so a year leaves the reserve whole
+  const s = tiny({cash:12, hold:20000, series:20}), cfg = flat({rate:10, opex:10, reserveMo:12});
+  const year = simulateCredit(s, cfg);
+  assert.equal(year.cashOut, 11);
+  assert.equal(year.firstSale, 11);
+  near(year.sold, 20000, "every coin sold");
+  near(year.endReserve, 2, "the reserve whole");
+  assert.equal(year.reserveShort, null);
+  // three months more: the reserve pays months 13-14, and month 15 is the first gap
+  const more = simulateCredit(s, {...cfg, months:15});
+  assert.equal(more.reserveShort, 13);
+  assert.equal(more.firstGap, 15);
+  near(more.unpaid, 1, "unpaid");
+});
+
+test("with no reserve, DFDV and CHAD give exactly the goldens they had before it", () => {
+  const pre = {
+    DFDV: {implied:3.603919409501438, endHold:2724687.5748565323, endSharesM:38.10249356729776, assetSold:0, pausedMo:0, broke:null},
+    CHAD: {unpaid:0, firstGap:null, cashOut:4, firstSale:4, sold:2530182.5238330057, repaid:126.052, coverEnd:-1.6300013586043436, breakEven:73.34536690751364},
+  };
+  const d = simulate(FIXTURES.DFDV.s, {...FIXTURES.DFDV.cfg, reserveMo:0});
+  for(const k in pre.DFDV) assert.equal(d[k], pre.DFDV[k], k);
+  const {s} = FIXTURES.CHAD, cfg = {...FIXTURES.CHAD.cfg, reserveMo:0};
+  const c = {...simulateCredit(s, cfg), breakEven:breakEven(s, cfg)};
+  for(const k in pre.CHAD) assert.equal(c[k], pre.CHAD[k], k);
+});
+
+test("a break-even of 0 can rest on the reserve: 12 months are funded at any price, 13 at none", () => {
+  // No coin to sell, $12M of cash and $1M owed a month, $2M of it the reserve. The cash
+  // outside it runs out after month 10, so cash alone would leave $2M unpaid; the reserve
+  // pays months 11-12. Nothing is left for month 13, whatever the coin does.
+  const s = tiny({cash:12, hold:0, series:20}), cfg = flat({rate:10, opex:10, reserveMo:12});
+  const r = simulateCredit(s, cfg);
+  assert.equal(r.cashOut, 11);
+  assert.equal(r.reserveShort, 11);
+  near(r.unpaid, 0, "unpaid");
+  assert.equal(breakEven(s, cfg), 0);
+  assert.equal(breakEven(s, {...cfg, months:13}), null);
 });

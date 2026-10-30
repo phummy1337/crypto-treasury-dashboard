@@ -739,6 +739,7 @@
       <li><b>Issuance is earned, not assumed</b> — the common ATM shuts in any month the modeled EV mNAV sits below your floor (default 1.00×, Strategy's stated accretion threshold) or senior claims exceed the treasury. Dividends, interest and costs then follow a waterfall: today's cash first, then runway cash, then issuance <i>only while the ATM is open</i>, priced after its own dilution so it never raises more than the company is worth, then forced sales of the treasury. That's what makes a premium collapse actually hurt — you lose the accretion engine and start selling coin at the same moment.</li>
       <li><b>Digital Credit</b> — STRC, SATA, SATS and CHAD run their issuer's balance sheet from the preferred holder's seat. No new money comes in unless you add it. Opening cash pays first, then sales of the treasury. Debt interest and any convertible due come before everything else: one out of the money today is repaid in cash at its first put or maturity, with no refinancing. Operating costs come next, then every preferred series at its own rate. Whatever can't be paid is a <i>modeled funding gap</i>, not a legal default.</li>
       <li><b>When can't it pay?</b> — the break-even is the lowest ending treasury price that still funds every payment through your horizon, holding everything else. Raising preferred below its stated amount adds more claim than cash: $1M at $8 is 125,000 CHAD shares and $1.25M of stated notional.</li>
+      <li><b>CHAD's dividend reserve</b> — DeFi Development intends to keep 12 months of CHAD dividends apart from its other cash, not pledged to CHAD holders. The DFDV and CHAD buttons both carve that reserve out of today's cash at the rate you set, and a CHAD raise tops it up before anything else. It offsets claims like cash and pays only once the rest of the cash and the SOL can't: CHAD's Cash Runway is the cash outside it, and the DFDV view never spends it, since stock or SOL sales pay first and a treasury sold out ends the run.</li>
       <li><b>Crash test</b> — dips the treasury price that far below the straight line, bottoming in the month you pick, then back to your target by the horizon. Same ending price, different path: coin sold near the bottom to pay the bills is gone for good, so a crash can open a gap the straight line never shows. The break-even keeps your crash and moves only the ending price.</li>
     </ul></details>
     <div class="grid calcbox">
@@ -791,8 +792,8 @@
       </div>
       <div class="calc-out" id="calc-out"></div>
       <div class="chartwrap" style="height:260px; padding: 0 16px 14px;"><canvas id="ch-calc"></canvas></div>
-      <p class="footnote" data-calcfoot="common" style="padding:0 18px 14px; margin:0;">A model, not a forecast: the treasury asset and mNAV move linearly to your targets, the asset dipping first if you set a crash; issuance is constant per month <i>while the ATM is open</i>. Not modeled: in-the-money converts flipping to shares, variable preferred-rate resets, debt maturities, and taxes on unrealized gains. mNAV here is EV mNAV on basic shares: market cap = mNAV × crypto NAV − claims. Converts are held at notional throughout — the model doesn't flip in-the-money tranches into share count. Runway cash offsets claims at face value and never earns the multiple, so only asset-bought dollars capture the issuance premium. Today's cash pays first, then runway cash, issuance and sales; spending it adds to claims. The dividend rate you set applies to the series being issued (STRC, SATA or CHAD); every other series pays its own rate.</p>
-      <p class="footnote" data-calcfoot="credit" hidden style="padding:0 18px 14px; margin:0;">A model, not a forecast: the treasury asset moves linearly to your target, dipping first if you set a crash, and payments are aggregated by month (CHAD pays a slice every business day). Every preferred series ranks together here, though SATS is junior to SATA; debt ranks ahead of all of them. Not modeled: refinancing, buybacks, rate resets beyond your input, compounding of unpaid dividends, the $10–$11 reset of CHAD's liquidation preference, taxes, and SOL locked in staking or posted as collateral. Coverage counts the preferred at its stated amount.</p>
+      <p class="footnote" data-calcfoot="common" style="padding:0 18px 14px; margin:0;">A model, not a forecast: the treasury asset and mNAV move linearly to your targets, the asset dipping first if you set a crash; issuance is constant per month <i>while the ATM is open</i>. Not modeled: in-the-money converts flipping to shares, variable preferred-rate resets, debt maturities, and taxes on unrealized gains. mNAV here is EV mNAV on basic shares: market cap = mNAV × crypto NAV − claims. Converts are held at notional throughout — the model doesn't flip in-the-money tranches into share count. Runway cash offsets claims at face value and never earns the multiple, so only asset-bought dollars capture the issuance premium. Today's cash pays first, then runway cash, issuance and sales; spending it adds to claims. DFDV's 12-month CHAD dividend reserve is held cash that offsets claims too and pays only when nothing else can, so it is never spent here. The dividend rate you set applies to the series being issued (STRC, SATA or CHAD); every other series pays its own rate.</p>
+      <p class="footnote" data-calcfoot="credit" hidden style="padding:0 18px 14px; margin:0;">A model, not a forecast: the treasury asset moves linearly to your target, dipping first if you set a crash, and payments are aggregated by month (CHAD pays a slice every business day). Every preferred series ranks together here, though SATS is junior to SATA; debt ranks ahead of all of them. Not modeled: refinancing, buybacks, rate resets beyond your input, compounding of unpaid dividends, the $10–$11 reset of CHAD's liquidation preference, taxes, and SOL locked in staking or posted as collateral. Coverage counts the preferred at its stated amount. DFDV's 12-month CHAD dividend reserve is held cash that pays only once the rest of the cash and the SOL can't.</p>
     </div>
   </section>
 
@@ -2144,6 +2145,10 @@ let calcCo = "MSTR";
 const CREDIT = { STRC:"MSTR", SATA:"ASST", SATS:"ASST", CHAD:"DFDV" };
 const isCredit = co => co in CREDIT;
 const calcIssuer = co => DATA.companies[CREDIT[co] || co];
+// DeFi Development's CHAD page: "At closing, the Company intends to establish a separate dividend
+// reserve equal to 12 months of CHAD dividends based on the initial 14% annual dividend rate. The
+// reserve is not pledged to CHAD holders." Both its buttons hold it; every other button passes 0.
+const CHAD_RESERVE_MO = 12;
 // A series' last trade and stated amount. SATS rides on ASST's pref2, since SATA, the
 // flagship, holds ASST's prefPrice; read from prefPrice, SATS would open at SATA's quote.
 const seriesTerms = tk => { const o = calcIssuer(tk), p2 = o.pref2;
@@ -2218,7 +2223,8 @@ function readCalcCfg(){
     atmFloor:Math.max(0, gv("ci-floor")),
     stake: sol ? gv("ci-stake") : 0, opex:gv("ci-opex"),
     issuePx:gv("ci-issue") || 0.01, reqYield:gv("ci-ry"),
-    crash:gv("ci-crash"), crashMo:gv("ci-crashmo") };
+    crash:gv("ci-crash"), crashMo:gv("ci-crashmo"),
+    reserveMo: calcIssuer(calcCo).ticker === "DFDV" ? CHAD_RESERVE_MO : 0 };
 }
 // an amount of the treasury asset as plain text, for alerts and the share card
 const unitsTxt = (o, n) => o.asset === "SOL" ? fmt(Math.round(n))+" SOL" : "₿"+fmt(Math.round(n));
@@ -2230,6 +2236,10 @@ const yrTxt = m => m>=12 ? `year ${fmt(m/12,1)}` : `month ${m}`;
 const horizonTxt = cfg => cfg.months+" months"+(cfg.crash > 0 && cfg.months > 1 ? `  ·  ${fmt(cfg.crash)}% crash at mo ${crashMonth(cfg)}` : "");
 // "-27%", or "-99.6%" where a whole number would round to -100%
 const pctFrom = (v, base) => { const d = (v/base - 1)*100; return sig(d)+fmt(d, Math.abs(d) >= 99.5 ? 1 : 0)+"%"; };
+// the dividend reserve at the horizon, for the page and the share cards: "12 mo · $2.2M held".
+// Short enough to clear a share card's chart panel, so "mo", not "month".
+const reserveTxt = (cfg, r) => `${cfg.reserveMo} mo · $${fmt(r.endReserve,1)}M ` + (r.reserveShort === 0 ? "held, short from start"
+  : r.reserveShort ? `left, drawn from mo ${r.reserveShort}` : "held");
 
 // Defaults that stand for "today" (a flat price target, a common's multiple today, a
 // preferred's yield and issue price at its last trade) follow the live values as they
@@ -2290,7 +2300,8 @@ function runCommon(out){
       <div class="v ${r.stockX>=r.assetX?"pos":"neg"}">${fmt(r.stockX/r.assetX,2)}x</div>
       <div class="s">stock ÷ ${u} multiple</div></div>
     <div class="calc-decomp">Decomposition: ${u} <b>${fmt(r.assetX,2)}x</b> × CEBE/share accretion <b>${fmt(r.cebeX,2)}x</b> × mNAV re-rate <b>${fmt(r.mnavX,2)}x</b> = <b>${fmt(r.stockX,2)}x</b>
-      &nbsp;·&nbsp; Ending: ${unitsTxt(o, r.endHold)} held · ${fmt(r.endSharesM,1)}M shares · $${fmt(Math.round(r.endOpenCash))}M of today's cash left · CEBE NAV $${fmt(r.cebeEnd,2)}/sh · claims ${fmt(r.endClaims,1)}% of NAV${
+      &nbsp;·&nbsp; Ending: ${unitsTxt(o, r.endHold)} held · ${fmt(r.endSharesM,1)}M shares · $${fmt(Math.round(r.endOpenCash))}M of today's cash left${
+      cfg.reserveMo > 0 ? ` (plus the ${issuedSeries(calcCo)} dividend reserve: ${reserveTxt(cfg, r)})` : ``} · CEBE NAV $${fmt(r.cebeEnd,2)}/sh · claims ${fmt(r.endClaims,1)}% of NAV${
       r.raised>0 ? `<br>Issuance: $${fmt(Math.round(r.raised))}M raised @ avg ${fmt(r.avgIssMn,2)}× mNAV — $${fmt(Math.round(r.raised - r.parked))}M → ${u} (premium captured ≈ ${sig(r.premCap/(r.implied*r.endSharesM)*100)}${fmt(r.premCap/(r.implied*r.endSharesM)*100,1)}% of ending equity) · $${fmt(Math.round(r.parked))}M parked as dividend cash (per-share neutral)${r.endCash>0.5 ? ` · $${fmt(Math.round(r.endCash))}M runway cash left` : ``}` : ``}${
       (r.pausedMo>0 || r.assetSold>0.5) ? `<br>Stress: ${
         r.pausedMo>0 ? `common ATM shut <b>${r.pausedMo} of ${cfg.months} months</b> (EV mNAV below ${fmt(cfg.atmFloor,2)}×, or claims above the treasury)` : `ATM open all ${cfg.months} months`}${
@@ -2338,8 +2349,12 @@ function runCredit(out){
     ? `below the $${fmt(s.stated)} stated: $1 raised adds $${fmt(s.stated/cfg.issuePx,2)} of claim`
     : `last trade $${fmt(s.quote,2)} · stated $${fmt(s.stated)}`;
   const withCrash = cfg.crash > 0 && cfg.months > 1 ? `, with your ${fmt(cfg.crash)}% crash in month ${crashMonth(cfg)}` : ``;
-  // what a break-even says, given what pays when the treasury doesn't have to
-  const beSays = (v, payers) => v === 0 ? `${payers} cover every payment through month ${cfg.months}, whatever ${u} does`
+  // what a break-even says, given what pays when the treasury doesn't have to. With a
+  // reserve, 0 can rest on SOL sold on the way down and the reserve paying the last months,
+  // so it says only what breakEven() tried: an ending price 99.99% below today's.
+  const beSays = (v, payers) => v === 0 ? (cfg.reserveMo > 0
+      ? `every payment through month ${cfg.months} stays funded even if ${u} ends 99.99% below today${withCrash}`
+      : `${payers} cover every payment through month ${cfg.months}, whatever ${u} does`)
     : v == null ? `no ending ${u} price up to 20× today funds every payment through month ${cfg.months}${withCrash}`
     : `every payment stays funded through month ${cfg.months} unless ${u} ends below <b>${pxTxt(v)}</b> (${pctFrom(v, s.spot)} from today)${withCrash}`;
   const cashAlone = `cash${cfg.stake > 0 ? " and staking" : ""} alone`;
@@ -2357,7 +2372,7 @@ function runCredit(out){
       <div class="s">${c.funded ? "every payment through month "+cfg.months : "$"+fmt(r.unpaid,1)+"M unpaid"}</div></div>
     <div class="calc-cell"><div class="k">Cash Runway</div>
       <div class="v">${r.cashOut == null ? cfg.months+"+ mo" : (r.cashOut - 1)+" mo"}</div>
-      <div class="s">${r.firstSale ? u+" sales from month "+r.firstSale : "no "+u+" sold"}</div></div>
+      <div class="s">${cfg.reserveMo > 0 ? "outside the reserve · " : ""}${r.firstSale ? u+" sales from month "+r.firstSale : "no "+u+" sold"}</div></div>
     <div class="calc-cell"><div class="k">Preferred Coverage</div>
       <div class="v ${r.coverEnd != null && r.coverEnd < 1 ? "neg" : ""}">${fmt(r.coverEnd,2)}x</div>
       <div class="s">after debt, month ${cfg.months} · today ${fmt(c.cover0,2)}x</div></div>
@@ -2373,6 +2388,7 @@ function runCredit(out){
         r.repaid > 0.05 ? ` · <b>$${fmt(r.repaid,1)}M</b> of converts repaid in cash` : ``}${
         c.next ? ` · next due after this horizon: ${esc(c.next.note)}, $${fmt(c.next.units ? c.next.units*cfg.target/1e6 : c.next.principal,1)}M in month ${c.next.repay}` : ``}${
         cfg.opex > 0 ? ` · operating costs $${fmt(cfg.opex,1)}M/yr` : ``}${
+      cfg.reserveMo > 0 ? `<br>Dividend reserve: <b>${reserveTxt(cfg, r)}</b> — ${tk} dividends ${o.ticker} keeps apart from its cash, not pledged to ${tk} holders; it pays only once the rest of the cash and the ${u} can't.` : ``}${
       cfg.prefMo > 0 ? `<br>Raising $${fmt(cfg.prefMo,1)}M of ${tk} a month at $${fmt(cfg.issuePx,2)} adds $${fmt(cfg.prefMo*s.stated/cfg.issuePx,2)}M of stated notional a month — $${fmt(r.endSeries,1)}M outstanding by month ${cfg.months}.` : ``}${
       c.ret != null ? `<br>Investor return: <b>${sig(c.ret*100)}${fmt(c.ret*100,1)}%</b> over ${cfg.months} months — ${fmt(cfg.rate,2)}% dividends plus the move to the implied price, before tax.` : ``}</div>`;
   if(typeof Chart!=="undefined"){
@@ -2574,6 +2590,7 @@ function commonCardContent(cfg){
       ["Dividend Funding Mix", Math.round(cfg.fundMix*100)+"% "+u+" sales / "+Math.round((1-cfg.fundMix)*100)+"% common"],
       ["ATM Pauses Below", fmt(cfg.atmFloor,2)+"x EV mNAV"],
       ...(cfg.runway>0 ? [["Div. Cash Runway", fmt(cfg.runway)+" months pre-funded"]] : []),
+      ...(cfg.reserveMo>0 ? [["Dividend Reserve", reserveTxt(cfg, r)]] : []),
       ...(cfg.stake>0 ? [["Staking Yield", fmt(cfg.stake,1)+"% / yr in "+u]] : []),
       ...(cfg.opex>0 ? [["Operating Costs", "$"+fmt(cfg.opex,1)+"M / yr"]] : []),
       ["Ending EV mNAV", fmt(cfg.endMnav,2)+"x  (now "+fmt(r.mnav0,2)+"x)"],
@@ -2600,7 +2617,8 @@ function creditCardContent(){
     stats:[["PREFERRED COVERAGE", fmt(r.coverEnd,2)+"x", r.coverEnd!=null && r.coverEnd<1 ? "#ff7a7a" : "#34d399", "after debt · today "+fmt(cover0,2)+"x"],
            ["BREAK-EVEN "+u, bePx(be), "#f5f6f7",
             cfg.prefMo>0 ? "with the raise · without: "+bePx(be0)
-              : be ? pctFrom(be, s.spot)+" from today" : be===0 ? "cash covers the horizon" : "up to 20× today"]],
+              : be ? pctFrom(be, s.spot)+" from today"
+              : be===0 ? (cfg.reserveMo>0 ? "99.99% down still funds it" : "cash covers the horizon") : "up to 20× today"]],
     rows:[
       [u+" Price Target", pxTxt(cfg.target)+"  (now "+pxTxt(s.spot)+")"],
       ["Horizon", horizonTxt(cfg)],
@@ -2609,7 +2627,8 @@ function creditCardContent(){
       ["Required Yield", fmt(cfg.reqYield,2)+"%"],
       ...(cfg.stake>0 ? [["Staking Yield", fmt(cfg.stake,1)+"% / yr in "+u]] : []),
       ["Operating Costs", cfg.opex>0 ? "$"+fmt(cfg.opex,1)+"M / yr" : "not modeled"],
-      ["Cash Runway", r.cashOut==null ? cfg.months+"+ months" : (r.cashOut-1)+" months"],
+      ["Cash Runway", (r.cashOut==null ? cfg.months+"+ months" : (r.cashOut-1)+" months")+(cfg.reserveMo>0 ? " outside the reserve" : "")],
+      ...(cfg.reserveMo>0 ? [["Dividend Reserve", reserveTxt(cfg, r)]] : []),
       ["Debt Repaid", r.repaid>0.05 ? "$"+fmt(r.repaid,1)+"M of converts" : "none due"],
       ["Starting Today", tk+" $"+fmt(s.quote,2)+"  ·  "+o.ticker+" "+unitsTxt(o, s.hold)],
     ],
@@ -2644,7 +2663,7 @@ async function shareCard(){
   for(const [k,v] of card.rows){
     x.font=F("400 19px"); x.fillStyle="#9aa0a6"; x.fillText(k, 56, y);
     x.font=F("700 19px"); x.fillStyle="#f5f6f7"; x.fillText(v, 290, y);
-    y+=card.rows.length > 10 ? 30 : 34;
+    y += card.rows.length > 12 ? 28 : card.rows.length > 10 ? 30 : 34;   // DFDV's runs to 13 with a runway
   }
   // chart panel: render a dedicated high-res chart (copying the small on-page
   // canvas produces an unreadable, pixelated chart)
