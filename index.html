@@ -1550,7 +1550,10 @@ async function checkFilingFreshness(){
 
 function renderActions(){
   const el = document.getElementById("grid-actions"); if(!el) return;
-  const acts = DATA.actions || [];
+  // SATS, the preferred, is hidden (README "Restoring SATS"): its lines go, and an entry
+  // left with none. Case-sensitive, so "sats" the bitcoin unit stays.
+  const acts = (DATA.actions || []).map(a => ({...a, items: a.items.filter(x => !/\bSATS\b/.test(x))}))
+                                   .filter(a => a.items.length);
   if(!acts.length){ el.innerHTML = '<div style="padding:14px 18px;color:var(--faint)">No actions parsed yet — populated by the data refresh.</div>'; return; }
   const dt = iso => new Date(iso+"T00:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});
   el.innerHTML = acts.map(a => {
