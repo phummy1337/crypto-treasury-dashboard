@@ -43,13 +43,9 @@
     --apyx: #dc143c;
     --mstr: #ed1946;
     --asst: #4c9fff;
-    --dfdv: #a970ff;     /* violet: clear of crimson MSTR, blue ASST, the amber EV line
-                            and the green/red P&L colours */
+    --dfdv: #a970ff;     /* violet: clear of crimson MSTR, blue ASST and the green/red
+                            P&L colours */
     --sol: #14f195;
-    --evmnav: #ffc44d;   /* EV mNAV line: warm, so it separates from BOTH the
-                            crimson MSTR and blue ASST price lines, and from the
-                            white net line. Lighter than --btc, which never
-                            appears on these charts. */
     --red: #ed1946;
     --pos: #34d399;
     --neg: #ff7a7a;
@@ -123,7 +119,7 @@
   .sg-item .sub { font-size:12px; color:var(--faint); margin-top:2px; }
   .sg-item .sub.live { color: var(--pos); }
   .sg-item .defhint { margin-left:4px; }
-  /* the glyph is a size up from the label; without this it deepens Net mNAV's label
+  /* the glyph is a size up from the label; without this it deepens EV mNAV's label
      line and drops its value below its neighbours' */
   .sg-item .lbl .defhint { line-height:0; }
   /* relative volume is its own hint — the figure carries the tooltip rather than a
@@ -134,7 +130,7 @@
      fit, three don't, so the word wrapped onto a line of its own. As on phones, the
      multiple wins; a line without one keeps its word ("-1.86% · common"). */
   @media (min-width: 1101px) { .sg-item .sub .defhint ~ .secword { display: none; } }
-  /* Just above 1100px a three-tile card is ~230px wide: "$146.01", "NET MNAV" and
+  /* Just above 1100px a three-tile card is ~230px wide: "$146.01", "EV MNAV" and
      "$99.36" at full size push the third tile out of the card ("$99.3"). */
   @media (min-width: 1101px) and (max-width: 1200px) {
     .sg-items { gap: 10px; }
@@ -304,9 +300,6 @@
   .calc-inputs input[type="range"] { padding: 0; border: none; background: transparent; accent-color: var(--red); height: 34px; }
   .calc-inputs .mixlbl { color: var(--text); font-size: 13px; text-transform: none; letter-spacing: 0; margin-top: -2px; }
   .calc-inputs .lblrow { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
-  .calc-inputs .basissel { background:none; border:none; color:var(--muted); font:inherit; font-size:12.5px;
-    text-transform:uppercase; letter-spacing:.8px; padding:0; cursor:pointer; }
-  .calc-inputs .basissel option { color:#000; text-transform:none; }
   .calc-alert { grid-column: 1/-1; border:1px solid rgba(255,122,122,0.45); background:rgba(255,122,122,0.08);
     border-radius:4px; padding:10px 14px; font-size:13.5px; color:var(--text); line-height:1.5; }
   .calc-alert b { color:#ff7a7a; }
@@ -322,7 +315,6 @@
   .chartcard, .chartwrap, .calc-inputs label, .calc-cell { min-width: 0; }
   .chartwrap canvas { max-width: 100%; }
   .calc-inputs input, .calc-inputs select { width: 100%; box-sizing: border-box; min-width: 0; }
-  .calc-inputs .basissel { width: auto; }
   .tabs { flex-wrap: wrap; }
   /* sticky section nav + chart range chips */
   .secnav { position: sticky; top: 0; z-index: 40; display: flex; align-items: center;
@@ -403,6 +395,7 @@
   .mnav-ctx { margin: 0 0 8px; }
   .mnav-ctx .si-chip { padding: 3px 9px; font-size: 12px; }
   .mnav-ctx .si-chip b { font-size: 13.5px; }
+  .mnav-ctx .hint-icon { align-self: center; }   /* DFDV's ⓘ: level with the chips, not their top */
   .calc-out { display:grid; grid-template-columns: repeat(4, 1fr); gap: 12px; padding: 14px 18px 6px; }
   .calc-cell { border: 1px solid var(--border); border-radius: 4px; padding: 11px 13px; background: rgba(255,255,255,0.02); }
   .calc-cell .k { font-size: 11.5px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted); }
@@ -439,7 +432,7 @@
   .charts.two { grid-template-columns: 1fr 1fr; }   /* the ATM cards: MSTR and ASST only */
   @media (max-width: 1100px) { .charts { grid-template-columns: 1fr 1fr; } }
   .charts.full { grid-template-columns: 1fr; }
-  .charts ~ .grid { margin-top: 14px; }   /* charts above a table (Company Stats, Valuation): same gap as a table above charts */
+  .charts ~ .grid { margin-top: 14px; }   /* charts above a table (Company Stats): same gap as a table above charts */
   .chartcard {
     background: var(--panel); border:1px solid var(--border); border-radius: var(--radius);
     padding: 14px 16px 12px;
@@ -537,8 +530,8 @@
         <div class="sg-items">
           <div class="sg-item"><div class="lbl">MSTR</div><div class="val" id="hdr-px-MSTR">—</div>
             <div class="sub" id="hdr-px-MSTR-sub">common</div></div>
-          <div class="sg-item"><div class="lbl">Net mNAV<span class="defhint" data-def="Net mNAV" data-co="MSTR" aria-label="About this metric">&#9432;</span></div>
-            <div class="val" id="hdr-mnav-MSTR">—</div><div class="sub">mcap ÷ net reserve</div></div>
+          <div class="sg-item"><div class="lbl">EV mNAV<span class="defhint" data-def="EV mNAV" data-co="MSTR" aria-label="About this metric">&#9432;</span></div>
+            <div class="val" id="hdr-mnav-MSTR">—</div><div class="sub">EV ÷ crypto</div></div>
           <div class="sg-item"><div class="lbl">STRC</div><div class="val" id="hdr-pref-MSTR">—</div>
             <div class="sub" id="hdr-pref-MSTR-sub">preferred</div></div>
         </div>
@@ -548,8 +541,8 @@
         <div class="sg-items" id="sg-items-ASST">
           <div class="sg-item"><div class="lbl">ASST</div><div class="val" id="hdr-px-ASST">—</div>
             <div class="sub" id="hdr-px-ASST-sub">common</div></div>
-          <div class="sg-item"><div class="lbl">Net mNAV<span class="defhint" data-def="Net mNAV" data-co="ASST" aria-label="About this metric">&#9432;</span></div>
-            <div class="val" id="hdr-mnav-ASST">—</div><div class="sub">mcap ÷ net reserve</div></div>
+          <div class="sg-item"><div class="lbl">EV mNAV<span class="defhint" data-def="EV mNAV" data-co="ASST" aria-label="About this metric">&#9432;</span></div>
+            <div class="val" id="hdr-mnav-ASST">—</div><div class="sub">EV ÷ crypto</div></div>
           <div class="sg-item"><div class="lbl">SATA</div><div class="val" id="hdr-pref-ASST">—</div>
             <div class="sub" id="hdr-pref-ASST-sub">preferred</div></div>
           <div class="sg-item" id="hdr-sats-item" hidden><div class="lbl">SATS</div>
@@ -562,8 +555,8 @@
         <div class="sg-items">
           <div class="sg-item"><div class="lbl">DFDV</div><div class="val" id="hdr-px-DFDV">—</div>
             <div class="sub" id="hdr-px-DFDV-sub">common</div></div>
-          <div class="sg-item"><div class="lbl">Net mNAV<span class="defhint" data-def="Net mNAV" data-co="DFDV" aria-label="About this metric">&#9432;</span></div>
-            <div class="val" id="hdr-mnav-DFDV">—</div><div class="sub">mcap ÷ net reserve</div></div>
+          <div class="sg-item"><div class="lbl">EV mNAV<span class="defhint" data-def="EV mNAV" data-co="DFDV" aria-label="About this metric">&#9432;</span></div>
+            <div class="val" id="hdr-mnav-DFDV">—</div><div class="sub">EV ÷ crypto</div></div>
           <div class="sg-item"><div class="lbl">CHAD</div><div class="val" id="hdr-pref-DFDV">—</div>
             <div class="sub" id="hdr-pref-DFDV-sub">preferred</div></div>
         </div>
@@ -620,17 +613,17 @@
     <p class="sec-note">Where each company stands right now — share price, size, and the balance-sheet building blocks that every metric below is built from. Hover any line item for how it's calculated and why it matters.</p>
     <div class="charts">
       <div class="chartcard">
-        <h3><span class="dot" style="background:var(--mstr)"></span>MSTR — Daily Close</h3>
+        <h3><span class="dot" style="background:var(--mstr)"></span>MSTR — Daily Close<span class="defhint" data-def="EV mNAV" aria-label="About EV mNAV">&#9432;</span></h3>
         <div class="si-chips mnav-ctx" id="mnav-ctx-MSTR"></div>
         <div class="chartwrap"><canvas id="ch-si-MSTR"></canvas></div>
       </div>
       <div class="chartcard">
-        <h3><span class="dot" style="background:var(--asst)"></span>ASST — Daily Close</h3>
+        <h3><span class="dot" style="background:var(--asst)"></span>ASST — Daily Close<span class="defhint" data-def="EV mNAV" aria-label="About EV mNAV">&#9432;</span></h3>
         <div class="si-chips mnav-ctx" id="mnav-ctx-ASST"></div>
         <div class="chartwrap"><canvas id="ch-si-ASST"></canvas></div>
       </div>
       <div class="chartcard">
-        <h3><span class="dot" style="background:var(--dfdv)"></span>DFDV — Daily Close</h3>
+        <h3><span class="dot" style="background:var(--dfdv)"></span>DFDV — Daily Close<span class="defhint" data-def="EV mNAV" aria-label="About EV mNAV">&#9432;</span></h3>
         <div class="si-chips mnav-ctx" id="mnav-ctx-DFDV"></div>
         <div class="chartwrap"><canvas id="ch-si-DFDV"></canvas></div>
       </div>
@@ -720,25 +713,7 @@
   <!-- 4. Valuation & Premium (incl. CEBE) -->
   <section id="valuation">
     <div class="sec-head"><h2>Valuation &amp; Premium</h2><span class="tag stub" id="tag-valuation">seed data</span></div>
-    <p class="sec-note">Whether the market is pricing each company above or below the treasury behind it — for the structure as a whole, and for common shareholders after debt and preferred take their cut.</p>
-    <div class="charts">
-      <div class="chartcard">
-        <h3><span class="dot" style="background:var(--mstr)"></span>MSTR — Price vs. mNAV</h3>
-        <div class="ch-sub">Line: daily close (left) · Right: Net mNAV solid (after debt &amp; preferred) · EV mNAV dashed (whole structure)</div>
-        <div class="chartwrap"><canvas id="ch-mnav-MSTR"></canvas></div>
-      </div>
-      <div class="chartcard">
-        <h3><span class="dot" style="background:var(--asst)"></span>ASST — Price vs. mNAV</h3>
-        <div class="ch-sub">Line: daily close (left) · Right: Net mNAV solid (after debt &amp; preferred) · EV mNAV dashed (whole structure)</div>
-        <div class="chartwrap"><canvas id="ch-mnav-ASST"></canvas></div>
-      </div>
-      <div class="chartcard">
-        <h3><span class="dot" style="background:var(--dfdv)"></span>DFDV — Price vs. mNAV<span class="evhint hint-icon" aria-label="About this chart" data-title="DFDV's mNAV lines"
-          data-rows="Gaps~nothing was left for common, or the multiple was above 5x|Starts~Feb 23 2026, the first day DFDV's daily EV series counts all its debt">&#9432;</span></h3>
-        <div class="ch-sub">Line: daily close (left) · Right: Net mNAV solid (after debt &amp; preferred) · EV mNAV dashed (whole structure)</div>
-        <div class="chartwrap"><canvas id="ch-mnav-DFDV"></canvas></div>
-      </div>
-    </div>
+    <p class="sec-note">Whether the market prices each company above or below the treasury behind it, and how much of that treasury the debt and preferred claim ahead of common.</p>
     <div class="grid" id="grid-valuation"></div>
     <div class="illus" id="illus-valuation"></div>
   </section>
@@ -757,11 +732,11 @@
     <p class="sec-note">Pick a common to get an implied share price, or a preferred to see whether its dividends stay funded — and at what treasury price they wouldn't.</p>
     <details class="howto"><summary>How the model works</summary>
     <ul class="calc-how">
-      <li><b>Month-by-month engine</b> — issuance buys the treasury asset (BTC, or SOL for DFDV), dividends, debt interest and operating costs get serviced, and for a common each month's price backs out of your mNAV. Every common share sold, for a raise or a bill, is priced after its own dilution, so its buyer pays what it's then worth.</li>
+      <li><b>Month-by-month engine</b> — issuance buys the treasury asset (BTC, or SOL for DFDV), dividends, debt interest and operating costs get serviced, and for a common each month's price backs out of your EV mNAV. Every common share sold, for a raise or a bill, is priced after its own dilution, so its buyer pays what it's then worth.</li>
       <li><b>Starts from today's live balance sheet.</b> DFDV's SOL loans are SOL owed, marked at each month's SOL price.</li>
       <li><b>Defaults are real</b> — issuance uses each company's rolling 3-month pace from its filings (a preferred whose ATM is on standby below par, as the ATM tracker shows, starts at $0). A common's ending mNAV starts at its multiple today, so nothing re-rates unless you set it; a preferred starts with BTC or SOL going nowhere. Those follow the live price until you change them. Override anything.</li>
-      <li><b>Dividend cash runway</b> — issuance proceeds first park N months of preferred dividends as cash (MSTR's recent posture); only the rest buys the treasury asset. On the EV basis parked cash never earns the mNAV multiple, so it's per-share neutral and a longer runway means less accretion. On the net basis it counts in net NAV like the asset and earns the multiple too, so a longer runway trades exposure to the asset's price for cash. 0 = every dollar buys the asset.</li>
-      <li><b>Issuance is earned, not assumed</b> — the common ATM shuts in any month the modeled net mNAV sits below your floor (default 1.00×, Strategy's stated accretion threshold). Dividends, interest and costs then follow a waterfall: today's cash first, then runway cash, then issuance <i>only while the ATM is open</i>, priced after its own dilution so it never raises more than the company is worth, then forced sales of the treasury. That's what makes a premium collapse actually hurt — you lose the accretion engine and start selling coin at the same moment.</li>
+      <li><b>Dividend cash runway</b> — issuance proceeds first park N months of preferred dividends as cash (MSTR's recent posture); only the rest buys the treasury asset. Parked cash never earns the mNAV multiple, so it's per-share neutral and a longer runway means less accretion. 0 = every dollar buys the asset.</li>
+      <li><b>Issuance is earned, not assumed</b> — the common ATM shuts in any month the modeled EV mNAV sits below your floor (default 1.00×, Strategy's stated accretion threshold) or senior claims exceed the treasury. Dividends, interest and costs then follow a waterfall: today's cash first, then runway cash, then issuance <i>only while the ATM is open</i>, priced after its own dilution so it never raises more than the company is worth, then forced sales of the treasury. That's what makes a premium collapse actually hurt — you lose the accretion engine and start selling coin at the same moment.</li>
       <li><b>Digital Credit</b> — STRC, SATA, SATS and CHAD run their issuer's balance sheet from the preferred holder's seat. No new money comes in unless you add it. Opening cash pays first, then sales of the treasury. Debt interest and any convertible due come before everything else: one out of the money today is repaid in cash at its first put or maturity, with no refinancing. Operating costs come next, then every preferred series at its own rate. Whatever can't be paid is a <i>modeled funding gap</i>, not a legal default.</li>
       <li><b>When can't it pay?</b> — the break-even is the lowest ending treasury price that still funds every payment through your horizon, holding everything else. Raising preferred below its stated amount adds more claim than cash: $1M at $8 is 125,000 CHAD shares and $1.25M of stated notional.</li>
       <li><b>Crash test</b> — dips the treasury price that far below the straight line, bottoming in the month you pick, then back to your target by the horizon. Same ending price, different path: coin sold near the bottom to pay the bills is gone for good, so a crash can open a gap the straight line never shows. The break-even keeps your crash and moves only the ending price.</li>
@@ -796,9 +771,9 @@
         <label data-view="credit" hidden>Issue Price ($)<input type="number" id="ci-issue" value="100" step="0.25" min="0.01">
           <span class="mixlbl" id="ci-issue-lbl"></span></label>
         <label data-view="common">Common Issued ($M / mo)<input type="number" id="ci-common" value="0" step="50" min="0"></label>
-        <label data-view="common"><span class="lblrow">ATM Pauses Below<span class="evhint" data-title="Common ATM discipline" data-rows="Rule~no common issuance below this net mNAV|Strategy's stated threshold~1.00×|Set 0~issue regardless (unrealistic)|Effect~below the floor, dividends must come from sales of the treasury">?</span></span>
+        <label data-view="common"><span class="lblrow">ATM Pauses Below<span class="evhint" data-title="Common ATM discipline" data-rows="Rule~no common issuance below this EV mNAV|Also shut~while senior claims exceed the treasury|Strategy's stated threshold~1.00×|Set 0~issue whenever the stock is worth anything (unrealistic)|Effect~below the floor, dividends must come from sales of the treasury">?</span></span>
           <input type="number" id="ci-floor" value="1.00" step="0.05" min="0" max="5">
-          <span class="mixlbl" id="ci-floor-lbl">× net mNAV — ATM open above this</span></label>
+          <span class="mixlbl" id="ci-floor-lbl">× EV mNAV — ATM open above this</span></label>
         <label><span><span id="ci-rate-name">Preferred</span> Dividend Rate (% / yr)<small id="ci-rate-note" class="ratenote" hidden></small></span><input type="number" id="ci-rate" value="12" step="0.5" min="0"></label>
         <label data-view="credit" hidden>Required Yield (%)<input type="number" id="ci-ry" value="12" step="0.25" min="0.1" max="100">
           <span class="mixlbl">the yield the market prices it at</span></label>
@@ -808,10 +783,7 @@
         <label data-view="common">Div. Cash Runway (months)
           <input type="number" id="ci-runway" value="0" step="3" min="0" max="120" title="Months of preferred dividends pre-funded with issuance cash before proceeds buy the treasury asset">
           <span class="mixlbl" id="ci-runway-lbl">0 — every $ raised buys the asset</span></label>
-        <label data-view="common"><span class="lblrow"><select id="ci-basis" class="basissel" title="Choose which multiple your ending target is expressed in">
-            <option value="net">Ending Net mNAV (×)</option>
-            <option value="ev">Ending EV mNAV (×)</option>
-          </select><span class="evhint" id="ci-mnav-hint" data-title="MSTR mNAV at prior bull peaks" data-rows="2021 cycle (Feb peak)~≈3.7×|2024 cycle (Nov peak)~≈3.4×">?</span></span><input type="number" id="ci-mnav" value="1.00" step="0.05" min="0.05"></label>
+        <label data-view="common"><span class="lblrow">Ending EV mNAV (×)<span class="evhint" id="ci-mnav-hint" data-title="MSTR mNAV at prior bull peaks" data-rows="2021 cycle (Feb peak)~≈3.7×|2024 cycle (Nov peak)~≈3.4×|Basis~mkt cap ÷ BTC NAV, not EV">?</span></span><input type="number" id="ci-mnav" value="1.00" step="0.05" min="0.05"></label>
         <label data-asset="SOL" hidden>Staking Yield (% / yr)<input type="number" id="ci-stake" value="0" step="0.5" min="0" max="50">
           <span class="mixlbl">earned in SOL on the whole treasury</span></label>
         <label>Operating Costs ($M / yr)<input type="number" id="ci-opex" value="0" step="1" min="0">
@@ -819,7 +791,7 @@
       </div>
       <div class="calc-out" id="calc-out"></div>
       <div class="chartwrap" style="height:260px; padding: 0 16px 14px;"><canvas id="ch-calc"></canvas></div>
-      <p class="footnote" data-calcfoot="common" style="padding:0 18px 14px; margin:0;">A model, not a forecast: the treasury asset and mNAV move linearly to your targets, the asset dipping first if you set a crash; issuance is constant per month <i>while the ATM is open</i>. Not modeled: in-the-money converts flipping to shares, variable preferred-rate resets, debt maturities, and taxes on unrealized gains. EV basis prices the whole structure (mcap = mNAV × crypto NAV − claims); net basis prices the common's residual (mcap = mNAV × net NAV). Converts are held at notional throughout — the model doesn't flip in-the-money tranches into share count. Runway cash offsets claims at face value: on the EV basis it never earns the multiple, so only asset-bought dollars capture the issuance premium; on the net basis it sits in net NAV and earns the multiple like the asset. Today's cash pays first, then runway cash, issuance and sales; spending it adds to claims. The dividend rate you set applies to the series being issued (STRC, SATA or CHAD); every other series pays its own rate.</p>
+      <p class="footnote" data-calcfoot="common" style="padding:0 18px 14px; margin:0;">A model, not a forecast: the treasury asset and mNAV move linearly to your targets, the asset dipping first if you set a crash; issuance is constant per month <i>while the ATM is open</i>. Not modeled: in-the-money converts flipping to shares, variable preferred-rate resets, debt maturities, and taxes on unrealized gains. mNAV here is EV mNAV on basic shares: market cap = mNAV × crypto NAV − claims. Converts are held at notional throughout — the model doesn't flip in-the-money tranches into share count. Runway cash offsets claims at face value and never earns the multiple, so only asset-bought dollars capture the issuance premium. Today's cash pays first, then runway cash, issuance and sales; spending it adds to claims. The dividend rate you set applies to the series being issued (STRC, SATA or CHAD); every other series pays its own rate.</p>
       <p class="footnote" data-calcfoot="credit" hidden style="padding:0 18px 14px; margin:0;">A model, not a forecast: the treasury asset moves linearly to your target, dipping first if you set a crash, and payments are aggregated by month (CHAD pays a slice every business day). Every preferred series ranks together here, though SATS is junior to SATA; debt ranks ahead of all of them. Not modeled: refinancing, buybacks, rate resets beyond your input, compounding of unpaid dividends, the $10–$11 reset of CHAD's liquidation preference, taxes, and SOL locked in staking or posted as collateral. Coverage counts the preferred at its stated amount.</p>
     </div>
   </section>
@@ -1017,7 +989,7 @@ function evMnav(o){
 // Net framework (Strategy, Jul-2026): net reserve = crypto NAV + USD reserve − OTM
 // convertible debt − preferred. In-the-money converts dilute the share count
 // instead of counting as debt; straight debt (no convPrice — DFDV's loans) is
-// always a claim. Net mNAV = fully-diluted mcap ÷ net reserve.
+// always a claim. Net Reserve, Amplification and Net Holdings per Share read it.
 function netParts(o){
   const ds = o.debtSchedule || [], px = o.stockPrice;
   let otm = 0, itmSh = 0;                                   // $mm claims / M shares
@@ -1034,17 +1006,6 @@ function netParts(o){
   const shares = o.netDilutedShares || (o.sharesOutstanding + itmSh);
   return { nav, reserve, netReserve, shares, mcap: px*shares, otm, itmSh };
 }
-function netMnav(o){
-  // Strategy publishes its own mNAV every minute of the session; take it verbatim then,
-  // so the headline matches strategy.com/btc. That figure stops at the 4pm close while
-  // BTC keeps moving, so after the close and at weekends compute it: the definition is
-  // the same (netParts gave its 1.1424 exactly at 4pm BTC on 2026-10-28). The computed
-  // path is also the only one for ASST and DFDV, which publish no net figure.
-  if(o._netMnavLive != null && marketOpenET()) return o._netMnavLive;
-  if(!(o.stockPrice && o.sharesOutstanding)) return null;
-  const p = netParts(o);
-  return p.netReserve > 0 ? p.mcap/p.netReserve : null;
-}
 
 function unit(v, u){ return `${v}<span class="unit">${u}</span>`; }
 
@@ -1055,12 +1016,10 @@ const METRIC_DEFS = {
     m:"Staying power. A high number means the company could service its dividends and interest for decades out of what it already holds, so a long bear market is survivable without touching the equity story. A low number means it depends on continued issuance or a rising treasury asset to keep the obligations funded — the same treasury is far more fragile. Operating costs are not counted; DFDV's run larger than its dividends and interest combined, and the calculator models them. Strategy splits this into BTC duration and USD duration; this is the combined figure."},
   "Total Duration (net)": {c:"(Crypto reserve + cash reserve − senior debt at face value) ÷ annual obligations, in years: the net crypto leg plus USD Duration. All debt is set aside, converts included whether in the money or not, and its coupons still count, since it is owed until it's repaid.",
     m:"The whole reserve's staying power once the lenders' principal is held back. Where dollars on hand match much of the debt, as at Strategy, it stays near the gross figure; where the debt is most of the treasury, it falls toward the USD leg alone."},
-  "EV mNAV": {c:"(Market cap + senior debt + preferred notional − USD reserve) ÷ crypto reserve (holdings × live BTC or SOL price).",
-    m:"What the market pays for the whole structure — common, debt and preferred together — per dollar of treasury asset behind it. This is the solvency and coverage lens, and it's the one a STRC, SATA, SATS or CHAD holder should care about, since their claim sits on the entire enterprise rather than the residual."},
   // co: a sentence only that issuer's own tile shows (tipHTML reads the hint's data-co)
-  "Net mNAV": {c:"Fully-diluted market cap ÷ net reserve, where net reserve is crypto + USD reserve − out-of-the-money convertible and straight debt − preferred notional. In-the-money converts are counted as shares instead of debt.",
-    co:{DFDV:"DFDV's own adjusted mNAV leaves CHAD out; it is a claim here."},
-    m:"What common shareholders pay per dollar of treasury asset that's actually left for them after the senior claims are satisfied. Strategy adopted this as its headline mNAV in July 2026, and it fixes the accretion threshold at exactly 1.0× — above it, issuing stock to buy the asset raises holdings per share; below it, issuing destroys them."},
+  "EV mNAV": {c:"(Market cap + senior debt + preferred notional − USD reserve) ÷ crypto reserve (holdings × live BTC or SOL price).",
+    co:{DFDV:"DFDV's own enterprise mNAV leaves CHAD out; it is a claim here."},
+    m:"What the market pays for the whole company — common, debt and preferred together — per dollar of treasury asset behind it. At exactly 1.0× the market cap equals the treasury left after every claim (crypto + cash − debt − preferred), which makes it the accretion line for issuing common: above it, each share sold raises the treasury every share owns after the claims; below it, each one lowers it."},
   "Net Reserve": {c:"Crypto reserve + USD reserve − out-of-the-money convertible and straight debt − preferred notional.",
     m:"The treasury value genuinely attributable to common equity once everyone senior has been paid. This is the denominator common shareholders are actually buying, and it's what makes leverage cut both ways: it grows faster than the asset on the way up and shrinks faster on the way down."},
   "Net Leverage": {c:"Senior debt left uncovered by the USD assets (USD Reserve + USD Cash), divided by the crypto reserve. Zero once the dollars on hand fully offset the debt. Taken from strategy.com's published figure for MSTR; the same arithmetic for ASST, which carries no debt, and DFDV.",
@@ -1404,20 +1363,6 @@ function renderValuation(){
     ["= Enterprise Value", bil(evv(o))], [`÷ ${assetUnit(o)} Reserve`, bil(nav(o))],
     ["= EV mNAV", fmt(evMnav(o),2)+"x"]
   ].map(r=>r.join("~")).join("|");
-  const netRows = o => { const p = netParts(o), ours = p.netReserve>0 ? p.mcap/p.netReserve : null;
-    // the arithmetic shown is always our own, so the rows reconcile; in session the
-    // cell shows strategy.com's published figure, so name it when the two round apart
-    const shown = netMnav(o);
-    const pub = shown != null && ours != null && fmt(shown,2) !== fmt(ours,2)
-      ? [["strategy.com publishes", fmt(shown,2)+"x"]] : [];
-    return [
-    [`${assetUnit(o)} Reserve`, bil(p.nav)], ["+ Cash", bil(o.cash)],
-    ["− OTM Convertible & Straight Debt", bil(p.otm)], ["− Preferred", bil(o.prefNotional)],
-    ["= Net Reserve", bil(p.netReserve)],
-    [`Mkt Cap (${fmt(p.shares,2)}M fully-diluted sh)`, bil(p.mcap)],
-    ...pub,
-    ["= Net mNAV  (mcap ÷ net reserve)", fmt(ours,2)+"x"]
-  ].map(r=>r.join("~")).join("|"); };
   const cell = (v,rows,title) => v==null ? null : `<span class="evhint" data-title="${title}" data-rows="${rows}"><span class="${cls(v)}">${fmt(v,2)}x</span></span>`;
 
   // Strategy's Jul-2026 net-framework stats (computed live for every name)
@@ -1426,7 +1371,6 @@ function renderValuation(){
 
   let h = headRow();
   h += row({label:"EV mNAV", cell:o => cell(evMnav(o),mnavRows(o),"EV mNAV")});
-  h += row({label:"Net mNAV", cell:o => cell(netMnav(o),netRows(o),"Net mNAV")});
   h += row({label:"Net Reserve", cell:o => bil(netRes(o))});
   h += row({label:"Amplification", cell:o => amp(o)==null ? null : fmt(amp(o),2)+"x"});
   // Strategy's headline "Net Leverage": senior debt left uncovered by the USD
@@ -1475,7 +1419,7 @@ function renderPriceHeader(){
   const set=(id,v)=>{const e=document.getElementById(id); if(e) e.innerHTML=v;};
   COS.forEach(co => { const o = D[co];
     set("hdr-px-"+co, usd(o.stockPrice,2));
-    set("hdr-mnav-"+co, fmt(netMnav(o),2)+"x");
+    set("hdr-mnav-"+co, fmt(evMnav(o),2)+"x");
     set("hdr-pref-"+co, usd(o.prefPrice,2));
   });
   // SATS listed 2026-10-20 as Strive's second, junior preferred. The tile only
@@ -1683,11 +1627,9 @@ function renderMnavChips(){
   COS.forEach(co => {
     const o = DATA.companies[co], mhs = o.mnavHistory, ctx = document.getElementById("mnav-ctx-"+co);
     if(!ctx || !mhs) return;
-    const mLbl = mhs.net ? "Net mNAV" : "EV mNAV", full = mhs.net || mhs.mnav;
-    const live = mhs.net ? netMnav(o) : evMnav(o);
+    const mLbl = "EV mNAV", full = mhs.mnav, live = evMnav(o);
     // only report a window the history actually covers — it starts Oct 2025 (MSTR), Jan
     // 2026 (ASST) and Feb 23 2026 (DFDV), so a shorter average would wear the wrong label.
-    // A window is its last rows blanks included, so DFDV's gaps don't stretch it back.
     const avg = n => { const need = Math.round(n*PPM_CAL);
       if(full.length < need) return null;
       const w = full.slice(-need).filter(v=>v!=null);
@@ -1700,7 +1642,10 @@ function renderMnavChips(){
     ctx.innerHTML = (live!=null
         ? `<span class="si-chip" title="${mLbl} right now, live with the ${assetUnit(o)} price">now <b>${fmt(live,2)}x</b></span>`
         : "")
-      + cell("1M",avg(1)) + cell("3M",avg(3)) + cell("6M",avg(6)) + cell("1Y",avg(12));
+      + cell("1M",avg(1)) + cell("3M",avg(3)) + cell("6M",avg(6)) + cell("1Y",avg(12))
+      // the one place the page says why DFDV's chart and averages start where they do
+      + (co === "DFDV" ? `<span class="evhint hint-icon" aria-label="About this history" data-title="DFDV's mNAV history"
+          data-rows="Starts~Feb 23 2026, the first day DFDV's daily EV series counts all its debt">&#9432;</span>` : "");
   });
 }
 
@@ -1725,7 +1670,6 @@ function mkChart(id, cfg){
   CHARTS[id] = new Chart(el.getContext("2d"), cfg);
 }
 const GRID = "rgba(255,255,255,0.07)", AX = "#9aa0a6";
-const EV_LINE = "#ffc44d";   // keep in step with --evmnav
 const MTL = (typeof innerWidth !== "undefined" && innerWidth < 640) ? 5 : 8;  // x ticks on phones
 
 // ---------- global chart time range ----------
@@ -1853,16 +1797,14 @@ function renderCharts(){
         borderWidth:2, tension:.25, pointRadius:0, fill:true} ]},
       options: bpsOpts });
 
-    // 3. Company Stats price chart — daily close (left) + net mNAV (right). DFDV's net
-    // series is rebuilt from its EV series, blank where nothing was left for common; a
-    // data.json from before that carries EV only, and the card plots EV mNAV instead.
+    // 3. Company Stats price chart — daily close (left) + EV mNAV (right)
     const mhs = o.mnavHistory;
-    const mLbl = mhs && mhs.net ? "Net mNAV" : "EV mNAV";
+    const mLbl = "EV mNAV";
     if(mhs){
       // MSTR from Oct 2025; ASST from Jan 1, 2026
       const _start = co==="ASST" ? Math.max(0, mhs.dates.findIndex(d=>d.startsWith("Jan"))) : 0;
       const [labels, px, mn] = clip(PPM_CAL, mhs.dates.slice(_start), mhs.px.slice(_start),
-            (mhs.net || mhs.mnav).slice(_start));
+            mhs.mnav.slice(_start));
       const siOpts = baseOpts({ scales:{
         x:{ ticks:{color:AX,font:{size:11},autoSkip:true,maxTicksLimit:MTL,maxRotation:0}, grid:{color:GRID} },
         yP:axis("","left",{ticks:{color:c,font:{size:11},callback:v=>"$"+(+v).toFixed(o.stockPrice<10?2:0)}}),
@@ -1914,44 +1856,9 @@ function renderCharts(){
           spanGaps:true, fill:true, order:2} ]},
         options: prefOpts });
     }
-
-    // 5. Valuation: price (left) vs daily Net mNAV (right) — the premium left to
-    // common once debt and preferred have taken their cut, which is the lens an
-    // equity holder is actually buying. The EV series (mh.mnav) is still carried
-    // in the data and is the coverage view credit holders want; the table above
-    // shows both, so the chart plots the one the section is asking about.
-    const mh = o.mnavHistory;
-    if(mh){
-      const mnOpts = baseOpts({ scales:{
-        x:{ ticks:{color:AX,font:{size:11},autoSkip:true,maxTicksLimit:MTL,maxRotation:0}, grid:{color:GRID} },
-        yP:axis("","left",{ticks:{color:c,font:{size:11},callback:v=>"$"+(+v).toFixed(o.stockPrice<10?2:0)}}),
-        // both multiples share one axis: same unit, and the gap between them IS
-        // the drag from debt and preferred, which only reads if they are to scale
-        yM:axis("mNAV","right",{ticks:{color:"#ffffff",font:{size:11},callback:v=>(+v).toFixed(2)+"x"}}) } });
-      mnOpts.plugins.tooltip.callbacks = { label: ctx => {
-        if(ctx.parsed.y==null) return null;
-        return ctx.dataset.yAxisID==="yM" ? ctx.dataset.label+": "+(+ctx.parsed.y).toFixed(2)+"x"
-                                          : co+": $"+(+ctx.parsed.y).toFixed(2);
-      }};
-      // net goes null on any day the net reserve is non-positive, so fall back to
-      // the EV series rather than drawing an empty right axis
-      const [mhd_, mhpx_, mhnet_, mhev_] =
-        clip(PPM_CAL, mh.dates, mh.px, (mh.net || mh.mnav), mh.mnav);
-      mkChart("ch-mnav-"+co, { type:"line", data:{ labels: mhd_, datasets:[
-        {label:"Price", data:mhpx_, yAxisID:"yP", borderColor:c, backgroundColor:c+"18",
-          borderWidth:2, tension:.2, pointRadius:0, fill:false, order:1},
-        // Net solid and bright — the section is about what is left for common.
-        // EV dashed and dimmer: the same structure before debt and preferred.
-        ...(mh.net ? [{label:"Net mNAV", data:mhnet_, yAxisID:"yM", borderColor:"rgba(255,255,255,0.9)",
-          backgroundColor:"transparent", borderWidth:2, tension:.2, pointRadius:0, fill:false, order:2}] : []),
-        {label:"EV mNAV", data:mhev_, yAxisID:"yM", borderColor:EV_LINE,
-          backgroundColor:"transparent", borderWidth:2, borderDash:[6,3], tension:.2,
-          pointRadius:0, fill:false, order:3} ]},
-        options: mnOpts });
-    }
   });
 
-  // 6. Short Interest section — bars: shorts % of float · line: days to cover (10d avg volume)
+  // 5. Short Interest section — bars: shorts % of float · line: days to cover (10d avg volume)
   const D = DATA.companies;
   const shortSpecs = [
     ["MSTR", D.MSTR.shortInterest,     acc("MSTR"), D.MSTR.borrowFee],
@@ -2268,17 +2175,15 @@ function otherSeries(o, tk){
 const issuedSeries = co => isCredit(co) ? co : (DATA.companies[co].prefTicker || "Preferred");
 function calcSnapshot(co){
   const o = DATA.companies[co];
-  // dilM: the fully-diluted shares beyond basic that the header's Net mNAV divides by
-  return { px:o.stockPrice, sharesM:o.sharesOutstanding, dilM:Math.max(0, netParts(o).shares - o.sharesOutstanding),
-           pref:o.prefNotional, ...balanceSheet(o), ...otherSeries(o, o.prefTicker) };
+  return { px:o.stockPrice, sharesM:o.sharesOutstanding, pref:o.prefNotional,
+           ...balanceSheet(o), ...otherSeries(o, o.prefTicker) };
 }
-// A common's mNAV today on the given basis ("net" or "ev"), to the input's 0.05 step:
-// an ending target at it re-rates nothing. Net on fully-diluted shares, EV on basic.
-function todaysMultiple(co, basis){
-  const s = calcSnapshot(co), nav0 = s.hold*s.spot/1e6, mcap = s.px*s.sharesM;
+// A common's EV mNAV today on basic shares, to the input's 0.05 step: an ending target
+// at it re-rates nothing.
+function todaysMultiple(co){
+  const s = calcSnapshot(co), nav0 = s.hold*s.spot/1e6;
   const cl = s.debtUsd + s.owed*s.spot/1e6 + s.pref - s.cash;
-  const cur = basis==="net" ? (nav0-cl>0 ? s.px*(s.sharesM + s.dilM)/(nav0-cl) : 1) : (mcap + cl)/nav0;
-  return (Math.round(cur*20)/20).toFixed(2);
+  return (Math.round((s.px*s.sharesM + cl)/nav0*20)/20).toFixed(2);
 }
 // simulate(), simulateCredit() and breakEven() live in calc-engine.js, which the tests load too.
 
@@ -2310,7 +2215,6 @@ function readCalcCfg(){
   return { target:gv(sol ? "ci-sol" : "ci-btc"), months:Math.max(1,Math.round(gv("ci-months"))),
     prefMo:gv("ci-pref"), commonMo:gv("ci-common"), rate:gv("ci-rate"),
     fundMix:gv("ci-fund")/100, endMnav:gv("ci-mnav"), runway:Math.max(0,gv("ci-runway")),
-    basis:(document.getElementById("ci-basis")||{}).value || "ev",
     atmFloor:Math.max(0, gv("ci-floor")),
     stake: sol ? gv("ci-stake") : 0, opex:gv("ci-opex"),
     issuePx:gv("ci-issue") || 0.01, reqYield:gv("ci-ry"),
@@ -2363,7 +2267,7 @@ function runCommon(out){
       : "parks ~$"+fmt(Math.round(cfg.runway*divMo0))+"M of dividends as cash first"; }
   const r = simulate(s, cfg);
   document.getElementById("calc-snap").textContent =
-    `Starting today: $${fmt(s.px,2)} · ${unitsTxt(o, s.hold)} · ${u} ${pxTxt(s.spot)} · EV mNAV ${r?fmt(r.mnav0,2):"—"}x · Net ${r&&r.net0?fmt(r.net0,2):"—"}x`;
+    `Starting today: $${fmt(s.px,2)} · ${unitsTxt(o, s.hold)} · ${u} ${pxTxt(s.spot)} · EV mNAV ${r?fmt(r.mnav0,2):"—"}x`;
   if(!r){ out.innerHTML = `<div class="calc-decomp">${u} NAV is unavailable — model cannot run.</div>`; return; }
   const cls = r.stockX>=1 ? "pos":"neg";
   // underwater at the horizon wipes the common out; underwater only in a dip doesn't
@@ -2387,9 +2291,9 @@ function runCommon(out){
       <div class="s">stock ÷ ${u} multiple</div></div>
     <div class="calc-decomp">Decomposition: ${u} <b>${fmt(r.assetX,2)}x</b> × CEBE/share accretion <b>${fmt(r.cebeX,2)}x</b> × mNAV re-rate <b>${fmt(r.mnavX,2)}x</b> = <b>${fmt(r.stockX,2)}x</b>
       &nbsp;·&nbsp; Ending: ${unitsTxt(o, r.endHold)} held · ${fmt(r.endSharesM,1)}M shares · $${fmt(Math.round(r.endOpenCash))}M of today's cash left · CEBE NAV $${fmt(r.cebeEnd,2)}/sh · claims ${fmt(r.endClaims,1)}% of NAV${
-      r.raised>0 ? `<br>Issuance: $${fmt(Math.round(r.raised))}M raised @ avg ${fmt(r.avgIssMn,2)}× mNAV — $${fmt(Math.round(r.raised - r.parked))}M → ${u} (premium captured ≈ ${sig(r.premCap/(r.implied*r.endSharesM)*100)}${fmt(r.premCap/(r.implied*r.endSharesM)*100,1)}% of ending equity) · $${fmt(Math.round(r.parked))}M parked as dividend cash (${cfg.basis === "net" ? "counted in net NAV" : "per-share neutral"})${r.endCash>0.5 ? ` · $${fmt(Math.round(r.endCash))}M runway cash left` : ``}` : ``}${
+      r.raised>0 ? `<br>Issuance: $${fmt(Math.round(r.raised))}M raised @ avg ${fmt(r.avgIssMn,2)}× mNAV — $${fmt(Math.round(r.raised - r.parked))}M → ${u} (premium captured ≈ ${sig(r.premCap/(r.implied*r.endSharesM)*100)}${fmt(r.premCap/(r.implied*r.endSharesM)*100,1)}% of ending equity) · $${fmt(Math.round(r.parked))}M parked as dividend cash (per-share neutral)${r.endCash>0.5 ? ` · $${fmt(Math.round(r.endCash))}M runway cash left` : ``}` : ``}${
       (r.pausedMo>0 || r.assetSold>0.5) ? `<br>Stress: ${
-        r.pausedMo>0 ? `common ATM shut <b>${r.pausedMo} of ${cfg.months} months</b> (net mNAV below ${fmt(cfg.atmFloor,2)}×)` : `ATM open all ${cfg.months} months`}${
+        r.pausedMo>0 ? `common ATM shut <b>${r.pausedMo} of ${cfg.months} months</b> (EV mNAV below ${fmt(cfg.atmFloor,2)}×, or claims above the treasury)` : `ATM open all ${cfg.months} months`}${
         r.assetSold>0.5 ? ` · <b>$${fmt(Math.round(r.assetSold))}M</b> of ${u} sold to pay dividends, interest and costs${
           r.forcedDiv>0.5 ? ` (<b>$${fmt(Math.round(r.forcedDiv))}M</b> forced — the ATM was shut or stock couldn't cover it)` : ``}` : ``}` : ``}</div>`;
   if(typeof Chart!=="undefined"){
@@ -2585,7 +2489,7 @@ function chartExportMeta(id, card){
   // a series switch counts as the series it shows, not the text of every button on it;
   // a hint icon isn't part of the title
   const title = [...h3.childNodes]
-    .filter(n => !(n.nodeType === 1 && (n.classList.contains("pngbtn") || n.classList.contains("evhint"))))
+    .filter(n => !(n.nodeType === 1 && n.matches(".pngbtn, .evhint, .defhint")))
     .map(n => n.nodeType === 1 && n.classList.contains("serieschips")
       ? (n.querySelector("button.active") || {}).textContent || "" : n.textContent)
     .join(" ").replace(/\s+/g, " ").trim();
@@ -2668,12 +2572,11 @@ function commonCardContent(cfg){
       ["Common Issued", "$"+fmt(cfg.commonMo)+"M / mo"],
       [issuedSeries(calcCo)+" Dividend Rate", fmt(cfg.rate,1)+"% / yr"],
       ["Dividend Funding Mix", Math.round(cfg.fundMix*100)+"% "+u+" sales / "+Math.round((1-cfg.fundMix)*100)+"% common"],
-      ["ATM Pauses Below", fmt(cfg.atmFloor,2)+"x net mNAV"],
+      ["ATM Pauses Below", fmt(cfg.atmFloor,2)+"x EV mNAV"],
       ...(cfg.runway>0 ? [["Div. Cash Runway", fmt(cfg.runway)+" months pre-funded"]] : []),
       ...(cfg.stake>0 ? [["Staking Yield", fmt(cfg.stake,1)+"% / yr in "+u]] : []),
       ...(cfg.opex>0 ? [["Operating Costs", "$"+fmt(cfg.opex,1)+"M / yr"]] : []),
-      [cfg.basis==="net" ? "Ending Net mNAV" : "Ending EV mNAV",
-        fmt(cfg.endMnav,2)+"x  (now "+fmt(r.mn0,2)+"x)"],
+      ["Ending EV mNAV", fmt(cfg.endMnav,2)+"x  (now "+fmt(r.mnav0,2)+"x)"],
       ["Starting Today", "$"+fmt(snap.px,2)+"  ·  "+unitsTxt(o, snap.hold)+"  ·  "+u+" "+pxTxt(snap.spot)],
     ],
     labels:r.labels, yTitle:"indexed (start = 100%)", yTick:v=>v+"%",
@@ -2790,8 +2693,8 @@ function clampCalcInput(el, raw){
 // what was on screen. An empty box is 0 here; dropping it would reopen the default.
 function calcInputValue(el){ return clampCalcInput(el, el.value === "" ? 0 : el.value); }
 
-// Everything in the hash is untrusted: numbers are clamped, the button and the mNAV
-// basis are whitelists. Returns null when the link carries no query at all.
+// Everything in the hash is untrusted: numbers are clamped and the button is a
+// whitelist. Returns null when the link carries no query at all.
 function parseCalcHash(){
   const q = location.hash.indexOf("?");
   if(q < 0) return null;
@@ -2806,8 +2709,9 @@ function parseCalcHash(){
     const v = clampCalcInput(el, p.get(key));
     if(v !== null) out.inputs[CALC_HASH_KEYS[key]] = v;
   }
-  const b = p.get("basis");
-  if(b === "net" || b === "ev") out.basis = b;
+  // A link from when the calculator also took a net multiple says basis=net. A net
+  // multiple (DFDV's 3.55) has no EV equivalent, so that link opens at today's EV one.
+  if(p.get("basis") === "net") delete out.inputs["ci-mnav"];
   return out;
 }
 
@@ -2818,10 +2722,6 @@ function applyCalcHash(link){
     const el = document.getElementById(id);
     if(el) el.value = link.inputs[id];
     delete liveDefaults[id];      // a link's value is the one it was sent with, not today's
-  }
-  if(link.basis){
-    const sel = document.getElementById("ci-basis");
-    if(sel) sel.value = link.basis;
   }
   document.querySelectorAll(".cobtn[data-co]").forEach(b =>
     b.classList.toggle("active", b.dataset.co === calcCo));
@@ -2840,7 +2740,6 @@ function writeCalcToHash(){
     const v = calcInputValue(el);
     if(v != null) p.set(key, v);
   }
-  if(!isCredit(calcCo)) p.set("basis", readCalcCfg().basis);
   lastCalcQuery = p.toString();
   // The 400ms debounce can land after the user has left the tab: keep the scenario
   // for the way back, but never put #calc on the dashboard's URL.
@@ -2985,9 +2884,9 @@ function initCalc(){
       const idle = o.atm && o.atm.status === "standby";
       val("ci-pref", idle ? 0 : ((o.trail3m && o.trail3m.prefMo) || 0));
       val("ci-common", (o.trail3m && o.trail3m.commonMo) || 0);
-      // each company's own multiple today (DFDV's is twice MSTR's), so the default
-      // re-rates nothing and any re-rate is one you set
-      followLive("ci-mnav", () => todaysMultiple(co, document.getElementById("ci-basis").value));
+      // each company's own EV multiple today, so the default re-rates nothing and any
+      // re-rate is one you set
+      followLive("ci-mnav", () => todaysMultiple(co));
       delete liveDefaults["ci-issue"]; delete liveDefaults["ci-ry"];
     }
     syncCalcInputs();
@@ -3008,14 +2907,6 @@ function initCalc(){
     const t = spot*Math.pow(1 + Math.max(-99, g)/100, readCalcCfg().months/12);
     val(sol ? "ci-sol" : "ci-btc", sol ? t.toFixed(2) : Math.round(t));
     runCalc(); queueCalcHash();
-  });
-  const basisSel = document.getElementById("ci-basis");
-  if(basisSel) basisSel.addEventListener("change", () => {
-    // prefill the target with today's multiple on the chosen basis (no re-rate)
-    const co = calcCo;
-    followLive("ci-mnav", () => todaysMultiple(co, basisSel.value));
-    runCalc();
-    queueCalcHash();
   });
   document.getElementById("ci-fund").addEventListener("input", () => { runCalc(); queueCalcHash(); });
   document.getElementById("ci-share").addEventListener("click", shareCard);
@@ -3087,14 +2978,12 @@ async function fetchLiveEquity(){
 // strategy.com's own KPI APIs (open, CORS-* , refreshed about once a minute). They
 // are the source refresh_data.py already treats as authoritative for MSTR, but the
 // cron only lands a few times a day — GitHub drops most of the 10-minute schedule —
-// so everything downstream of them (Net mNAV, net sats/share, EV mNAV, duration)
-// used to sit frozen on the last successful run. Pulling them client-side keeps the
-// headline live and guarantees it reads the same as strategy.com/btc.
+// so everything downstream of them (EV mNAV, net sats/share, duration) used to sit
+// frozen on the last successful run. Pulling them client-side keeps those live.
 //
 // Runs after fetchLiveEquity so MSTR's official consolidated quote wins over the
 // tracker's light feed, and runs after the close too: mstrKpiData carries the
-// settled 4:00pm print. strategy.com's own mNAV stops at that print, so after the
-// close netMnav computes it from these balances and keeps it moving with BTC.
+// settled 4:00pm print, and EV mNAV keeps moving with BTC from these balances.
 const num = s => parseFloat(String(s).replace(/,/g,""));
 
 /* Minutes-since-midnight ET, for both the wall clock and a quote's own stamp.
@@ -3219,7 +3108,6 @@ async function fetchStrategyLive(){
   }catch(e){ /* keep the cron's values */ }
   try{
     const r = (await (await fetch("https://api.strategy.com/btc/bitcoinKpis",{cache:"no-store"})).json()).results || {};
-    if(r.mNav > 0){ co._netMnavLive = +r.mNav; changed = true; }
     if(r.satsPerShare > 0) co.satsPerShareDiluted = Math.round(+r.satsPerShare);
     if(r.netSatsPerShare > 0 && r.netBtcReserve > 0 && r.ufPrice > 0){
       co.netSatsPerShare = Math.round(+r.netSatsPerShare);
@@ -3233,6 +3121,7 @@ async function fetchStrategyLive(){
      ["totalDuration","creditDurationPub"]].forEach(([src,dst]) => {
        if(r[src] != null) co[dst] = +r[src];
      });
+    changed = true;   // these feed Holdings per Share, the net rows, Net Leverage and the Hurdle Rate
   }catch(e){ /* keep the cron's values */ }
   if(changed){ renderAll(); markFresh(); }
 }

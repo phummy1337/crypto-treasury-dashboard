@@ -3,30 +3,30 @@
 // Each fixture is one calculator button's opening snapshot and default inputs, frozen
 // from data.json on 2026-10-25 so a data refresh can't move them. The goldens are what
 // the engine returns for them: an edit that shifts one has changed what the page shows,
-// and its commit should say so. dilM is that day's fully-diluted count less basic
-// (MSTR 426.32 - 422.35, ASST 126.79 - 124.06); DFDV published no adjusted count then.
+// and its commit should say so. A common's endMnav is that day's EV mNAV to the input's
+// 0.05 step.
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { crashMonth, pathPrice, simulate, simulateCredit, breakEven } = require("../calc-engine.js");
 
 const FIXTURES = {
   MSTR: {
-    s: {px:146.01, sharesM:422.35, dilM:3.97, pref:13557, spot:80472, hold:848517, cash:5281, owed:0, debtUsd:6714, intUsd:34.5953, intUnits:0,
+    s: {px:146.01, sharesM:422.35, pref:13557, spot:80472, hold:848517, cash:5281, owed:0, debtUsd:6714, intUsd:34.5953, intUnits:0,
         otherNotional:4987, otherDivs:470.66},
-    cfg: {target:150000, months:12, prefMo:0, commonMo:1579, rate:12, fundMix:0, endMnav:1.15, runway:0, basis:"net", atmFloor:1, stake:0, opex:0},
-    golden: {implied:305.03437585840555, endHold:1013760.6016336514, endSharesM:507.02650571566767, assetSold:0, pausedMo:0, broke:null},
+    cfg: {target:150000, months:12, prefMo:0, commonMo:1579, rate:12, fundMix:0, endMnav:1.1, runway:0, atmFloor:1, stake:0, opex:0},
+    golden: {implied:296.4855431259105, endHold:1013760.6016336514, endSharesM:508.4458499399204, assetSold:0, pausedMo:0, broke:null},
   },
   ASST: {
-    s: {px:28.97, sharesM:124.06, dilM:2.73, pref:2103, spot:80472, hold:36818, cash:976, owed:0, debtUsd:0, intUsd:0, intUnits:0,
+    s: {px:28.97, sharesM:124.06, pref:2103, spot:80472, hold:36818, cash:976, owed:0, debtUsd:0, intUsd:0, intUnits:0,
         otherNotional:700, otherDivs:105},
-    cfg: {target:150000, months:12, prefMo:207, commonMo:334, rate:13, fundMix:0, endMnav:1.95, runway:0, basis:"net", atmFloor:1, stake:0, opex:0},
-    golden: {implied:100.38244313531246, endHold:93434.07883711549, endSharesM:190.3966335461057, assetSold:0, pausedMo:0, broke:null},
+    cfg: {target:150000, months:12, prefMo:207, commonMo:334, rate:13, fundMix:0, endMnav:1.6, runway:0, atmFloor:1, stake:0, opex:0},
+    golden: {implied:95.06533221898071, endHold:93434.07883711549, endSharesM:193.03434272587322, assetSold:0, pausedMo:0, broke:null},
   },
   DFDV: {
     s: {px:3.78, sharesM:32.62, pref:15.81, spot:101.4, hold:2590266, cash:9.98, owed:562000, debtUsd:149.0532, intUsd:7.5087, intUnits:33725,
         otherNotional:0, otherDivs:0},
-    cfg: {target:101.4, months:12, prefMo:0, commonMo:0, rate:13, fundMix:0, endMnav:2.45, runway:0, basis:"net", atmFloor:1, stake:5.07, opex:17},
-    golden: {implied:3.467920781773927, endHold:2724687.5748565323, endSharesM:38.45579025983129, assetSold:0, pausedMo:0, broke:null},
+    cfg: {target:101.4, months:12, prefMo:0, commonMo:0, rate:13, fundMix:0, endMnav:1.3, runway:0, atmFloor:1, stake:5.07, opex:17},
+    golden: {implied:3.603919409501438, endHold:2724687.5748565323, endSharesM:38.10249356729776, assetSold:0, pausedMo:0, broke:null},
   },
   STRC: {
     s: {spot:80472, hold:848517, cash:5281, owed:0, debtUsd:6714, intUsd:34.5953, intUnits:0, stated:100, quote:99.36,
@@ -94,7 +94,7 @@ test("MSTR pays a year of dividends and interest from today's cash, each series 
   // ($470.66M) is $1,499.06M, and $34.60M of convert interest makes the $1,534M a year
   // Strategy files. Its $5,281M of cash covers that, so no shares are issued and no BTC sold.
   const {s, cfg} = FIXTURES.MSTR;
-  const flatCfg = {...cfg, target:s.spot, commonMo:0, endMnav:simulate(s, cfg).net0};
+  const flatCfg = {...cfg, target:s.spot, commonMo:0, endMnav:simulate(s, cfg).mnav0};
   const r = simulate(s, flatCfg);
   near(r.endSharesM, s.sharesM, "shares");
   near(r.endHold, s.hold, "BTC");
@@ -201,25 +201,10 @@ test("a convert in the money converts into shares instead of being repaid", () =
 const tinyCo = (over = {}) => ({px:10, sharesM:10, pref:0, spot:100, hold:1e6, cash:0, owed:0, debtUsd:20,
   intUsd:0, intUnits:0, otherNotional:0, otherDivs:0, ...over});
 const flatCo = (over = {}) => ({target:100, months:1, prefMo:0, commonMo:0, rate:0, fundMix:0, endMnav:1.5,
-  runway:0, basis:"net", atmFloor:1, stake:0, opex:0, ...over});
+  runway:0, atmFloor:1, stake:0, opex:0, ...over});
 
-test("the net basis prices the common's residual, the EV basis the whole structure", () => {
-  near(simulate(tinyCo(), flatCo()).implied, 1.5*(100 - 20)/10, "net: 1.5 x (NAV - claims) / shares");
-  near(simulate(tinyCo(), flatCo({basis:"ev"})).implied, (1.5*100 - 20)/10, "EV: (1.5 x NAV - claims) / shares");
-});
-
-test("net mNAV divides a fully-diluted market cap; EV mNAV a basic one", () => {
-  // 2M options on top of 10M basic shares: net mNAV today is $10 x 12M / $80M = 1.5x,
-  // so an ending 1.5x re-rates nothing and the price stays $10. EV ignores them.
-  const s = tinyCo({dilM:2});
-  near(simulate(s, flatCo()).net0, 10*12/80, "net mNAV today");
-  near(simulate(s, flatCo()).implied, 10, "no re-rate at today's multiple");
-  near(simulate(s, flatCo({basis:"ev"})).implied, (1.5*100 - 20)/10, "EV: basic shares");
-  // a $12M bill sold as stock: the 12M diluted shares are worth $120M, so it issues
-  // 12 x 12 / 108 new shares and leaves the old 12M worth $108M
-  const r = simulate(s, flatCo({opex:144}));
-  near(r.endSharesM, 10 + 12*12/108, "shares issued");
-  near(r.implied*12, 120 - 12, "the old holders' stake");
+test("the ending mNAV prices the whole structure", () => {
+  near(simulate(tinyCo(), flatCo()).implied, (1.5*100 - 20)/10, "(1.5 x NAV - claims) / shares");
 });
 
 test("SATS and SATA share one pool, so their coverage reads the same", () => {
@@ -242,33 +227,40 @@ test("with the ATM shut below its floor, costs are paid by selling the treasury"
 });
 
 test("stock sold to pay a bill costs existing holders exactly the bill", () => {
-  // $12M of costs in the month, at 1.5x net NAV of $80M: the company is worth $120M, so
-  // the sale issues 12 x 10 / (120 - 12) shares and leaves the old 10M worth $108M
+  // $12M of costs in the month, at 1.5x: the company is worth 1.5 x $100M - $20M = $130M,
+  // so the sale issues 12 x 10 / (130 - 12) shares and leaves the old 10M worth $118M
   const r = simulate(tinyCo(), flatCo({opex:144}));
-  near(r.endSharesM, 10 + 12*10/108, "shares");
-  near(r.implied*10, 120 - 12, "the old holders' stake");
+  near(r.endSharesM, 10 + 12*10/118, "shares");
+  near(r.implied*10, 130 - 12, "the old holders' stake");
   near(r.assetSold, 0, "nothing sold");
 });
 
 test("premium captured is what existing holders gain from issuance", () => {
-  // $30M of common and $30M of preferred in one month. Net basis at 1.5x: the common's
-  // $30M adds 1.5 x 30 to a company worth $120M, and the preferred's claim offsets its
-  // cash, so holders gain $15M. EV basis at 1.3x: each $30M adds $9M of premium.
-  for(const [basis, endMnav, before, gain] of [["net", 1.5, 1.5*80, 15], ["ev", 1.3, 1.3*100 - 20, 18]]){
-    const r = simulate(tinyCo(), flatCo({basis, endMnav, commonMo:30, prefMo:30}));
-    near(r.implied*10 - before, gain, `${basis}: the old 10M shares' gain`);
-    near(r.premCap, gain, `${basis}: premium captured`);
-  }
+  // $30M of common and $30M of preferred in one month at 1.3x: the coin each buys is
+  // priced at 1.3x, so each $30M adds $9M to a company that was worth 1.3 x 100 - 20
+  const r = simulate(tinyCo(), flatCo({endMnav:1.3, commonMo:30, prefMo:30}));
+  near(r.implied*10 - (1.3*100 - 20), 18, "the old 10M shares' gain");
+  near(r.premCap, 18, "premium captured");
+});
+
+test("the common ATM shuts below the EV floor, and while claims exceed the treasury", () => {
+  // EV mNAV runs from 1.2x today to 0.85x in month 12, so it is under 1.0x from month 7
+  near(simulate(tinyCo(), flatCo({months:12, endMnav:0.85})).pausedMo, 6, "months shut");
+  // $120M of debt against $100M of coin: the market still values the stock above zero,
+  // but the ATM stays shut, so a year of $1M monthly costs is all paid in coin
+  const r = simulate(tinyCo({px:1, debtUsd:120}), flatCo({months:12, opex:12}));
+  near(r.pausedMo, 12, "shut every month");
+  near(r.forcedDiv, 12, "all of it forced");
 });
 
 test("a bill bigger than the company's market value is paid by selling the treasury", () => {
-  // DFDV with a 22% crash bottoming in month 6: that month's $2.44M of bills is more than
-  // the whole company is worth, so SOL pays them though the ATM stays open
-  const {s, cfg} = FIXTURES.DFDV;
-  const r = simulate(s, {...cfg, crash:22, crashMo:6});
+  // $100M of coin against $99M of debt at 1.0x: the whole company is worth $1M, so the
+  // month's $2M of costs can't be paid in stock and coin pays it, though the ATM is open
+  const r = simulate(tinyCo({px:0.1, debtUsd:99}), flatCo({endMnav:1, opex:24}));
   near(r.pausedMo, 0, "the ATM never shut");
-  assert.ok(r.forcedDiv > 2.4 && r.forcedDiv < 2.5, `forced ${r.forcedDiv}`);
-  assert.ok(r.implied > 2.3, `recovered to ${r.implied}`);
+  near(r.forcedDiv, 2, "forced");
+  near(r.assetSold, 2, "coin sold");
+  near(r.endSharesM, 10, "no shares issued");
 });
 
 test("SOL owed is marked at each month's SOL price, not today's", () => {
