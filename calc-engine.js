@@ -1,5 +1,6 @@
 /* The calculator's engine: pure functions of a balance-sheet snapshot and the
-   calculator's inputs. index.html builds the snapshots from data.json and loads
+   calculator's inputs, plus the run-off behind the Coverage & Duration rows (the
+   last two functions). index.html builds the snapshots from data.json and loads
    this file as a plain script; tests/calc-engine.test.js requires it under Node.
    Keep it free of DATA, the DOM and other page globals so both can run it. */
 
@@ -244,4 +245,27 @@ function breakEven(s, cfg){
   return hi;
 }
 
-if(typeof module !== "undefined") module.exports = { crashMonth, pathPrice, prefDivsMo, reserveFor, reserveMonths, simulate, simulateCredit, breakEven };
+// When a dated tranche leaves the debt: at its next put or maturity after `today` (ISO
+// dates). Out of the money at `stockPx` it is repaid in cash then (no refinancing); in
+// the money it converts into shares. A loan with no date ahead rolls over: null. The
+// credit view's tranches and the Coverage & Duration run-off both read it.
+function trancheExit(t, stockPx, today){
+  const date = [t.put, t.maturity].filter(d => d && d > today).sort()[0];
+  return date ? { date, converts: !!(t.convPrice && stockPx >= t.convPrice) } : null;
+}
+// Years a reserve ($M) lasts paying `obligations` ($M a year: every dividend and coupon)
+// with no new money, at today's prices. Each exit ({at: years from today, principal,
+// coupon: $M a year}) stops its coupon then and takes its principal from the reserve; a
+// tranche that converts takes none. A principal the reserve can't meet ends the run.
+function runoffYears(reserve, obligations, exits){
+  let at = 0, rate = obligations;
+  for(const e of [...exits].sort((a, b) => a.at - b.at)){
+    if(rate*(e.at - at) >= reserve) return at + reserve/rate;
+    reserve -= rate*(e.at - at); at = e.at;
+    if(e.principal > reserve) return at;
+    reserve -= e.principal; rate -= e.coupon;
+  }
+  return at + reserve/rate;
+}
+
+if(typeof module !== "undefined") module.exports = { crashMonth, pathPrice, prefDivsMo, reserveFor, reserveMonths, simulate, simulateCredit, breakEven, trancheExit, runoffYears };

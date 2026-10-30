@@ -6,7 +6,7 @@ SOL for DeFi Development.
 
 ## Files
 - **index.html** — the dashboard: HTML, CSS and JS in one file, apart from the calculator's engine.
-- **calc-engine.js** — the Implied Price Calculator's engine, which index.html loads.
+- **calc-engine.js** — the Implied Price Calculator's engine and the year-by-year run-off behind the gross durations, which index.html loads.
 - **tests/** — `node --test tests/*.test.js` checks that engine. No dependencies; CI runs it on changes.
 - **data.json** — the numbers the dashboard reads. Edit by hand or via the scraper.
 - **refresh_data.py** — optional updater that repopulates `data.json`.

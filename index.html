@@ -621,9 +621,9 @@
   <!-- 1b. Coverage & Duration -->
   <section id="coverage">
     <div class="sec-head"><h2>Coverage &amp; Duration</h2></div>
-    <p class="sec-note">How long each treasury could keep paying its dividends and coupons if no new money came in — from the crypto, from the dollars, and after setting aside what the debt is owed — and how many times over the assets cover the preferred.</p>
+    <p class="sec-note">How long each treasury could keep paying its dividends and coupons, and repaying its converts as they fall due, if no new money came in — from the crypto, from the dollars, and after setting aside what the debt is owed — and how many times over the assets cover the preferred.</p>
     <div class="grid" id="grid-coverage"></div>
-    <p class="footnote">Durations divide by annual obligations: every preferred series' dividends plus debt coupons, at the latest declared rates. Net figures set aside all senior debt at face value, converts included, and keep its coupons, since the debt is owed until it's repaid. Operating costs aren't counted; the calculator models them.</p>
+    <p class="footnote">Gross durations run each reserve down year by year: every preferred series' dividends and every debt coupon at the latest declared rates, and each convert's principal at its next put or maturity — unless today's stock price is above its conversion price, in which case it converts to shares instead. Either way its coupon stops then; debt with no date ahead rolls over. USD Duration divides by today's obligations. Net figures set aside all senior debt at face value today, converts included, and keep its coupons, since the debt is owed until it's repaid. Operating costs aren't counted; the calculator models them.</p>
   </section>
 
   <!-- 1. Accumulation & Holdings -->
@@ -931,6 +931,8 @@ const capFmt = (mm) => { if(mm==null||isNaN(mm)) return "—"; const s=mm<0?"-":
 const pct = (n, d=1) => n==null||isNaN(n) ? "—" : fmt(n,d)+"%";
 // "May 17" from an ISO date, read as a calendar day wherever the viewer is
 const shortDate = iso => new Date(iso+"T00:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric"});
+// a debt date by month and year ("Sep 28"), as the debt and run-off hovers show them
+const mDate = iso => iso ? new Date(iso+"T00:00:00").toLocaleDateString("en-US",{month:"short",year:"2-digit"}) : "—";
 const sig = (n) => n>0?"+":"";
 
 // Each treasury is marked at its own asset's live price: BTC for MSTR and ASST, SOL for DFDV.
@@ -984,7 +986,7 @@ function unit(v, u){ return `${v}<span class="unit">${u}</span>`; }
 
 // ---------- per-metric definitions (label hover: how it's calculated / what it means) ----------
 const METRIC_DEFS = {
-  "Total Duration (gross)": {c:"(Crypto reserve + cash reserve) ÷ annual obligations, where obligations are preferred dividends plus cash interest on debt. Answers: if no new money ever came in, how many years could the existing reserves keep paying? Crypto Duration plus USD Duration, except that ASST's cash here includes the STRC it holds.",
+  "Total Duration (gross)": {c:"Years the crypto and cash reserves together last paying every obligation as it falls due, run down year by year as Crypto Duration (gross) is: preferred dividends and debt coupons each year, and each convert's principal at its next put or maturity unless it converts. Answers: if no new money ever came in, how long could the existing reserves keep paying? At least Crypto Duration plus USD Duration, since dollars spent after the converts are repaid cover lighter obligations. ASST's cash here includes the STRC it holds. Hover a value for the year-by-year steps.",
     m:"Staying power. A high number means the company could service its dividends and interest for decades out of what it already holds, so a long bear market is survivable without touching the equity story. A low number means it depends on continued issuance or a rising treasury asset to keep the obligations funded — the same treasury is far more fragile. Operating costs are not counted; DFDV's run larger than its dividends and interest combined, and the calculator models them. Strategy splits this into BTC duration and USD duration; this is the combined figure."},
   "Total Duration (net)": {c:"(Crypto reserve + cash reserve − senior debt at face value) ÷ annual obligations, in years: the net crypto leg plus USD Duration. All debt is set aside, converts included whether in the money or not, and its coupons still count, since it is owed until it's repaid.",
     m:"The whole reserve's staying power once the lenders' principal is held back. Where dollars on hand match much of the debt, as at Strategy, it stays near the gross figure; where the debt is most of the treasury, it falls toward the USD leg alone."},
@@ -1028,11 +1030,11 @@ const METRIC_DEFS = {
     m:"The claims that rank ahead of both preferred and common if things go wrong."},
   "Preferred Equity Notional": {c:"Stated value of every preferred series — $100 per share (EUR-denominated STRE at its USD stated amount), $10 per CHAD share.",
     m:"The full preferred claim sitting senior to common — the 'digital credit' layer each company funds itself with."},
-  "Crypto Duration (gross)": {c:"Crypto reserve (holdings × live BTC or SOL price) ÷ annual obligations, in years — how long the treasury alone could fund every dividend and coupon at today's marks. DFDV's SOL includes SOL it borrowed in kind (its SOL loans, carried in senior debt), which the net row sets aside with the rest of the debt.",
-    m:"The crypto leg of staying power. It moves with the asset price: a drawdown shortens it exactly when the obligations feel heaviest. Add USD Duration for the Total Duration below."},
+  "Crypto Duration (gross)": {c:"Years the crypto reserve (holdings × live BTC or SOL price) alone lasts paying every obligation as it falls due, run down year by year at today's marks: each year's preferred dividends and debt coupons, and each convert's principal at its next put or maturity, after which its coupon stops. A convert whose conversion price today's stock price has passed converts to shares then instead, taking no principal. Debt with no date ahead rolls over, paying its coupon throughout. DFDV's SOL includes SOL it borrowed in kind (its SOL loans, carried in senior debt), which the net row sets aside with the rest of the debt. Hover a value for the year-by-year steps.",
+    m:"The crypto leg of staying power. It moves with the asset price: a drawdown shortens it exactly when the obligations feel heaviest. Converts falling due within a few years cut it hardest, since their principal leaves the reserve long before it would otherwise run out."},
   "Crypto Duration (net)": {c:"(Crypto reserve − senior debt at face value) ÷ annual obligations, in years. Every convert and loan is set aside in full, in the money or not, and the coupons still count, since the debt is owed until it's repaid.",
     m:"The crypto's staying power with enough held back to repay the lenders. Where debt is a large share of the treasury this is far shorter than the gross figure, and it reaches zero once the crypto only just covers the debt; below that it turns negative."},
-  "USD Duration": {c:"True dollar reserve ÷ annual obligations, in years. For ASST this deliberately EXCLUDES the STRC preferred Strive holds — that position is counted in total-reserve metrics (matching Strive's own math) but it is BTC-linked paper, not dollars; hover the ASST value for the blended figure.",
+  "USD Duration": {c:"True dollar reserve ÷ today's annual obligations, in years: the years of current dividends and coupons the dollars cover. It isn't run down year by year, so no convert's principal is drawn from it. For ASST this deliberately EXCLUDES the STRC preferred Strive holds — that position is counted in total-reserve metrics (matching Strive's own math) but it is BTC-linked paper, not dollars; hover the ASST value for the blended figure.",
     m:"The cushion that decides whether a bear market forces treasury sales — so it should only count assets that hold value in that exact scenario. A reserve parked in another BTC treasury company's preferred is weakest at precisely the moment it's needed, which is why the headline here is stricter than the issuer's blended number."},
   "Annual Obligations": {c:"Each preferred series' notional × its latest declared dividend rate, plus debt coupons.",
     m:"The fixed yearly cash cost of the capital structure — what must be paid out before common shareholders see anything."},
@@ -1201,15 +1203,46 @@ function renderCompany(){
 }
 
 // Years of obligations each reserve covers, and the assets' cover on the preferred.
-// Net sets aside all senior debt at face, converts included, and keeps its coupons:
-// the debt is owed until it's repaid. Crypto + USD = Total, gross and net alike (ASST's
-// Total also counts the STRC it holds, which USD Duration leaves out).
+// Gross runs the reserve down year by year (runoffYears): dividends and coupons, and
+// each convert's principal when trancheExit has it repaid. Net sets aside all senior
+// debt at face today, converts included, and keeps its coupons: the debt is owed until
+// it's repaid. USD divides by today's obligations, so net crypto + USD = net Total; the
+// gross Total runs at least as long as its legs, since dollars spent after the converts
+// are repaid cover lighter obligations. (ASST's Total also counts the STRC it holds,
+// which USD Duration leaves out.)
 function renderCoverage(){
   const D = DATA.companies, strcPx = (D.MSTR && D.MSTR.prefPrice) || 0;
   const nav = o => o.holdings*assetPx(o)/1e6;                    // crypto reserve, $mm
   const years = f => o => o.annualObligations>0 ? f(o)/o.annualObligations : null;
-  const cryptoDur = years(nav), cryptoNet = years(o => nav(o) - o.seniorDebt);
-  const totalDur = years(o => nav(o) + o.cash), totalNet = years(o => nav(o) + o.cash - o.seniorDebt);
+  // each dated tranche's exit: when, the principal it takes (none if it converts), and
+  // the coupon it stops
+  const today = etDateStr(), yrsTo = d => (Date.parse(d) - Date.parse(today))/(365.25*864e5);
+  const exits = o => (o.debtSchedule || []).flatMap(t => {
+    const x = trancheExit(t, o.stockPrice, today);
+    return x ? [{...x, note:t.note, put:x.date === t.put, at:yrsTo(x.date),
+                 principal:x.converts ? 0 : t.principal, coupon:t.principal*t.coupon/100}] : [];
+  });
+  const runoff = f => o => o.annualObligations>0 ? runoffYears(f(o), o.annualObligations, exits(o)) : null;
+  const cryptoDur = runoff(nav), cryptoNet = years(o => nav(o) - o.seniorDebt);
+  const totalDur = runoff(o => nav(o) + o.cash), totalNet = years(o => nav(o) + o.cash - o.seniorDebt);
+  // a gross value, with the run-off's steps on hover wherever debt falls due (note names
+  // reach the hover as DFDV's API sent them; refresh_data.py checks them, as esc() says)
+  const runoffCell = (f, what) => o => {
+    const y = runoff(f)(o); if(y == null) return null;
+    const ex = exits(o).filter(e => e.at <= y).sort((a, b) => a.at - b.at);
+    if(!ex.length) return fmt(y,1)+" yrs";
+    // a tenth of a $M under $1B (capFmt's whole millions would hide DFDV's steps), and the
+    // run-out's full year, since it lands decades out
+    const usd = v => v >= 1000 ? capFmt(v) : "$"+fmt(v,1)+"M";
+    const end = new Date(Date.parse(today) + y*365.25*864e5)
+      .toLocaleDateString("en-US",{month:"short",year:"numeric",timeZone:"UTC"});
+    const rows = [["Reserve today", usd(f(o))], ["Dividends + coupons", usd(o.annualObligations)+" / yr"],
+      ...ex.map(e => [`${mDate(e.date)} · ${e.note} ${e.converts ? "converts" : e.put ? "put" : "matures"}`,
+                      e.converts ? "coupon stops" : "−"+usd(e.principal)]),
+      ["After that", usd(o.annualObligations - ex.reduce((s, e) => s + e.coupon, 0))+" / yr"],
+      ["Runs out", `${end} · ${fmt(y,1)} yrs`]];
+    return `<span class="evhint" data-title="${o.ticker} · ${what} run-off" data-rows="${rows.map(r=>r.join("~")).join("|")}">${fmt(y,1)} yrs</span>`;
+  };
   // "USD" means dollars. ASST parks part of its reserve in STRC (BTC-linked paper,
   // marked live at STRC's price) — headline only true dollars, blend in the hover.
   const usdOnly = o => o.cashUsd != null ? o.cashUsd : o.cash;
@@ -1232,10 +1265,10 @@ function renderCoverage(){
   const neg = f => o => f(o) < 0 ? "neg" : "";        // the debt outweighs that reserve
   let h = headRow();
   h += subHead("Years of obligations covered <small style='color:var(--faint)'>higher = safer</small>");
-  h += row({label:"Crypto Duration (gross)", cell:yrs(cryptoDur), cmp:cryptoDur});
+  h += row({label:"Crypto Duration (gross)", cell:runoffCell(nav, "crypto"), cmp:cryptoDur});
   h += row({label:"Crypto Duration (net)", cell:yrs(cryptoNet), cls:neg(cryptoNet), cmp:cryptoNet});
   h += row({label:"USD Duration", cell:usdDurCell, cmp:usdDur});
-  h += row({label:"Total Duration (gross)", cell:yrs(totalDur), cmp:totalDur});
+  h += row({label:"Total Duration (gross)", cell:runoffCell(o => nav(o) + o.cash, "crypto + cash"), cmp:totalDur});
   h += row({label:"Total Duration (net)", cell:yrs(totalNet), cls:neg(totalNet), cmp:totalNet});
   h += row({label:"Breakeven Crypto Rate", cell:o => brkE(o)==null ? null : fmt(brkE(o),2)+"%/yr", cmp:brkE, dir:"min"});
   h += subHead("Asset coverage <small style='color:var(--faint)'>higher = safer</small>");
@@ -1991,7 +2024,6 @@ function debtTipHTML(co){
   const owed=ds.reduce((s,x)=>s+(x.solAmount||0),0), usdDebt=ds.reduce((s,x)=>s+(x.solAmount?0:x.principal),0);
   const u=assetUnit(o), assetPar=o.holdings>owed ? usdDebt*1e6/(o.holdings-owed) : null;
   const px=o.stockPrice;
-  const mDate=s=>s ? new Date(s+"T00:00:00").toLocaleDateString("en-US",{month:"short",year:"2-digit"}) : "—";
   const parity=x=>x.convRate ? px*x.convRate/10 : null;   // conversion value as % of par
   const SH=DATA.stockHistory||{}, arr=SH[co]||[];
   const chg=n=>(arr.length>n&&arr[arr.length-1-n])?(arr.at(-1)/arr[arr.length-1-n]-1)*100:null;
@@ -2152,14 +2184,12 @@ function creditSnapshot(tk){
   const rows = o.prefBreakdown || [];
   const me = rows.find(r => r[0] === tk) || [tk, "", o.prefNotional, null];
   const monthOf = iso => Math.max(1, Math.round((Date.parse(iso) - Date.parse(today))/(30.44*864e5)));
-  // A tranche comes due at its next put or maturity. Out of the money today, it is
-  // repaid in cash then (no refinancing); in the money, it converts into shares.
-  // Loans with neither date roll over.
+  // each tranche is repaid or converts when trancheExit (calc-engine.js) says; loans
+  // with no date ahead roll over
   const tranches = (o.debtSchedule || []).map(t => {
-    const date = [t.put, t.maturity].filter(d => d && d > today).sort()[0];
-    const itm = t.convPrice && o.stockPrice >= t.convPrice;
+    const x = trancheExit(t, o.stockPrice, today);
     return { note:t.note, principal:t.principal, coupon:t.coupon, units:t.solAmount || 0,
-             repay: date && !itm ? monthOf(date) : null, convert: date && itm ? monthOf(date) : null };
+             repay: x && !x.converts ? monthOf(x.date) : null, convert: x && x.converts ? monthOf(x.date) : null };
   });
   return { ...balanceSheet(o), ...seriesTerms(tk),
            series:me[2], rate:me[3], ...otherSeries(o, tk),

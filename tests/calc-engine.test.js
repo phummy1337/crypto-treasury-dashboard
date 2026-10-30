@@ -8,7 +8,7 @@
 // both buttons (reserveMo).
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { crashMonth, pathPrice, reserveFor, reserveMonths, simulate, simulateCredit, breakEven } = require("../calc-engine.js");
+const { crashMonth, pathPrice, reserveFor, reserveMonths, simulate, simulateCredit, breakEven, trancheExit, runoffYears } = require("../calc-engine.js");
 
 const FIXTURES = {
   MSTR: {
@@ -376,4 +376,51 @@ test("a break-even of 0 can rest on the reserve: 12 months are funded at any pri
   near(r.unpaid, 0, "unpaid");
   assert.equal(breakEven(s, cfg), 0);
   assert.equal(breakEven(s, {...cfg, months:13}), null);
+});
+
+// The gross durations' run-off. $100M paying $10M a year makes the arithmetic checkable.
+test("with no debt falling due, the run-off is the reserve over the obligations", () => {
+  near(runoffYears(100, 8, []), 12.5, "100 / 8");
+});
+
+test("a repaid convert's principal leaves the reserve on its date, and its coupon stops", () => {
+  // $20M paid by year 2 leaves $80M; the $30M convert leaves $50M at $9M a year
+  near(runoffYears(100, 10, [{at:2, principal:30, coupon:1}]), 2 + 50/9, "years");
+});
+
+test("a converting tranche takes no principal, only its coupon stops", () => {
+  near(runoffYears(100, 10, [{at:2, principal:0, coupon:1}]), 2 + 80/9, "years");
+});
+
+test("exits are taken in date order, whatever order they come in", () => {
+  // year 1: 90 left, 20 repaid, 70 at $8M a year; year 3: 54 left, 10 repaid, 44 at $7M a year
+  near(runoffYears(100, 10, [{at:3, principal:10, coupon:1}, {at:1, principal:20, coupon:2}]), 3 + 44/7, "years");
+});
+
+test("a principal the reserve can't meet ends the run on its date", () => {
+  near(runoffYears(100, 10, [{at:2, principal:90, coupon:1}]), 2, "years");
+});
+
+test("the reserve can run out before a tranche falls due", () => {
+  near(runoffYears(15, 10, [{at:2, principal:30, coupon:1}]), 1.5, "years");
+});
+
+test("a tranche leaves at its next put or maturity: repaid out of the money, converted in it", () => {
+  const april = {put:"2028-04-06", maturity:"2030-04-06", convPrice:9.74143};
+  near(trancheExit(april, 3.99, "2026-10-30"), {date:"2028-04-06", converts:false}, "put ahead, out of the money");
+  near(trancheExit(april, 10, "2026-10-30"), {date:"2028-04-06", converts:true}, "put ahead, in the money");
+  near(trancheExit(april, 3.99, "2028-05-01"), {date:"2030-04-06", converts:false}, "put passed: maturity");
+  near(trancheExit({put:null, maturity:"2027-06-30", convPrice:null}, 100, "2026-10-30"),
+       {date:"2027-06-30", converts:false}, "straight debt is repaid");
+  near(trancheExit({put:null, maturity:null, convPrice:null}, 3.99, "2026-10-30"), null, "an undated loan rolls over");
+});
+
+test("DFDV on 2026-10-30: its converts' $126M falls due, so its SOL lasts 15.4 years, not 19.1", () => {
+  // 2,595,612 SOL at $95.19 against $12.93M a year (CHAD at 14%). The April notes are put
+  // on 2028-04-06 and the July notes mature on 2030-07-01, both far out of the money at
+  // $3.99; after them only CHAD and the undated loans are left, $6.34M a year.
+  const yrs = d => (Date.parse(d) - Date.parse("2026-10-30"))/(365.25*864e5);
+  const exits = [{at:yrs("2028-04-06"), principal:11.471, coupon:11.471*2.5/100},
+                 {at:yrs("2030-07-01"), principal:114.581, coupon:114.581*5.5/100}];
+  near(runoffYears(2595612*95.19/1e6, 12.93, exits), 15.374330453640416, "years");
 });
