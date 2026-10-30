@@ -1,4 +1,4 @@
-# TreasuryTracker.NET — Strategy (MSTR/STRC), Strive (ASST/SATA/SATS) and DeFi Development (DFDV/CHAD)
+# TreasuryTracker.NET — Strategy (MSTR/STRC), Strive (ASST/SATA) and DeFi Development (DFDV/CHAD)
 
 A single-file dashboard comparing digital-asset treasury companies and their preferred
 equity (digital credit) against the asset each one holds: BTC for Strategy and Strive,
@@ -59,3 +59,30 @@ Refresh every morning at 7am via cron:
 - Not investment advice. Notional/face values used for the ratios — confirm against
   each issuer's latest filing.
 - "▲" next to a value marks the more favorable side for common holders.
+
+## Restoring SATS
+SATS, Strive's junior 15% preferred ($700M, listed 2026-10-20), is hidden from the page
+as an instrument, but its claim still counts.
+- **Hidden:** its header tile, the SATA/SATS switches on the Daily Close and Short Interest
+  cards, its calculator button, and its name in the masthead, the meta and social-card
+  text, the grid headings, the sources, the ATM note, the Preferred Price definition and
+  the calculator's notes.
+- **Still counted:** ASST's preferred notional, annual obligations and mNAV history include
+  its $700M at 15%. The Preferred by Series hover and the Company Actions log name it,
+  since they reconcile those totals and that history.
+- **Still collected:** `refresh_data.py` keeps writing ASST's `pref2` (SATS's quote and
+  terms) and `pref2History`, and `pref2ShortInterest` from its first FINRA settlement. The
+  quotes worker still carries SATS.
+
+The surfaces came in with d377bd6 (tile, masthead, meta), bbb5330 (switches), a7d5d27
+(calculator button), 248bb13 (grid headings, the tile's day change, sources), f93f796 (the
+switch as the heading, PNG titles) and 4567fe5 (og-card-v3.jpg), with smaller mentions in
+4e8bcba, f92ff43, 947b5ce and 50a4b81. `og-card-v3.jpg` is the social card with SATS on
+it; the page now points at `og-card-v4.jpg`.
+
+One commit hid all of it, so reverting that commit brings it all back (later edits to the
+same lines may need merging by hand):
+
+```bash
+git revert $(git log -1 --format=%h --grep='Hide SATS')
+```

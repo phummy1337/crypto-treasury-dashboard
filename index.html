@@ -4,23 +4,23 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>TreasuryTracker.NET — Real-Time Treasury &amp; Digital Credit Tracking</title>
-<meta name="description" content="Live analytics on Strategy (MSTR · STRC), Strive (ASST · SATA · SATS) and DeFi Development (DFDV · CHAD): mNAV, CEBE, accumulation, capital structure, and implied price models. Powered by APYX.">
+<meta name="description" content="Live analytics on Strategy (MSTR · STRC), Strive (ASST · SATA) and DeFi Development (DFDV · CHAD): mNAV, CEBE, accumulation, capital structure, and implied price models. Powered by APYX.">
 <link rel="canonical" href="https://treasurytracker.net/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="TreasuryTracker.NET">
 <meta property="og:title" content="TreasuryTracker.NET — Real-Time Treasury &amp; Digital Credit Tracking">
-<meta property="og:description" content="Live analytics on Strategy (MSTR · STRC), Strive (ASST · SATA · SATS) and DeFi Development (DFDV · CHAD): mNAV, CEBE, accumulation, capital structure, and implied price models. Powered by APYX.">
+<meta property="og:description" content="Live analytics on Strategy (MSTR · STRC), Strive (ASST · SATA) and DeFi Development (DFDV · CHAD): mNAV, CEBE, accumulation, capital structure, and implied price models. Powered by APYX.">
 <meta property="og:url" content="https://treasurytracker.net/">
-<meta property="og:image" content="https://treasurytracker.net/og-card-v3.jpg">
+<meta property="og:image" content="https://treasurytracker.net/og-card-v4.jpg">
   <meta property="og:image:type" content="image/jpeg">
-  <meta property="og:image:alt" content="TreasuryTracker.NET — live MSTR, STRC, ASST, SATA, SATS, DFDV and CHAD analytics">
+  <meta property="og:image:alt" content="TreasuryTracker.NET — live MSTR, STRC, ASST, SATA, DFDV and CHAD analytics">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="TreasuryTracker.NET — Real-Time Treasury &amp; Digital Credit Tracking">
-<meta name="twitter:description" content="Live MSTR · STRC · ASST · SATA · SATS · DFDV · CHAD analytics — mNAV, CEBE, accumulation, capital structure, implied price models. Powered by APYX.">
-<meta name="twitter:image" content="https://treasurytracker.net/og-card-v3.jpg">
-  <meta name="twitter:image:alt" content="TreasuryTracker.NET — live MSTR, STRC, ASST, SATA, SATS, DFDV and CHAD analytics">
+<meta name="twitter:description" content="Live MSTR · STRC · ASST · SATA · DFDV · CHAD analytics — mNAV, CEBE, accumulation, capital structure, implied price models. Powered by APYX.">
+<meta name="twitter:image" content="https://treasurytracker.net/og-card-v4.jpg">
+  <meta name="twitter:image:alt" content="TreasuryTracker.NET — live MSTR, STRC, ASST, SATA, DFDV and CHAD analytics">
 <link rel="icon" href="apyx-logo.svg" type="image/svg+xml">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -99,20 +99,15 @@
 
   /* header stat bar */
   /* a Bitcoin card and three issuer cards, all built alike so every value sits on one
-     line at one size. Strive's is widest (two preferred series); Strategy's next, since
-     "$145.16" and "$99.92" are the widest figures and crowded a card DFDV's size. */
-  .statbar { display:grid; grid-template-columns: 0.62fr 1.42fr 1.68fr 1.24fr; gap: 12px; align-items: stretch; }
+     line at one size. Each issuer card holds three tiles, so they share the width evenly;
+     Strategy's "$145.16" and "$99.92", the widest figures, fit with ~1px to spare. */
+  .statbar { display:grid; grid-template-columns: 0.62fr repeat(3, 1.36fr); gap: 12px; align-items: stretch; }
   .statgroup { position:relative; overflow:hidden; border:1px solid var(--border); border-radius:6px;
     background:rgba(255,255,255,0.02); padding:10px 16px 12px; }
   .statgroup::before { content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--bx); }
   .sg-head { font-size:11.5px; text-transform:uppercase; letter-spacing:1.4px; font-weight:700; margin-bottom:6px; }
   .sg-items { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
   .sg-items.one { grid-template-columns:1fr; }
-  /* Strive carries two preferred series since SATS listed 2026-10-20. Four tiles in
-     the same single row keep the cards the same height; its card is wide enough that
-     the values keep the others' size. */
-  .sg-items.four { grid-template-columns:repeat(4,1fr); }
-  .sg-items.four .sg-item .lbl { letter-spacing:.6px; }
   .sg-item .lbl { font-size:11px; text-transform:uppercase; letter-spacing:.8px; color:var(--muted); white-space:nowrap; }
   .sg-item .val { font-size:20px; font-weight:700; font-style:italic; margin-top:2px;
     color:var(--bx); font-variant-numeric:tabular-nums; }
@@ -135,10 +130,6 @@
   @media (min-width: 1101px) and (max-width: 1200px) {
     .sg-items { gap: 10px; }
     .sg-item .val { font-size: 17px; }
-    /* a chart card is ~345px here: "SATA | SATS — Short Interest" and its PNG button
-       overran one line by a few px; tighter gaps keep it level with its neighbours */
-    .chartcard h3 { column-gap: 5px; }
-    .chartcard h3 .serieschips button { padding: 2px 5px; }
     .sg-item .lbl { letter-spacing: .5px; }
   }
   @media (max-width: 1100px) { .statbar { grid-template-columns: 1fr; } }
@@ -279,7 +270,7 @@
   .cobtn { font: inherit; font-size: 13.5px; font-weight: 700; color: var(--muted); background: rgba(255,255,255,0.04);
     border: 1px solid var(--border); border-radius: 6px; padding: 7px 14px; cursor: pointer; }
   .cobtn.active[data-co="MSTR"], .cobtn.active[data-co="STRC"] { color:#fff; border-color: var(--mstr); background: rgba(237,25,70,0.12); }
-  .cobtn.active[data-co="ASST"], .cobtn.active[data-co="SATA"], .cobtn.active[data-co="SATS"] { color:#fff; border-color: var(--asst); background: rgba(76,159,255,0.12); }
+  .cobtn.active[data-co="ASST"], .cobtn.active[data-co="SATA"] { color:#fff; border-color: var(--asst); background: rgba(76,159,255,0.12); }
   .cobtn.active[data-co="DFDV"], .cobtn.active[data-co="CHAD"] { color:#fff; border-color: var(--dfdv); background: rgba(169,112,255,0.13); }
   .calc-snap { color: var(--faint); font-size: 12.5px; margin-right: auto; }
   .calc-meta { padding-top: 8px; }
@@ -339,17 +330,6 @@
     color: var(--faint); font: inherit; font-size: 12px; font-weight: 600; padding: 3px 9px; cursor: pointer; }
   .rangechips button:hover { color: var(--text); }
   .rangechips button.active { color: #fff; border-color: rgba(255,255,255,0.45); background: rgba(255,255,255,0.06); }
-  /* Strive runs two preferred series, so its two preferred cards switch between
-     them. Same vocabulary as the range chips, sized to sit inside a card heading.
-     The switch stands in for the ticker there ("SATA | SATS — Short Interest"), so the
-     heading and its PNG button stay on one line, level with the cards beside it. */
-  .serieschips { display:inline-flex; gap:4px; margin-left:10px; vertical-align:middle; }
-  .chartcard h3 .serieschips { margin-left:0; }
-  .serieschips button { background:none; border:1px solid var(--border); border-radius:4px;
-    color:var(--faint); font:inherit; font-size:11px; font-weight:700; letter-spacing:.4px;
-    padding:2px 7px; cursor:pointer; }
-  .serieschips button:hover { color:var(--text); }
-  .serieschips button.active { color:#fff; border-color:rgba(255,255,255,0.45); background:rgba(255,255,255,0.06); }
   .nodata { display:flex; align-items:center; justify-content:center; height:100%;
     color:var(--faint); font-size:13.5px; text-align:center; padding:0 24px; line-height:1.5; }
   section { scroll-margin-top: 54px; }
@@ -440,7 +420,6 @@
   }
   .chartcard h3 { margin:0; font-weight:700; font-size: 14.5px; letter-spacing:.3px;
     display:flex; flex-wrap:wrap; align-items:center; gap:6px 7px; color:#fff; }
-  .chartcard h3 .h3t { white-space: nowrap; }
   .chartcard h3 .dot { width:9px; height:9px; }
   .chartcard h3 .pngbtn { margin-left:auto; flex:0 0 auto; background:none;
     border:1px solid var(--border); border-radius:4px; color:var(--faint);
@@ -466,10 +445,6 @@
     .statbar { gap: 8px; }
     .statgroup { padding: 9px 12px 11px; }
     .sg-items { gap: 8px; }
-    /* four tiles across a phone would leave ~75px a column, so Strive's second
-       preferred wraps to a 2x2 instead; the card is full width here anyway */
-    .sg-items.four { grid-template-columns: repeat(2, 1fr); gap: 8px 12px; }
-    .sg-items.four .sg-item .val { font-size: 17px; }
     .sg-item .val { font-size: 17px; }
     .sg-item .lbl, .sg-item .sub { font-size: 10.5px; letter-spacing: .6px; }
     /* .sg-items stays repeat(3, 1fr) here, so the sub-line has a third of the width
@@ -508,7 +483,7 @@
         <p>Real-Time Treasury &amp; Digital Credit Tracking</p>
         <div class="legend">
           <span><span class="dot" style="background:var(--mstr)"></span>Strategy — <b>MSTR</b> common · <b>STRC</b> preferred</span>
-          <span><span class="dot" style="background:var(--asst)"></span>Strive — <b>ASST</b> common · <b>SATA</b> + <b>SATS</b> preferred</span>
+          <span><span class="dot" style="background:var(--asst)"></span>Strive — <b>ASST</b> common · <b>SATA</b> preferred</span>
           <span><span class="dot" style="background:var(--dfdv)"></span>DeFi Development — <b>DFDV</b> common · <b>CHAD</b> preferred</span>
         </div>
       </div>
@@ -538,16 +513,13 @@
       </div>
       <div class="statgroup" style="--bx:var(--asst)">
         <div class="sg-head" style="color:var(--asst)">Strive</div>
-        <div class="sg-items" id="sg-items-ASST">
+        <div class="sg-items">
           <div class="sg-item"><div class="lbl">ASST</div><div class="val" id="hdr-px-ASST">—</div>
             <div class="sub" id="hdr-px-ASST-sub">common</div></div>
           <div class="sg-item"><div class="lbl">EV mNAV<span class="defhint" data-def="EV mNAV" data-co="ASST" aria-label="About this metric">&#9432;</span></div>
             <div class="val" id="hdr-mnav-ASST">—</div><div class="sub">EV ÷ crypto</div></div>
           <div class="sg-item"><div class="lbl">SATA</div><div class="val" id="hdr-pref-ASST">—</div>
             <div class="sub" id="hdr-pref-ASST-sub">preferred</div></div>
-          <div class="sg-item" id="hdr-sats-item" hidden><div class="lbl">SATS</div>
-            <div class="val" id="hdr-sats">—</div>
-            <div class="sub" id="hdr-sats-sub">preferred</div></div>
         </div>
       </div>
       <div class="statgroup" style="--bx:var(--dfdv)">
@@ -601,7 +573,7 @@
   <!-- 0. Preferred ATM Tracker (lead section) -->
   <section id="atm">
     <div class="sec-head"><h2>Preferred ATM Tracker</h2><span class="tag stub" id="tag-atm">seed data</span></div>
-    <p class="sec-note">An estimate of how much bitcoin each company is buying through its preferred ATM today, inferred from live trading and calibrated to the filings. CHAD and SATS will be reflected once their ATMs can be tracked.
+    <p class="sec-note">An estimate of how much bitcoin each company is buying through its preferred ATM today, inferred from live trading and calibrated to the filings. CHAD will be reflected once its ATM can be tracked.
       <span class="evhint hint-icon" aria-label="Methodology" data-title="How this estimate is built" data-rows="At-par volume~15-min bars printed at/above $99.95, prorated when a bar straddles it|Capture rate~the share of that volume that was really ATM issuance|Calibration~capture solved from the newest filed week, else a default rate|To bitcoin~estimated proceeds ÷ live BTC price|Why $99.95, not $100~SATA hugs par to the cent; a strict cutoff undercounted a confirmed $44.1M week roughly 4x|Assumption~issuance tracks at-par volume evenly through the session|Confirmed vs estimate~the 8-K figure is fact; the intraday number is an estimate between filings">&#9432;</span></p>
     <div class="charts two" id="atm-cards"></div>
   </section>
@@ -632,8 +604,7 @@
         <div class="chartwrap"><canvas id="ch-pref-MSTR"></canvas></div>
       </div>
       <div class="chartcard">
-        <h3><span class="dot" style="background:var(--asst)"></span><span class="serieschips" data-switch="pref">
-          <button data-series="SATA" class="active">SATA</button><button data-series="SATS">SATS</button></span><span class="h3t">— Daily Close</span></h3>
+        <h3><span class="dot" style="background:var(--asst)"></span>SATA — Daily Close</h3>
         <div class="chartwrap"><canvas id="ch-pref-ASST"></canvas></div>
       </div>
       <div class="chartcard">
@@ -737,7 +708,7 @@
       <li><b>Defaults are real</b> — issuance uses each company's rolling 3-month pace from its filings (a preferred whose ATM is on standby below par, as the ATM tracker shows, starts at $0). A common's ending mNAV starts at its multiple today, so nothing re-rates unless you set it; a preferred starts with BTC or SOL going nowhere. Those follow the live price until you change them. Override anything.</li>
       <li><b>Dividend cash runway</b> — issuance proceeds first park N months of preferred dividends as cash (MSTR's recent posture); only the rest buys the treasury asset. Parked cash never earns the mNAV multiple, so it's per-share neutral and a longer runway means less accretion. 0 = every dollar buys the asset.</li>
       <li><b>Issuance is earned, not assumed</b> — the common ATM shuts in any month the modeled EV mNAV sits below your floor (default 1.00×, Strategy's stated accretion threshold) or senior claims exceed the treasury. Dividends, interest and costs then follow a waterfall: today's cash first, then runway cash, then issuance <i>only while the ATM is open</i>, priced after its own dilution so it never raises more than the company is worth, then forced sales of the treasury. That's what makes a premium collapse actually hurt — you lose the accretion engine and start selling coin at the same moment.</li>
-      <li><b>Digital Credit</b> — STRC, SATA, SATS and CHAD run their issuer's balance sheet from the preferred holder's seat. No new money comes in unless you add it. Opening cash pays first, then sales of the treasury. Debt interest and any convertible due come before everything else: one out of the money today is repaid in cash at its first put or maturity, with no refinancing. Operating costs come next, then every preferred series at its own rate. Whatever can't be paid is a <i>modeled funding gap</i>, not a legal default.</li>
+      <li><b>Digital Credit</b> — STRC, SATA and CHAD run their issuer's balance sheet from the preferred holder's seat. No new money comes in unless you add it. Opening cash pays first, then sales of the treasury. Debt interest and any convertible due come before everything else: one out of the money today is repaid in cash at its first put or maturity, with no refinancing. Operating costs come next, then every preferred series at its own rate. Whatever can't be paid is a <i>modeled funding gap</i>, not a legal default.</li>
       <li><b>When can't it pay?</b> — the break-even is the lowest ending treasury price that still funds every payment through your horizon, holding everything else. Raising preferred below its stated amount adds more claim than cash: $1M at $8 is 125,000 CHAD shares and $1.25M of stated notional.</li>
       <li><b>CHAD's dividend reserve</b> — DeFi Development intends to keep 12 months of CHAD dividends apart from its other cash, not pledged to CHAD holders. The DFDV and CHAD buttons both carve that reserve out of today's cash at the rate you set, and a CHAD raise tops it up before anything else. It offsets claims like cash and pays only once the rest of the cash and the SOL can't: CHAD's Cash Runway is the cash outside it, and the DFDV view never spends it, since stock or SOL sales pay first and a treasury sold out ends the run.</li>
       <li><b>Crash test</b> — dips the treasury price that far below the straight line, bottoming in the month you pick, then back to your target by the horizon. Same ending price, different path: coin sold near the bottom to pay the bills is gone for good, so a crash can open a gap the straight line never shows. The break-even keeps your crash and moves only the ending price.</li>
@@ -751,7 +722,6 @@
         <span class="cogroup">Digital Credit</span>
         <button class="cobtn" data-co="STRC">STRC</button>
         <button class="cobtn" data-co="SATA">SATA</button>
-        <button class="cobtn" data-co="SATS">SATS</button>
         <button class="cobtn" data-co="CHAD">CHAD</button>
       </div>
       <div class="calc-co calc-meta">
@@ -793,7 +763,7 @@
       <div class="calc-out" id="calc-out"></div>
       <div class="chartwrap" style="height:260px; padding: 0 16px 14px;"><canvas id="ch-calc"></canvas></div>
       <p class="footnote" data-calcfoot="common" style="padding:0 18px 14px; margin:0;">A model, not a forecast: the treasury asset and mNAV move linearly to your targets, the asset dipping first if you set a crash; issuance is constant per month <i>while the ATM is open</i>. Not modeled: in-the-money converts flipping to shares, variable preferred-rate resets, debt maturities, and taxes on unrealized gains. mNAV here is EV mNAV on basic shares: market cap = mNAV × crypto NAV − claims. Converts are held at notional throughout — the model doesn't flip in-the-money tranches into share count. Runway cash offsets claims at face value and never earns the multiple, so only asset-bought dollars capture the issuance premium. Today's cash pays first, then runway cash, issuance and sales; spending it adds to claims. DFDV's 12-month CHAD dividend reserve is held cash that offsets claims too and pays only when nothing else can, so it is never spent here. The dividend rate you set applies to the series being issued (STRC, SATA or CHAD); every other series pays its own rate.</p>
-      <p class="footnote" data-calcfoot="credit" hidden style="padding:0 18px 14px; margin:0;">A model, not a forecast: the treasury asset moves linearly to your target, dipping first if you set a crash, and payments are aggregated by month (CHAD pays a slice every business day). Every preferred series ranks together here, though SATS is junior to SATA; debt ranks ahead of all of them. Not modeled: refinancing, buybacks, rate resets beyond your input, compounding of unpaid dividends, the $10–$11 reset of CHAD's liquidation preference, taxes, and SOL locked in staking or posted as collateral. Coverage counts the preferred at its stated amount. DFDV's 12-month CHAD dividend reserve is held cash that pays only once the rest of the cash and the SOL can't.</p>
+      <p class="footnote" data-calcfoot="credit" hidden style="padding:0 18px 14px; margin:0;">A model, not a forecast: the treasury asset moves linearly to your target, dipping first if you set a crash, and payments are aggregated by month (CHAD pays a slice every business day). Every preferred series ranks together here, whatever its seniority; debt ranks ahead of all of them. Not modeled: refinancing, buybacks, rate resets beyond your input, compounding of unpaid dividends, the $10–$11 reset of CHAD's liquidation preference, taxes, and SOL locked in staking or posted as collateral. Coverage counts the preferred at its stated amount. DFDV's 12-month CHAD dividend reserve is held cash that pays only once the rest of the cash and the SOL can't.</p>
     </div>
   </section>
 
@@ -824,8 +794,7 @@
         <div class="chartwrap"><canvas id="ch-short-STRC"></canvas></div>
       </div>
       <div class="chartcard">
-        <h3><span class="dot" style="background:var(--asst)"></span><span class="serieschips" data-switch="si">
-          <button data-series="SATA" class="active">SATA</button><button data-series="SATS">SATS</button></span><span class="h3t">— Short Interest</span></h3>
+        <h3><span class="dot" style="background:var(--asst)"></span>SATA — Short Interest</h3>
         <div class="si-chips" id="si-chips-SATA"></div>
         <div class="chartwrap"><canvas id="ch-short-SATA"></canvas></div>
       </div>
@@ -848,12 +817,12 @@
   <div class="sources">
     <b>Sources &amp; methodology</b> — Prices as of <span id="priceAsOf">—</span>; data as of <span id="dataAsOf">—</span>. Data refreshes automatically throughout market hours.
     <ul>
-      <li>Holdings, prices, shares, yields, preferred series: strategy.com / treasury.strive.com data feed; SATS's terms: its 8-K and prospectus, its daily closes: Nasdaq</li>
+      <li>Holdings, prices, shares, yields, preferred series: strategy.com / treasury.strive.com data feed</li>
       <li>DFDV &amp; CHAD — SOL held: DFDV's weekly 8-Ks, with its dashboard for the days between; CHAD's rate and offerings: its 8-Ks; shares, debt, cash, CHAD notional and quotes, SOL per share: DeFi Development's dashboard (defidevcorp.com/dashboard); daily DFDV closes: Nasdaq</li>
       <li>Weekly accumulation, debt schedule, historical preferred &amp; cash: SEC EDGAR filings (8-K, 10-Q, XBRL)</li>
       <li>Days to cover / short interest: Nasdaq (semi-monthly settlement data)</li>
       <li>Live BTC and SOL prices: CoinGecko API</li>
-      <li>Live preferred quotes: strategy.com API (STRC, real-time) · Cboe delayed quotes (SATA, SATS, CHAD, ~15 min)</li>
+      <li>Live preferred quotes: strategy.com API (STRC, real-time) · Cboe delayed quotes (SATA, CHAD, ~15 min)</li>
     </ul>
     <div style="margin-top:8px;color:var(--faint)">Not investment advice. Confirm against each issuer's latest filing before relying on the ratios.</div>
   </div>
@@ -1047,7 +1016,7 @@ const METRIC_DEFS = {
     m:"What it would cost to own the entire company: the equity plus every claim ahead of it, net of the cash on hand."},
   "Beta to Treasury Asset": {c:"Slope of daily stock returns regressed against the issuer's own treasury asset over the past year: BTC for MSTR and ASST, SOL for DFDV.",
     m:"Sensitivity to the asset behind the stock: a beta of 1.5 means the stock has tended to move 1.5% for every 1% move in that asset. A low figure means the stock has been trading on more than its treasury."},
-  "Preferred Price": {c:"Last trade of each issuer's flagship preferred (STRC / SATA / CHAD), against its stated value — $100 for STRC and SATA, $10 for CHAD. Strive's second series, SATS, is junior to SATA and shown in the header and in the preferred breakdown.",
+  "Preferred Price": {c:"Last trade of each issuer's flagship preferred (STRC / SATA / CHAD), against its stated value — $100 for STRC and SATA, $10 for CHAD.",
     m:"Below its stated value, the market demands more yield than the coupon pays — the discount is the market's live read on issuer risk."},
   "Crypto Holdings": {c:"The treasury held: bitcoin per the latest weekly 8-K (MSTR, ASST); SOL and SOL equivalents per DeFi Development's dashboard (DFDV), whose SOL loans are counted in senior debt.",
     m:"The treasury itself — the asset backing everything else on this page."},
@@ -1135,13 +1104,12 @@ function row({label, cell, cls, cmp, dir, sameAsset}){
   </div>`;
 }
 
-// Each column's issuer: ticker, name and every preferred it lists (ASST's SATS too), on
-// one line; the CSS drops the name before anything would wrap (.coname)
+// Each column's issuer: ticker, name and its flagship preferred, on one line; the CSS
+// drops the name before anything would wrap (.coname)
 const SHORT_NAME = { DFDV: "DeFi Dev" };
 function headRow(){
   const c = k => { const o = DATA.companies[k];
-    const prefs = [o.prefTicker, o.pref2 && o.pref2.ticker].filter(Boolean).join(" + ");
-    return `<div class="co" style="color:${o.accent}">${o.ticker} <small><span class="coname">· ${SHORT_NAME[k] || o.name} </span>· ${prefs} pref</small></div>`; };
+    return `<div class="co" style="color:${o.accent}">${o.ticker} <small><span class="coname">· ${SHORT_NAME[k] || o.name} </span>· ${o.prefTicker} pref</small></div>`; };
   return `<div class="grow headrow"><div class="glabel"></div>${COS.map(c).join("")}</div>`;
 }
 // a section sub-heading inside a metric grid, with an empty cell per issuer
@@ -1416,23 +1384,13 @@ function renderPriceHeader(){
   const sv=document.getElementById("solVal"); if(sv) sv.textContent = usd(solPrice,2);
   const pa=document.getElementById("priceAsOf"); if(pa) pa.textContent = DATA.priceAsOf || "—";
   const da=document.getElementById("dataAsOf"); if(da) da.textContent = DATA.asOf || "—";
-  const D=DATA.companies, A=D.ASST;
+  const D=DATA.companies;
   const set=(id,v)=>{const e=document.getElementById(id); if(e) e.innerHTML=v;};
   COS.forEach(co => { const o = D[co];
     set("hdr-px-"+co, usd(o.stockPrice,2));
     set("hdr-mnav-"+co, fmt(evMnav(o),2)+"x");
     set("hdr-pref-"+co, usd(o.prefPrice,2));
   });
-  // SATS listed 2026-10-20 as Strive's second, junior preferred. The tile only
-  // appears once there is a quote, so a feed without it renders exactly as before.
-  const p2 = A.pref2, sats = document.getElementById("hdr-sats-item"),
-        grid = document.getElementById("sg-items-ASST");
-  if(sats && grid){
-    const on = !!(p2 && p2.price > 0);
-    sats.hidden = !on;
-    grid.classList.toggle("four", on);
-    if(on) set("hdr-sats", usd(p2.price,2));
-  }
   const chg = v => (v==null||isNaN(v)) ? "" : `<span class="${v>=0?'pos':'neg'}">${sig(v)}${fmt(v,2)}%</span>`;
   // Relative volume is the last SETTLED session's (refresh_data.py leaves the running
   // one out), so from the open until the evening refresh it describes the previous
@@ -1468,9 +1426,6 @@ function renderPriceHeader(){
     set("hdr-px-"+co+"-sub",   sub(o, o.dayChangePct,  o.rvol,     "_preClose",     "common"));
     set("hdr-pref-"+co+"-sub", sub(o, o.prefChangePct, o.prefRvol, "_prefPreClose", "preferred"));
   });
-  // SATS: its day's move like the others, then its terms where the others say "preferred"
-  if(p2 && p2.price > 0)
-    set("hdr-sats-sub", sub(p2, p2.changePct, null, "_preClose", `${fmt(p2.rate,0)}% · $${fmt(p2.stated,0)} par`));
 }
 // One ATM stat tile; its tooltip rides in data-rows, which tipHTML splits on | then ~.
 function atmCell(k, v, sub, tip, color){
@@ -1676,11 +1631,8 @@ const MTL = (typeof innerWidth !== "undefined" && innerWidth < 640) ? 5 : 8;  //
 // ---------- global chart time range ----------
 // One window for every time-series chart, so MSTR and ASST panels stay comparable.
 let chartRange = "all";
-// Which of Strive's two preferred series each of its preferred cards is showing.
-let prefSeries = "SATA", siSeries = "SATA";
-// SATS listed 2026-10-20, so both of its series start empty and fill in: the price
-// history one session at a time, short interest at the first FINRA settlement.
-// Say which, rather than drawing a chart out of one point or none.
+// A card whose series hasn't started yet (a weekly holdings series, a newer listing's
+// first FINRA settlement) says why, rather than drawing a chart out of one point or none.
 function showNoData(canvasId, msg){
   const cv = document.getElementById(canvasId); if(!cv) return false;
   const wrap = cv.parentElement;
@@ -1824,20 +1776,12 @@ function renderCharts(){
 
     }
 
-    // 4. Preferred price + shares outstanding (STRC / SATA / SATS / CHAD); shares =
+    // 4. Preferred price + shares outstanding (STRC / SATA / CHAD); shares =
     // notional ÷ stated amount ($100, CHAD $10)
-    const useSats = (co === "ASST" && prefSeries === "SATS");
-    const ph = useSats ? o.pref2History : o.prefHistory;
-    if(co === "ASST"){
-      if(useSats && (!ph || (ph.px || []).filter(v=>v!=null).length < 2)){
-        showNoData("ch-pref-ASST",
-          `SATS listed 20 Oct 2026. Its daily close builds here one session at a time — `
-          + `${(ph && ph.px ? ph.px.length : 0)} so far.`);
-      } else clearNoData("ch-pref-ASST");
-    }
-    if(ph && !(useSats && (ph.px || []).filter(v=>v!=null).length < 2)){
-      const pt = useSats ? "SATS" : o.prefTicker;
-      const stated = (useSats ? o.pref2 && o.pref2.stated : o.prefStated) || 100;
+    const ph = o.prefHistory;
+    if(ph){
+      const pt = o.prefTicker;
+      const stated = o.prefStated || 100;
       const [phd_, phpx_, phn_] = clip(PPM_DAY, ph.dates, ph.px, ph.notional);
       const shOut = phn_.map(n => n ? n/stated : null);           // $M notional -> M shares
       const prefOpts = baseOpts({ scales:{
@@ -1866,10 +1810,7 @@ function renderCharts(){
     ["ASST", D.ASST.shortInterest,     acc("ASST"), D.ASST.borrowFee],
     ["DFDV", D.DFDV.shortInterest,     acc("DFDV"), D.DFDV.borrowFee],
     ["STRC", D.MSTR.prefShortInterest, acc("MSTR"), D.MSTR.prefBorrowFee],
-    ["SATA", siSeries === "SATS" ? D.ASST.pref2ShortInterest
-                                 : D.ASST.prefShortInterest,
-             acc("ASST"), siSeries === "SATS" ? D.ASST.pref2BorrowFee
-                                              : D.ASST.prefBorrowFee],
+    ["SATA", D.ASST.prefShortInterest, acc("ASST"), D.ASST.prefBorrowFee],
     ["CHAD", D.DFDV.prefShortInterest, acc("DFDV"), D.DFDV.prefBorrowFee],
   ];
   // DFDV and CHAD are newer to the page; an empty card should say why, not look broken
@@ -1883,22 +1824,9 @@ function renderCharts(){
         : "No FINRA short-interest settlements for "+sym+" yet.");
     }
   });
-  // The SATA card doubles as the SATS card. FINRA settles twice a month and
-  // publishes about a week later, so a listing from 20 Oct has nothing to show
-  // until mid-November — an empty card would just look broken.
-  {
-    const s2 = D.ASST.pref2ShortInterest;
-    if(siSeries === "SATS" && !(s2 && s2.pctFloat)){
-      const chips = document.getElementById("si-chips-SATA"); if(chips) chips.innerHTML = "";
-      showNoData("ch-short-SATA",
-        "SATS listed 20 Oct 2026. FINRA settles short interest twice a month and "
-        + "publishes about a week later, so the first reading is due mid-November.");
-    } else clearNoData("ch-short-SATA");
-  }
   let anyShorts = false;
   shortSpecs.forEach(([sym, si, ac, fee]) => {
     if(!si || !si.pctFloat) return;
-    if(sym === "SATA" && siSeries === "SATS" && !(D.ASST.pref2ShortInterest || {}).pctFloat) return;
     anyShorts = true;
     const chips = document.getElementById("si-chips-"+sym);
     if(chips){
@@ -2142,18 +2070,15 @@ async function loadData(){
 let calcCo = "MSTR";
 // The Digital Credit buttons and the issuer each one models: a preferred is valued from
 // its holder's seat on the issuer's whole balance sheet.
-const CREDIT = { STRC:"MSTR", SATA:"ASST", SATS:"ASST", CHAD:"DFDV" };
+const CREDIT = { STRC:"MSTR", SATA:"ASST", CHAD:"DFDV" };
 const isCredit = co => co in CREDIT;
 const calcIssuer = co => DATA.companies[CREDIT[co] || co];
 // DeFi Development's CHAD page: "At closing, the Company intends to establish a separate dividend
 // reserve equal to 12 months of CHAD dividends based on the initial 14% annual dividend rate. The
 // reserve is not pledged to CHAD holders." Both its buttons hold it; every other button passes 0.
 const CHAD_RESERVE_MO = 12;
-// A series' last trade and stated amount. SATS rides on ASST's pref2, since SATA, the
-// flagship, holds ASST's prefPrice; read from prefPrice, SATS would open at SATA's quote.
-const seriesTerms = tk => { const o = calcIssuer(tk), p2 = o.pref2;
-  return p2 && p2.ticker === tk ? { quote:p2.price, stated:p2.stated || 100 }
-                                : { quote:o.prefPrice, stated:o.prefStated || 100 }; };
+// A series' last trade and stated amount; each button is its issuer's flagship, quoted in prefPrice.
+const seriesTerms = tk => { const o = calcIssuer(tk); return { quote:o.prefPrice, stated:o.prefStated || 100 }; };
 
 // Today's treasury, cash and debt as both engines read them. DFDV's SOL loans are SOL
 // owed, so they stay in units (`owed`) and each month marks them at that month's price:
@@ -2502,12 +2427,10 @@ function exportCanvas(cv, filename, btn){
 function chartExportMeta(id, card){
   const cfg = CHART_CFG[id] || {};
   const h3 = card.querySelector("h3");
-  // a series switch counts as the series it shows, not the text of every button on it;
-  // a hint icon isn't part of the title
+  // the heading's text, less its PNG button and any hint icon
   const title = [...h3.childNodes]
     .filter(n => !(n.nodeType === 1 && n.matches(".pngbtn, .evhint, .defhint")))
-    .map(n => n.nodeType === 1 && n.classList.contains("serieschips")
-      ? (n.querySelector("button.active") || {}).textContent || "" : n.textContent)
+    .map(n => n.textContent)
     .join(" ").replace(/\s+/g, " ").trim();
   const dash = title.indexOf("—");
   const scales = (cfg.options && cfg.options.scales) || {};
@@ -3087,9 +3010,6 @@ async function fetchCboe(){
     apply(F, "stockPrice", "dayChangePct",  "_preClose",     "DFDV");
     apply(F, "prefPrice",  "prefChangePct", "_prefPreClose", "CHAD");
   }
-  // SATS lives on its own object rather than a prefPrice field, since ASST's
-  // flagship preferred is still SATA
-  if(A.pref2) apply(A.pref2, "price", "changePct", "_preClose", "SATS");
   if(changed){ renderAll(); markFresh(); }
 }
 async function fetchStrategyLive(){
@@ -3268,13 +3188,6 @@ async function repollData(){
   addEventListener("scroll", () => { if(!queued){ queued = true; requestAnimationFrame(setHere); } },
                    {passive:true});
   setHere();
-  document.addEventListener("click", e => {
-    const b = e.target.closest(".serieschips button[data-series]"); if(!b) return;
-    const which = b.closest(".serieschips").dataset.switch;
-    if(which === "pref") prefSeries = b.dataset.series; else siSeries = b.dataset.series;
-    [...b.parentElement.children].forEach(x => x.classList.toggle("active", x === b));
-    renderCharts();
-  });
   document.getElementById("rangechips").addEventListener("click", e => {
     const b = e.target.closest("button[data-range]"); if(!b) return;
     chartRange = b.dataset.range;

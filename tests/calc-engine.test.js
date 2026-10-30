@@ -43,17 +43,12 @@ const FIXTURES = {
     cfg: {target:80472, months:60, prefMo:0, rate:12, issuePx:99.36, reqYield:12.0773, stake:0, opex:0},
     golden: {unpaid:0, firstGap:null, cashOut:18, firstSale:18, sold:111859.34464523906, repaid:6713.75, coverEnd:4.372672039662781, breakEven:313.14230393831235},
   },
+  // SATS has no button now, but its $700M at 15% still ranks with SATA's $1,403M at 13%:
+  // it is the other series here, as in ASST's fixture (otherNotional, otherDivs)
   SATA: {
     s: {spot:80472, hold:36818, cash:976, owed:0, debtUsd:0, intUsd:0, intUnits:0, stated:100, quote:98.02,
         series:1403, rate:13, otherNotional:700, otherDivs:105, tranches:[]},
     cfg: {target:80472, months:60, prefMo:0, rate:13, issuePx:98.02, reqYield:13.2626, stake:0, opex:0},
-    golden: {unpaid:0, firstGap:null, cashOut:41, firstSale:41, sold:5728.07933194154, repaid:0, coverEnd:1.1896662368045656, breakEven:4683.269706652449},
-  },
-  // SATS from the same day's stack: its $700M at 15%, SATA's $1,403M at 13% the other series
-  SATS: {
-    s: {spot:80472, hold:36818, cash:976, owed:0, debtUsd:0, intUsd:0, intUnits:0, stated:100, quote:92.6,
-        series:700, rate:15, otherNotional:1403, otherDivs:182.39, tranches:[]},
-    cfg: {target:80472, months:60, prefMo:0, rate:15, issuePx:92.6, reqYield:16.1987, stake:0, opex:0},
     golden: {unpaid:0, firstGap:null, cashOut:41, firstSale:41, sold:5728.07933194154, repaid:0, coverEnd:1.1896662368045656, breakEven:4683.269706652449},
   },
   CHAD: {
@@ -84,7 +79,7 @@ for(const co of ["MSTR", "ASST", "DFDV"]){
     for(const k in golden) near(r[k], golden[k], k);
   });
 }
-for(const tk of ["STRC", "SATA", "SATS", "CHAD"]){
+for(const tk of ["STRC", "SATA", "CHAD"]){
   test(`${tk} credit defaults give the golden results`, () => {
     const {s, cfg, golden} = FIXTURES[tk];
     const r = {...simulateCredit(s, cfg), breakEven:breakEven(s, cfg)};
@@ -208,13 +203,6 @@ const flatCo = (over = {}) => ({target:100, months:1, prefMo:0, commonMo:0, rate
 
 test("the ending mNAV prices the whole structure", () => {
   near(simulate(tinyCo(), flatCo()).implied, (1.5*100 - 20)/10, "(1.5 x NAV - claims) / shares");
-});
-
-test("SATS and SATA share one pool, so their coverage reads the same", () => {
-  const sata = simulateCredit(FIXTURES.SATA.s, FIXTURES.SATA.cfg);
-  const sats = simulateCredit(FIXTURES.SATS.s, FIXTURES.SATS.cfg);
-  near(sats.coverEnd, sata.coverEnd, "coverage");
-  near(sats.sold, sata.sold, "coin sold");
 });
 
 test("with the ATM shut below its floor, costs are paid by selling the treasury", () => {
