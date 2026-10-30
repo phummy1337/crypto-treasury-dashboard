@@ -587,17 +587,17 @@
     <p class="sec-note">Where each company stands right now — share price, size, and the balance-sheet building blocks that every metric below is built from. Hover any line item for how it's calculated and why it matters.</p>
     <div class="charts">
       <div class="chartcard">
-        <h3><span class="dot" style="background:var(--mstr)"></span>MSTR — Daily Close<span class="defhint" data-def="EV mNAV" aria-label="About EV mNAV">&#9432;</span></h3>
+        <h3><span class="dot" style="background:var(--mstr)"></span>MSTR — Daily Close</h3>
         <div class="si-chips mnav-ctx" id="mnav-ctx-MSTR"></div>
         <div class="chartwrap"><canvas id="ch-si-MSTR"></canvas></div>
       </div>
       <div class="chartcard">
-        <h3><span class="dot" style="background:var(--asst)"></span>ASST — Daily Close<span class="defhint" data-def="EV mNAV" aria-label="About EV mNAV">&#9432;</span></h3>
+        <h3><span class="dot" style="background:var(--asst)"></span>ASST — Daily Close</h3>
         <div class="si-chips mnav-ctx" id="mnav-ctx-ASST"></div>
         <div class="chartwrap"><canvas id="ch-si-ASST"></canvas></div>
       </div>
       <div class="chartcard">
-        <h3><span class="dot" style="background:var(--dfdv)"></span>DFDV — Daily Close<span class="defhint" data-def="EV mNAV" aria-label="About EV mNAV">&#9432;</span></h3>
+        <h3><span class="dot" style="background:var(--dfdv)"></span>DFDV — Daily Close</h3>
         <div class="si-chips mnav-ctx" id="mnav-ctx-DFDV"></div>
         <div class="chartwrap"><canvas id="ch-si-DFDV"></canvas></div>
       </div>
@@ -1769,6 +1769,10 @@ function renderCharts(){
         return ctx.dataset.yAxisID==="yM" ? mLbl+": "+(+ctx.parsed.y).toFixed(2)+"x"
                                           : co+": $"+(+ctx.parsed.y).toFixed(2);
       }};
+      // hovering "EV mNAV" in the legend opens its definition (the header tile keeps a ⓘ)
+      Object.assign(siOpts.plugins.legend, {
+        onHover:(e, item, lg) => { if(item.text === mLbl) showLegendDef(lg, item); },
+        onLeave:(e, item, lg) => { if(item.text === mLbl) hideLegendDef(lg); } });
       mkChart("ch-si-"+co, { type:"line", data:{ labels, datasets:[
         {label:"Price", data:px, yAxisID:"yP", borderColor:c, backgroundColor:c+"18",
           borderWidth:2, tension:.2, pointRadius:0, fill:false, order:1},
@@ -1894,26 +1898,31 @@ const evtip = document.createElement("div"); evtip.id = "evtip"; document.body.a
 const HINT_SEL = ".evhint, .defhint";
 let tipPinned = null;                       // element whose tip is held open by tap/click
 
+// a metric's definition from METRIC_DEFS; `co` adds that issuer's own note, which only
+// its own tile passes
+function defHTML(name, co){
+  const d = METRIC_DEFS[name]; if(!d) return null;
+  const own = (d.co || {})[co];
+  // a definition with no "what it means" is a one-liner, shown without headings
+  if(!d.m) return `<div class="et-title">${name}</div><p class="et-p">${d.c}</p>`;
+  return `<div class="et-title">${name}</div>
+    <div class="et-sec">How It's Calculated</div><p class="et-p">${d.c}${own ? " "+own : ""}</p>
+    <div class="et-sec">What It Means</div><p class="et-p">${d.m}</p>`;
+}
 function tipHTML(el){
-  if(el.classList.contains("defhint")){
-    const d = METRIC_DEFS[el.dataset.def]; if(!d) return null;
-    const own = (d.co || {})[el.dataset.co];     // an issuer's own note, on its own tile only
-    // a definition with no "what it means" is a one-liner, shown without headings
-    if(!d.m) return `<div class="et-title">${el.dataset.def}</div><p class="et-p">${d.c}</p>`;
-    return `<div class="et-title">${el.dataset.def}</div>
-      <div class="et-sec">How It's Calculated</div><p class="et-p">${d.c}${own ? " "+own : ""}</p>
-      <div class="et-sec">What It Means</div><p class="et-p">${d.m}</p>`;
-  }
+  if(el.classList.contains("defhint")) return defHTML(el.dataset.def, el.dataset.co);
   const rows = (el.dataset.rows||"").split("|").map(r=>r.split("~"));
   return `<div class="et-title">${el.dataset.title||""}</div><table>` +
     rows.map(([k,v])=>`<tr><td>${k}</td><td>${v}</td></tr>`).join("") + '</table>';
 }
-function showTip(el){
-  const html = tipHTML(el); if(html==null) return;
+// definitions read left-aligned; breakdown tables hang right off the number
+function showTip(el){ placeTip(tipHTML(el), el.getBoundingClientRect(), el.classList.contains("defhint")); }
+// the tip under box r, or above it when there's no room below, kept inside the window
+function placeTip(html, r, alignLeft){
+  if(html==null) return;
   evtip.innerHTML = html; evtip.style.display = "block";
-  const r = el.getBoundingClientRect(), W = window.innerWidth;
-  // definitions read left-aligned; breakdown tables hang right off the number
-  let left = el.classList.contains("defhint") ? r.left : r.right - evtip.offsetWidth;
+  const W = window.innerWidth;
+  let left = alignLeft ? r.left : r.right - evtip.offsetWidth;
   if(left + evtip.offsetWidth > W - 8) left = W - evtip.offsetWidth - 8;
   if(left < 8) left = 8;
   let top = r.bottom + 8;
@@ -1921,6 +1930,21 @@ function showTip(el){
   evtip.style.left = left + "px"; evtip.style.top = Math.max(8, top) + "px";
 }
 function hideTip(){ evtip.style.display = "none"; tipPinned = null; }
+// A legend label is drawn into its chart's canvas, where no ⓘ can sit, so a label named
+// for a metric opens that metric's definition on hover, under the label. Chart.js gives a
+// legend no hover on touch: there a tap still toggles the line.
+function showLegendDef(lg, item){
+  const cv = lg.chart.canvas, c = cv.getBoundingClientRect();
+  const b = lg.legendHitBoxes[lg.legendItems.indexOf(item)];
+  cv.style.cursor = "help";
+  if(tipPinned || !b) return;                 // a pinned tip outranks hover
+  placeTip(defHTML(item.text), {left:c.left+b.left, right:c.left+b.left+b.width,
+                                top:c.top+b.top, bottom:c.top+b.top+b.height}, true);
+}
+function hideLegendDef(lg){
+  lg.chart.canvas.style.cursor = "";
+  if(!tipPinned) evtip.style.display = "none";
+}
 
 document.addEventListener("mouseover", e => {
   if(tipPinned) return;                     // a pinned tip outranks hover
