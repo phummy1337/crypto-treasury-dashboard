@@ -1,7 +1,7 @@
 {
   "asOf": "2026-11-02",
   "priceAsOf": "2026-11-02",
-  "btcPriceUsd": 76893,
+  "btcPriceUsd": 76801,
   "btcSupply": 21000000,
   "btcCirculating": 20105365,
   "companies": {
@@ -4194,7 +4194,7 @@
       "borrowFee": {
         "pct": 0.36,
         "avail": 10000000,
-        "asOf": "2026-11-02 17:14:44"
+        "asOf": "2026-11-02 17:46:11"
       },
       "borrowFeeHist": {
         "iso": [
@@ -4329,7 +4329,7 @@
       "prefBorrowFee": {
         "pct": 1.41,
         "avail": 1700000,
-        "asOf": "2026-11-02 17:14:44"
+        "asOf": "2026-11-02 17:46:11"
       },
       "prefBorrowFeeHist": {
         "iso": [
@@ -4463,13 +4463,13 @@
       },
       "assumedDilutedShares": 453.11,
       "_dilOverlayM": 29.579,
-      "netSatsPerShare": 153171,
+      "netSatsPerShare": 153179,
       "netMnavPub": 1.1111,
-      "amplificationPub": 1.2971,
-      "breakevenArrPub": 2.2765,
+      "amplificationPub": 1.297,
+      "breakevenArrPub": 2.276,
       "hurdleArrPub": 10.5353,
-      "floorArrPub": -16.9466,
-      "creditDurationPub": 6.1307,
+      "floorArrPub": -16.9508,
+      "creditDurationPub": 6.1303,
       "netDilutedShares": 427.5,
       "atm": {
         "ticker": "STRC",
@@ -4829,7 +4829,7 @@
         "latestOnEdgar": "2026-11-02",
         "ingested": "2026-11-02"
       },
-      "netLeveragePub": 2.7494,
+      "netLeveragePub": 2.7488,
       "costBasisFiledM": 64080,
       "rvol": {
         "mult": 0.57,
@@ -4902,7 +4902,7 @@
       "capStructAsOf": "2026-06-18 (8-K)",
       "dilutedShares": 130.04,
       "marketCapBasic": 925,
-      "navPremiumBasic": 0.8,
+      "navPremiumBasic": 0.801,
       "treasuryDate": "2026-11-02",
       "bpsHistory": {
         "dates": [
@@ -7454,7 +7454,7 @@
           1.622,
           1.612,
           1.582,
-          1.549
+          1.55
         ]
       },
       "cashUsd": 490.4,
@@ -7620,7 +7620,7 @@
       "borrowFee": {
         "pct": 0.68,
         "avail": 5200000,
-        "asOf": "2026-11-02 17:14:44"
+        "asOf": "2026-11-02 17:46:11"
       },
       "borrowFeeHist": {
         "iso": [
@@ -7755,7 +7755,7 @@
       "prefBorrowFee": {
         "pct": 20.58,
         "avail": 500000,
-        "asOf": "2026-11-02 17:14:44"
+        "asOf": "2026-11-02 17:46:11"
       },
       "prefBorrowFeeHist": {
         "iso": [
@@ -7889,7 +7889,7 @@
       },
       "_dilOverlayM": 2.7136,
       "assumedDilutedShares": 130.04,
-      "netSatsPerShare": 17531,
+      "netSatsPerShare": 17512,
       "netDilutedShares": 130.04,
       "atm": {
         "ticker": "SATA",
@@ -8468,7 +8468,7 @@
           "coupon": 12.5,
           "maturity": null,
           "put": null,
-          "principal": 6.902,
+          "principal": 6.9,
           "convPrice": null,
           "convRate": null,
           "solAmount": 75000.0
@@ -8487,13 +8487,13 @@
           "coupon": 5.0,
           "maturity": null,
           "put": null,
-          "principal": 44.814,
+          "principal": 44.804,
           "convPrice": null,
           "convRate": null,
           "solAmount": 487000.0
         }
       ],
-      "seniorDebt": 200.77,
+      "seniorDebt": 200.76,
       "capStructAsOf": "2026-11-02 (DFDV dashboard)",
       "prefNotional": 15.81,
       "prefBreakdown": [
@@ -10069,9 +10069,9 @@
         "dtcLive": 0.48
       },
       "borrowFee": {
-        "pct": 4.13,
+        "pct": 4.17,
         "avail": 1000000,
-        "asOf": "2026-11-02 17:14:44"
+        "asOf": "2026-11-02 17:46:11"
       },
       "borrowFeeHist": {
         "iso": [
@@ -10088,13 +10088,13 @@
           4.44,
           4.33,
           4.33,
-          4.13
+          4.17
         ]
       },
       "prefBorrowFee": {
-        "pct": 69.67,
+        "pct": 69.73,
         "avail": 400,
-        "asOf": "2026-11-02 17:14:44"
+        "asOf": "2026-11-02 17:46:11"
       },
       "prefBorrowFeeHist": {
         "iso": [
@@ -10111,7 +10111,7 @@
           69.12,
           68.05,
           68.05,
-          69.67
+          69.73
         ]
       },
       "netDilutedShares": 34.44,
@@ -13996,7 +13996,7 @@
     "options": [
       {
         "name": "apxUSD / PT-apyUSD-5NOV2026",
-        "apy": 17.18
+        "apy": 17.17
       },
       {
         "name": "apxUSD / PT-apxUSD-5NOV2026",
@@ -14012,6 +14012,6 @@
       }
     ]
   },
-  "solPriceUsd": 92.02,
-  "solCirculating": 590205717
+  "solPriceUsd": 92.0,
+  "solCirculating": 590205707
 }
