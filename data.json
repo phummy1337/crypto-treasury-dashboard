@@ -1,9 +1,9 @@
 {
   "asOf": "2026-11-17",
   "priceAsOf": "2026-11-17",
-  "btcPriceUsd": 64475,
+  "btcPriceUsd": 64879,
   "btcSupply": 21000000,
-  "btcCirculating": 20113128,
+  "btcCirculating": 20113143,
   "companies": {
     "MSTR": {
       "name": "Strategy",
@@ -4326,7 +4326,7 @@
       "borrowFee": {
         "pct": 0.34,
         "avail": 10000000,
-        "asOf": "2026-11-16 21:59:05"
+        "asOf": "2026-11-16 23:01:46"
       },
       "borrowFeeHist": {
         "iso": [
@@ -4485,7 +4485,7 @@
       "prefBorrowFee": {
         "pct": 1.35,
         "avail": 550000,
-        "asOf": "2026-11-16 21:59:05"
+        "asOf": "2026-11-16 23:01:46"
       },
       "prefBorrowFeeHist": {
         "iso": [
@@ -4643,12 +4643,12 @@
       },
       "assumedDilutedShares": 457.25,
       "_dilOverlayM": 29.5656,
-      "netSatsPerShare": 145026,
+      "netSatsPerShare": 145269,
       "netMnavPub": 1.0902,
-      "amplificationPub": 1.3592,
-      "breakevenArrPub": 2.6073,
+      "amplificationPub": 1.357,
+      "breakevenArrPub": 2.5952,
       "hurdleArrPub": 10.4725,
-      "floorArrPub": -15.2758,
+      "floorArrPub": -15.3493,
       "creditDurationPub": 5.9725,
       "netDilutedShares": 431.63,
       "atm": {
@@ -5009,7 +5009,7 @@
         "latestOnEdgar": "2026-11-16",
         "ingested": "2026-11-16"
       },
-      "netLeveragePub": 3.3012,
+      "netLeveragePub": 3.2858,
       "costBasisFiledM": 64200,
       "rvol": {
         "mult": 0.85,
@@ -7918,7 +7918,7 @@
       "borrowFee": {
         "pct": 0.61,
         "avail": 3900000,
-        "asOf": "2026-11-16 21:59:05"
+        "asOf": "2026-11-16 23:01:46"
       },
       "borrowFeeHist": {
         "iso": [
@@ -8077,7 +8077,7 @@
       "prefBorrowFee": {
         "pct": 22.46,
         "avail": 450000,
-        "asOf": "2026-11-16 21:59:05"
+        "asOf": "2026-11-16 23:01:46"
       },
       "prefBorrowFeeHist": {
         "iso": [
@@ -8235,7 +8235,7 @@
       },
       "_dilOverlayM": 2.7136,
       "assumedDilutedShares": 130.04,
-      "netSatsPerShare": 14448,
+      "netSatsPerShare": 14566,
       "netDilutedShares": 130.04,
       "atm": {
         "ticker": "SATA",
@@ -8908,13 +8908,13 @@
           "coupon": 5.0,
           "maturity": null,
           "put": null,
-          "principal": 34.918,
+          "principal": 35.405,
           "convPrice": null,
           "convRate": null,
           "solAmount": 487000.0
         }
       ],
-      "seniorDebt": 196.97,
+      "seniorDebt": 197.46,
       "capStructAsOf": "2026-11-17 (DFDV dashboard)",
       "prefNotional": 15.81,
       "prefBreakdown": [
@@ -8925,7 +8925,7 @@
           14.0
         ]
       ],
-      "annualObligations": 11.99,
+      "annualObligations": 12.01,
       "prefPrice": 10.0,
       "prefChangePct": 0.21,
       "prefHistory": {
@@ -10612,7 +10612,7 @@
       "borrowFee": {
         "pct": 4.12,
         "avail": 1100000,
-        "asOf": "2026-11-16 21:59:05"
+        "asOf": "2026-11-16 23:01:46"
       },
       "borrowFeeHist": {
         "iso": [
@@ -10659,7 +10659,7 @@
       "prefBorrowFee": {
         "pct": 69.36,
         "avail": 6000,
-        "asOf": "2026-11-16 21:59:05"
+        "asOf": "2026-11-16 23:01:46"
       },
       "prefBorrowFeeHist": {
         "iso": [
@@ -13652,7 +13652,8 @@
       "d": "2026-09-11",
       "co": "DFDV",
       "items": [
-        "SOL & equivalents +55,491 \u2192 2,388,923"
+        "SOL & equivalents +55,491 \u2192 2,388,923",
+        "Established CHAD ATM: up to 30,000,000 shares"
       ],
       "filed": "2026-09-14",
       "url": "https://www.sec.gov/Archives/edgar/data/1805526/000180552626000107/dfdv-20260914.htm"
@@ -14679,7 +14680,7 @@
     "options": [
       {
         "name": "apxUSD / PT-apyUSD-5NOV2026",
-        "apy": 27.77
+        "apy": 27.88
       },
       {
         "name": "apxUSD / PT-apxUSD-5NOV2026",
@@ -14691,10 +14692,10 @@
       },
       {
         "name": "Apyx apxUSD vault",
-        "apy": 6.89
+        "apy": 6.91
       }
     ]
   },
-  "solPriceUsd": 71.7,
-  "solCirculating": 591684198
+  "solPriceUsd": 72.7,
+  "solCirculating": 591684183
 }
