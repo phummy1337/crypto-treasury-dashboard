@@ -157,7 +157,6 @@
   .lb-stats { display:flex; gap:24px; }
   .lb-stat .v { font-size:24px; line-height:32px; font-weight:600; color:#fff; white-space:nowrap; }
   .lb-stat .s { font-size:12px; line-height:18px; }
-  .lb-stat .lb-pips { color:#FFE788; }
   .lb-cta { flex:0 0 auto; padding:0 16px; line-height:48px; border-radius:8px; background:#F7F5F5;
     color:#131111; font-size:14px; font-weight:500; white-space:nowrap; }
   .lb-cta:hover { background:#fff; text-decoration:none; }
@@ -546,10 +545,8 @@
           <!-- hidden until renderLendingBanner() has a live figure -->
           <div class="lb-stat" id="lb-apy" style="display:none"><div class="v" id="lb-apy-v"></div>
             <div class="s">lending APY · variable</div></div>
-          <div class="lb-stat"><div class="v lb-pips">100× Pips</div>
-            <div class="s">on <span id="lb-count">4</span> lending options</div></div>
         </div>
-        <a class="lb-cta" href="https://app.apyx.fi/discover?tab=lending&amp;campaign=boosted-pips" target="_blank" rel="noopener">Explore lending</a>
+        <a class="lb-cta" href="https://app.apyx.fi/discover?tab=lending" target="_blank" rel="noopener">Explore lending</a>
       </div>
     </aside>
   </header>
@@ -1632,16 +1629,16 @@ function renderActions(){
   }).join("");
 }
 
-// The lending banner quotes the best APY among the options refresh_data.py reads
-// (fetch_lending) and counts them. A data.json from before the banner has no lending
-// block, so the figure stays hidden rather than falling back to a typed-in number.
+// The lending banner quotes the best APY among the apxUSD lending options that
+// refresh_data.py reads from Apyx's discover feed (fetch_lending). With no options, or
+// no lending block at all, the figure stays hidden rather than falling back to a
+// typed-in number.
 function renderLendingBanner(){
   const stat = document.getElementById("lb-apy"); if(!stat) return;
   const opts = (DATA.lending && DATA.lending.options) || [];
   const apys = opts.map(o => o.apy).filter(v => typeof v === "number" && isFinite(v));
   stat.style.display = apys.length ? "" : "none";
   if(apys.length) document.getElementById("lb-apy-v").textContent = "Up to " + fmt(Math.max(...apys), 2) + "%";
-  if(opts.length) document.getElementById("lb-count").textContent = opts.length;
 }
 
 // Trailing mNAV averages beside each Company Stats chart, so today's multiple has
