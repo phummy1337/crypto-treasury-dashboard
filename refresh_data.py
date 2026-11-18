@@ -20,8 +20,8 @@ WHAT WORKS OUT OF THE BOX
     "BTC Update" table, Strive's "Bitcoin held" table), rebuilds data["weekly"]
     and refreshes current holdings / % of supply.
 
-  - apxUSD lending APYs for the lending banner -> Morpho API (open GraphQL, no
-    key). See fetch_lending().
+  - apxUSD lending APYs for the lending banner -> Apyx's discover feed
+    (api.apyx.fi, no key). See fetch_lending().
 
 WHAT NEEDS WIRING (per-source TODOs below)
   per-share / yield (strategy.com, treasury.strive.com) and CEBE / claims% /
@@ -51,6 +51,7 @@ Dependencies: requests  (pip3 install requests)
 
 import bisect
 import json
+import math
 import re
 import sys
 import ssl
@@ -80,13 +81,6 @@ except Exception:
 # --------------------------------------------------------------------------- #
 def get_json(url, timeout=15):
     req = urllib.request.Request(url, headers=UA)
-    with urllib.request.urlopen(req, timeout=timeout, context=_SSL_CTX) as r:
-        return json.loads(r.read().decode())
-
-
-def post_json(url, payload, timeout=15):
-    req = urllib.request.Request(url, data=json.dumps(payload).encode(),
-                                 headers={**UA, "Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=timeout, context=_SSL_CTX) as r:
         return json.loads(r.read().decode())
 
@@ -2921,44 +2915,61 @@ def fetch_borrow_fees(data):
 
 
 # --------------------------------------------------------------------------- #
-# apxUSD lending banner: Morpho API (open GraphQL, no key)
+# apxUSD lending banner: Apyx's discover feed (open, no key)
 # --------------------------------------------------------------------------- #
-MORPHO_GRAPHQL = "https://api.morpho.org/graphql"
-# (kind, Morpho id, label). The banner's "Up to" quotes the best of these, and its
-# "on 4 lending options" counts them. The ids are the ones app.morpho.org links to.
-APXUSD_LENDING = [
-    ("market", "0xebd23a871b52e0a8c92bd719f4413600101b69e946cb72923b3a33fb5bc6ec85", "apxUSD / PT-apyUSD-5NOV2026"),
-    ("market", "0xd86df29b48f2d88a0453027212247a29e68ff52c6589c46054f57285da2fa7e3", "apxUSD / PT-apxUSD-5NOV2026"),
-    ("market", "0xe23380494e365453f72f736f2d941959ae945773eb67a06cf4f538c7c4201264", "apxUSD / apyUSD"),
-    ("vault", "0x3a618E9D4159dff94E90bd6239161dE4dd7C0082", "Apyx apxUSD vault"),
-]
+# The list app.apyx.fi/discover shows. Apyx drops an option from it when the option
+# ends, so nothing here names a market and nothing goes stale when one matures.
+APYX_API = "https://api.apyx.fi"
+
+
+def _apxusd_lending_options(items, now):
+    """[{name, apy}] for each discover entry that lends apxUSD on Morpho and hasn't matured.
+
+    The feed names a market's collateral first and the asset it lends last, and the
+    vault names only apxUSD, so an entry lends apxUSD when apxUSD comes last. A
+    matured market is dropped even while the feed still lists it: PT-apyUSD-5NOV2026
+    kept $237k borrowed after it matured on 5 Nov 2026, its supply rate ran past 30%,
+    and the banner said "Up to 29.91%" on 17 Nov. An entry without a usable APY is
+    left out.
+    """
+    options = []
+    for item in items:
+        symbols = item.get("assetSymbols") or []
+        expires = item.get("expiresAt")
+        if item.get("protocol") != "Morpho" or symbols[-1:] != ["apxUSD"]:
+            continue
+        if expires and datetime.datetime.fromisoformat(expires.replace("Z", "+00:00")) <= now:
+            continue
+        try:
+            apy = float(item.get("apy"))      # already in %, unlike Morpho's own API
+        except (TypeError, ValueError):
+            continue
+        if math.isfinite(apy) and apy >= 0:
+            options.append({"name": str(item.get("name"))[:80], "apy": round(apy, 2)})
+    return options
 
 
 def fetch_lending(data):
-    """The APY of each apxUSD lending option in APXUSD_LENDING, from the Morpho API.
+    """apxUSD's Morpho lending options and their APYs, from Apyx's discover feed.
 
-    Markets report avgNetSupplyApy, the figure api.apyx.fi/v1/lending/markets
-    republishes (matched to 4 dp on 2026-09-28), so the banner agrees with the lending
-    tab its button opens. That feed lists no vault, hence Morpho. The vault is a Vault
-    V2 and reports avgNetApy, net of its performance fee. All or nothing: one missing
-    option keeps the last full set, so "Up to" is never the best of three.
+    The banner quotes the best of them. A failed read keeps the last block, like every
+    other fetcher. A read that finds no options is believed: the banner hides its figure
+    rather than quote a stale one.
     """
     try:
-        fields = [f'o{i}: marketById(marketId: "{ident}", chainId: 1) {{ state {{ avgNetSupplyApy }} }}'
-                  if kind == "market" else
-                  f'o{i}: vaultV2ByAddress(address: "{ident}", chainId: 1) {{ avgNetApy }}'
-                  for i, (kind, ident, _) in enumerate(APXUSD_LENDING)]
-        res = post_json(MORPHO_GRAPHQL, {"query": "{ " + " ".join(fields) + " }"})["data"]
-        options = []
-        for i, (kind, _, label) in enumerate(APXUSD_LENDING):
-            node = res[f"o{i}"]
-            apy = node["state"]["avgNetSupplyApy"] if kind == "market" else node["avgNetApy"]
-            options.append({"name": label, "apy": round(float(apy) * 100, 2)})
+        season = get_json(f"{APYX_API}/v1/rewards/seasons")["data"]["currentSeason"]
+        if type(season) is not int:         # it goes into the next URL
+            raise ValueError(f"current season {season!r}")
+        items = get_json(f"{APYX_API}/v1/rewards/seasons/{season}/discover")["data"]["items"]
+        options = _apxusd_lending_options(items, datetime.datetime.now(datetime.timezone.utc))
         data["lending"] = {"asOf": datetime.date.today().isoformat(), "options": options}
-        best = max(options, key=lambda o: o["apy"])
-        log(f"[lending] apxUSD up to {best['apy']:.2f}% ({best['name']}) across {len(options)} options")
+        if options:
+            best = max(options, key=lambda o: o["apy"])
+            log(f"[lending] apxUSD up to {best['apy']:.2f}% ({best['name']}) across {len(options)} options")
+        else:
+            log("[lending] Apyx's discover feed lists no apxUSD lending on Morpho — banner figure hidden")
     except Exception as e:
-        log(f"[skip] Morpho lending APY: {e} — keeping existing values")
+        log(f"[skip] Apyx lending APYs: {e} — keeping existing values")
 
 
 # --------------------------------------------------------------------------- #
@@ -3619,7 +3630,7 @@ def main():
     fetch_atm(data)                   # preferred ATM issuance estimate + filing calibration
     apply_sats_proceeds(data)         # SATS cash belongs with the SATS claim
     rebase_mnav_holdings(data)        # filings beat the tracker's stale daily BTC balance
-    fetch_lending(data)               # Morpho API: apxUSD lending APYs for the banner
+    fetch_lending(data)               # Apyx discover feed: apxUSD lending APYs for the banner
     # debt schedule + preferred breakdown are parsed from the 10-Q (see notes);
     # cebe / per-share / valuation are computed live in the dashboard.
 
