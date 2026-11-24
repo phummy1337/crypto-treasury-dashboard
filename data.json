@@ -1,9 +1,9 @@
 {
   "asOf": "2026-11-24",
   "priceAsOf": "2026-11-24",
-  "btcPriceUsd": 60636,
+  "btcPriceUsd": 60390,
   "btcSupply": 21000000,
-  "btcCirculating": 20116503,
+  "btcCirculating": 20116606,
   "companies": {
     "MSTR": {
       "name": "Strategy",
@@ -965,7 +965,7 @@
           1.51,
           1.5
         ],
-        "dtcLive": 1.26
+        "dtcLive": 1.19
       },
       "daysToCover": 1.43,
       "prefHistory": {
@@ -4384,7 +4384,7 @@
       "borrowFee": {
         "pct": 0.41,
         "avail": 10000000,
-        "asOf": "2026-11-23 21:26:02"
+        "asOf": "2026-11-23 23:46:59"
       },
       "borrowFeeHist": {
         "iso": [
@@ -4555,7 +4555,7 @@
       "prefBorrowFee": {
         "pct": 1.06,
         "avail": 850000,
-        "asOf": "2026-11-23 21:26:02"
+        "asOf": "2026-11-23 23:46:59"
       },
       "prefBorrowFeeHist": {
         "iso": [
@@ -4725,12 +4725,12 @@
       },
       "assumedDilutedShares": 459.19,
       "_dilOverlayM": 29.5711,
-      "netSatsPerShare": 141507,
+      "netSatsPerShare": 141345,
       "netMnavPub": 0.9711,
-      "amplificationPub": 1.3875,
-      "breakevenArrPub": 2.7305,
+      "amplificationPub": 1.3891,
+      "breakevenArrPub": 2.7386,
       "hurdleArrPub": 10.4446,
-      "floorArrPub": -14.7751,
+      "floorArrPub": -14.7277,
       "creditDurationPub": 5.8623,
       "netDilutedShares": 433.58,
       "atm": {
@@ -5091,7 +5091,7 @@
         "latestOnEdgar": "2026-11-23",
         "ingested": "2026-11-23"
       },
-      "netLeveragePub": 3.6818,
+      "netLeveragePub": 3.6927,
       "costBasisFiledM": 64230,
       "rvol": {
         "mult": 0.93,
@@ -5494,7 +5494,7 @@
           1.89,
           2.17
         ],
-        "dtcLive": 2.45
+        "dtcLive": 2.32
       },
       "daysToCover": 2.14,
       "prefHistory": {
@@ -8050,7 +8050,7 @@
       "borrowFee": {
         "pct": 0.66,
         "avail": 3900000,
-        "asOf": "2026-11-23 21:26:02"
+        "asOf": "2026-11-23 23:46:59"
       },
       "borrowFeeHist": {
         "iso": [
@@ -8221,7 +8221,7 @@
       "prefBorrowFee": {
         "pct": 25.54,
         "avail": 550000,
-        "asOf": "2026-11-23 21:26:02"
+        "asOf": "2026-11-23 23:46:59"
       },
       "prefBorrowFeeHist": {
         "iso": [
@@ -8391,7 +8391,7 @@
       },
       "_dilOverlayM": 2.7136,
       "assumedDilutedShares": 130.04,
-      "netSatsPerShare": 13250,
+      "netSatsPerShare": 13168,
       "netDilutedShares": 130.04,
       "atm": {
         "ticker": "SATA",
@@ -8923,7 +8923,8 @@
           "Nov 17",
           "Nov 18",
           "Nov 19",
-          "Nov 20"
+          "Nov 20",
+          "Nov 23"
         ],
         "iso": [
           "2026-10-20",
@@ -8949,7 +8950,8 @@
           "2026-11-17",
           "2026-11-18",
           "2026-11-19",
-          "2026-11-20"
+          "2026-11-20",
+          "2026-11-23"
         ],
         "px": [
           94.61,
@@ -8975,9 +8977,11 @@
           93.46,
           89.66,
           89.55,
-          85.76
+          85.76,
+          90.3
         ],
         "notional": [
+          700,
           700,
           700,
           700,
@@ -9039,10 +9043,10 @@
         "prefMo": 0,
         "commonMo": 0
       },
-      "stockPrice": 2.16,
-      "prevClose": 2.55,
-      "priceDateET": "2026-11-20",
-      "dayChangePct": -15.29,
+      "stockPrice": 2.25,
+      "prevClose": 2.16,
+      "priceDateET": "2026-11-23",
+      "dayChangePct": 4.17,
       "sharesOutstanding": 39.74,
       "holdings": 2624491,
       "pctSupply": 0.4433,
@@ -9082,7 +9086,7 @@
           "coupon": 5.0,
           "maturity": null,
           "put": null,
-          "principal": 34.713,
+          "principal": 34.874,
           "convPrice": null,
           "convRate": null,
           "solAmount": 487000.0
@@ -9124,7 +9128,7 @@
           "convRate": null
         }
       ],
-      "seniorDebt": 196.77,
+      "seniorDebt": 196.93,
       "capStructAsOf": "2026-11-24 (DFDV dashboard)",
       "prefNotional": 16.01,
       "prefBreakdown": [
@@ -9136,8 +9140,8 @@
         ]
       ],
       "annualObligations": 12.01,
-      "prefPrice": 9.94,
-      "prefChangePct": -0.5,
+      "prefPrice": 9.9802,
+      "prefChangePct": 0.4,
       "prefHistory": {
         "dates": [
           "Sep 8",
@@ -9193,7 +9197,8 @@
           "Nov 17",
           "Nov 18",
           "Nov 19",
-          "Nov 20"
+          "Nov 20",
+          "Nov 23"
         ],
         "iso": [
           "2026-09-08",
@@ -9249,7 +9254,8 @@
           "2026-11-17",
           "2026-11-18",
           "2026-11-19",
-          "2026-11-20"
+          "2026-11-20",
+          "2026-11-23"
         ],
         "px": [
           8.36,
@@ -9305,7 +9311,8 @@
           10.0,
           9.93,
           9.99,
-          9.94
+          9.94,
+          9.98
         ],
         "notional": [
           13.75,
@@ -9361,14 +9368,15 @@
           16.0126,
           16.0126,
           16.0126,
+          16.0126,
           16.0126
         ]
       },
       "prefRvol": {
-        "mult": 2.7,
-        "sessionUsd": 1045320,
-        "avg30Usd": 387291,
-        "asOf": "2026-11-20"
+        "mult": 3.25,
+        "sessionUsd": 1346259,
+        "avg30Usd": 414799,
+        "asOf": "2026-11-23"
       },
       "treasuryDate": "2026-11-23",
       "yearEnd": {
@@ -9555,16 +9563,16 @@
         "basis": "basic"
       },
       "assetYieldYtd": -5.6,
-      "organicYield": 4.85,
+      "organicYield": 4.92,
       "avgCost": 156.99,
       "costBasisSol": 2148968,
       "costBasisAsOf": "2026-09-14",
       "betaAsset": 1.33,
       "rvol": {
-        "mult": 0.7,
-        "sessionUsd": 3419677,
-        "avg30Usd": 4859534,
-        "asOf": "2026-11-20"
+        "mult": 1.04,
+        "sessionUsd": 4925981,
+        "avg30Usd": 4754098,
+        "asOf": "2026-11-23"
       },
       "mnavHistory": {
         "dates": [
@@ -10117,7 +10125,7 @@
           2.16,
           2.16,
           2.16,
-          2.16
+          2.25
         ],
         "mnav": [
           1.553,
@@ -10829,7 +10837,7 @@
           3.34,
           5.72
         ],
-        "dtcLive": 4.94
+        "dtcLive": 4.54
       },
       "daysToCover": 5.53,
       "prefShortInterest": {
@@ -10863,12 +10871,12 @@
           0.55,
           0.48
         ],
-        "dtcLive": 0.3
+        "dtcLive": 0.26
       },
       "borrowFee": {
         "pct": 4.01,
         "avail": 1500000,
-        "asOf": "2026-11-23 21:26:02"
+        "asOf": "2026-11-23 23:46:59"
       },
       "borrowFeeHist": {
         "iso": [
@@ -10927,7 +10935,7 @@
       "prefBorrowFee": {
         "pct": 71.54,
         "avail": 10000,
-        "asOf": "2026-11-23 21:26:02"
+        "asOf": "2026-11-23 23:46:59"
       },
       "prefBorrowFeeHist": {
         "iso": [
@@ -12829,8 +12837,8 @@
       2.16,
       2.16,
       2.16,
-      2.16,
-      2.16
+      2.25,
+      2.25
     ]
   },
   "weekly": {
@@ -15004,15 +15012,15 @@
     "options": [
       {
         "name": "Morpho apyUSD/apxUSD Supply",
-        "apy": 4.76
+        "apy": 4.75
       },
       {
         "name": "apxUSD vault on Morpho by Hyperithm",
-        "apy": 4.91
+        "apy": 4.9
       },
       {
         "name": "Morpho PT-apxUSD-11FEB2027/apxUSD Supply",
-        "apy": 6.26
+        "apy": 6.25
       },
       {
         "name": "Morpho PT-apyUSD-11FEB2027/apxUSD Supply",
@@ -15020,6 +15028,6 @@
       }
     ]
   },
-  "solPriceUsd": 71.28,
-  "solCirculating": 592071821
+  "solPriceUsd": 71.61,
+  "solCirculating": 592071784
 }
